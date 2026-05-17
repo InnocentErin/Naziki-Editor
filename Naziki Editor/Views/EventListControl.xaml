@@ -1,0 +1,86 @@
+﻿<UserControl x:Class="Naziki_Editor.Views.EventListControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="250">
+
+    <Border Background="#F0F0F0" BorderBrush="Gray" BorderThickness="0,0,1,0">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="55"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TabControl x:Name="EventTabControl" Grid.ColumnSpan="2" TabStripPlacement="Left" 
+            Background="Transparent" BorderThickness="0"
+            SelectionChanged="EventTabControl_SelectionChanged">
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="55"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#E5E5E5" BorderBrush="#CCCCCC" BorderThickness="0,0,1,0">
+                                <TabPanel IsItemsHost="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border Grid.Column="1" Background="{TemplateBinding Background}">
+                                <ContentPresenter ContentSource="SelectedContent"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </TabControl.Template>
+
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Width" Value="45"/>
+                        <Setter Property="Height" Value="35"/>
+                        <Setter Property="FontSize" Value="10"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="HeaderTemplate">
+                            <Setter.Value>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </TabControl.Resources>
+
+                <TabItem Header="图片">
+                    <TreeView x:Name="SpriteTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="文字">
+                    <TreeView x:Name="TextTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="线条">
+                    <TreeView x:Name="LinesTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="视频">
+                    <TreeView x:Name="VideoTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="场景">
+                    <TreeView x:Name="SceneTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="音符">
+                    <TreeView x:Name="NoteCtrlTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+                <TabItem Header="模板">
+                    <TreeView x:Name="EventTemplateTreeView" Background="White" BorderThickness="0" Visibility="Collapsed"/>
+                </TabItem>
+            </TabControl>
+
+            <StackPanel x:Name="DynamicEmptyHint" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                <TextBlock Text="这里空空如也" Foreground="Gray" HorizontalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+                    <TextBlock Text="快来添加“" Foreground="LightGray" FontSize="10"/>
+                    <TextBlock Text="{Binding SelectedItem.Header, ElementName=EventTabControl}" Foreground="LightGray" FontSize="10"/>
+                    <TextBlock Text="”事件吧！" Foreground="LightGray" FontSize="10"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

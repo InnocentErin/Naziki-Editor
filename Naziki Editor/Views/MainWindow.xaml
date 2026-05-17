@@ -1,0 +1,70 @@
+﻿<Window x:Class="Naziki_Editor.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Naziki_Editor.Views"
+        Title="Naziki Editor" 
+        Height="720" Width="1280"
+        MinWidth="800" MinHeight="600">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="*" MinHeight="200"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="250" MinHeight="100" MaxHeight="600"/>
+        </Grid.RowDefinitions>
+
+        <Menu Grid.Row="0" Background="#F0F0F0" BorderBrush="LightGray" BorderThickness="0,0,0,1">
+            <MenuItem Header="文件(_F)">
+                <MenuItem Header="打开/新建项目..." Name="MenuOpenProject" Click="MenuOpenProject_Click" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="导入谱面文件..." Name="MenuImportChart" Click="MenuImportChart_Click" InputGestureText="Ctrl+I"/>
+                <MenuItem Header="保存(_S)" Name="MenuSave" InputGestureText="Ctrl+S"/>
+                <MenuItem Header="导出为 Storyboard.json"/>
+                <Separator/>
+                <MenuItem Header="退出(_X)" Name="MenuExit" Click="MenuExit_Click" InputGestureText="Alt+F4"/>
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20*" MinWidth="150"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="25*" MinWidth="250"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="40*" MinWidth="300"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="15*" MinWidth="150"/>
+            </Grid.ColumnDefinitions>
+
+            <local:EventListControl x:Name="EventList" Grid.Column="0" />
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
+
+            <local:NoteListControl x:Name="NoteList" Grid.Column="2" />
+
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
+
+            <local:CanvasControl x:Name="CanvasArea" Grid.Column="4" />
+
+            <GridSplitter Grid.Column="5" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
+
+            <local:PropertyPanelControl x:Name="PropertyPanel" Grid.Column="6" />
+        </Grid>
+
+        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#D0D0D0" Cursor="SizeNS"/>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="35*" MinWidth="200"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="65*" MinWidth="200"/>
+            </Grid.ColumnDefinitions>
+
+            <local:AssetListControl x:Name="AssetList" Grid.Column="0" />
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
+
+            <local:TimelineControl x:Name="TimelineConsole" Grid.Column="2" />
+        </Grid>
+    </Grid>
+</Window>
