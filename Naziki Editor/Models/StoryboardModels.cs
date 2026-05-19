@@ -1,141 +1,339 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Models
 {
-    // JSON 文件的总入口模具 (已加入所有对象大类！)
+    // ==========================================
+    // 🌟 一、 故事板大管家 (Storyboard Root)
+    // ==========================================
     public class StoryboardRoot
     {
-        public List<SpriteObject> sprites { get; set; } = new List<SpriteObject>();
-        public List<TextObject> texts { get; set; } = new List<TextObject>();
-        public List<LineObject> lines { get; set; } = new List<LineObject>();
-        public List<VideoObject> videos { get; set; } = new List<VideoObject>();
-        public List<ControllerObject> controllers { get; set; } = new List<ControllerObject>();
-        public List<NoteControllerObject> note_controllers { get; set; } = new List<NoteControllerObject>();
-        // 🌟 修正：Cytoid 的模板是用名字作为 Key 的字典，不是列表！
+        public List<Sprite> sprites { get; set; } = new List<Sprite>();
+        public List<Text> texts { get; set; } = new List<Text>();
+        public List<Line> lines { get; set; } = new List<Line>();
+        public List<Video> videos { get; set; } = new List<Video>();
+        public List<Controller> controllers { get; set; } = new List<Controller>();
+        public List<NoteController> note_controllers { get; set; } = new List<NoteController>();
         public Dictionary<string, StoryboardTemplate> templates { get; set; } = new Dictionary<string, StoryboardTemplate>();
     }
-        // 状态模具 (不变)
-        public class State
-    {
-        public object time { get; set; }
-        public object x { get; set; }
-        public object y { get; set; }
-        public double? opacity { get; set; }
-        public string easing { get; set; } = "linear";
-    }
 
-    // 基础对象模具 (不变)
-    public class StoryboardObject
-    {
-        public string id { get; set; }
-        public object time { get; set; }
-        public object x { get; set; }
-        public object y { get; set; }
-        public double opacity { get; set; } = 0;
-        public List<State> states { get; set; } = new List<State>();
-    }
+    public class StoryboardTemplate : StoryboardRoot { } // 模板内部其实就是个小故事板
 
-    // 1. 图片模具
-    public class SpriteObject : StoryboardObject
-    {
-        public string path { get; set; }
-    }
-
-    // 2. 文本模具
-    public class TextObject : StoryboardObject
-    {
-        public string text { get; set; }
-        public int size { get; set; } = 20;
-        public string color { get; set; } = "#fff";
-    }
-
-    // 🌟 3. 新增：视频模具
-    public class VideoObject : StoryboardObject
-    {
-        public string path { get; set; }
-        public string color { get; set; } = "#fff";
-    }
-
-    // 🌟 4. 新增：线条模具
-    public class LineObject : StoryboardObject
-    {
-        public double width { get; set; } = 0.05;
-        public string color { get; set; } = "#fff";
-        public List<Vertex> pos { get; set; } = new List<Vertex>(); // 线条有很多端点
-    }
-
-    // 线条端点专用的模具
-    public class Vertex
-    {
-        public object x { get; set; }
-        public object y { get; set; }
-        public object z { get; set; }
-    }
-
-    // 🌟 5. 新增：场景控制器模具 (它没有具体的坐标，主要管大局)
-    public class ControllerObject
-    {
-        public object time { get; set; }
-        // 这里面的属性太多太杂，对于初学者，我们先用百宝箱接着，保证不崩溃
-        public List<object> states { get; set; } = new List<object>();
-    }
-
-    // 🌟 6. 新增：音符控制器模具 (操控游戏里的 note)
-    public class NoteControllerObject
-    {
-        // 音符对象不仅能填数字，还能填选择器，必须用 object！
-        public object note { get; set; }
-        public object time { get; set; }
-        public List<object> states { get; set; } = new List<object>();
-
-        // 🌟 7. 新增：模板专用模具 (Template)
-        // 模板其实就是一个带名字(id)的“微型故事板”，它可以打包一堆子对象！
-        
-    }
-    public class StoryboardTemplate
-    {
-        // 模板的唯一名字（我们刚才就是靠读这个名字在列表里显示的！）
-        // 模板肚子里能装的宝贝（和外层的 Root 一模一样，准备好篮子接着！）
-        public List<SpriteObject> sprites { get; set; } = new List<SpriteObject>();
-        public List<TextObject> texts { get; set; } = new List<TextObject>();
-        public List<LineObject> lines { get; set; } = new List<LineObject>();
-        public List<VideoObject> videos { get; set; } = new List<VideoObject>();
-        public List<ControllerObject> controllers { get; set; } = new List<ControllerObject>();
-        public List<NoteControllerObject> note_controllers { get; set; } = new List<NoteControllerObject>();
-    }
     // ==========================================
-    // 🌟 8. 专属子对象：音符控制器事件选择器 
+    // 🌟 二、 官方枚举字典 (Enums)
     // ==========================================
-    public class NoteCtrlEventSelect
+    public enum Easing
     {
-        // Cytoid 官方支持的常见筛选属性
-        public int? type { get; set; }       // 过滤音符类型 (如 Click=0, Hold=1 等)
-        public int? page { get; set; }       // 过滤所在的页码
-        public int? id { get; set; }         // 显式指定起始 ID
-        public int? min_tick { get; set; }   // 时间轴 Tick 下限
-        public int? max_tick { get; set; }   // 时间轴 Tick 上限
+        None = 0, EaseInQuad = 1, EaseOutQuad = 2, EaseInOutQuad = 3, EaseInCubic = 4, EaseOutCubic = 5, EaseInOutCubic = 6,
+        EaseInQuart = 7, EaseOutQuart = 8, EaseInOutQuart = 9, EaseInQuint = 10, EaseOutQuint = 11, EaseInOutQuint = 12,
+        EaseInSine = 13, EaseOutSine = 14, EaseInOutSine = 15, EaseInExpo = 16, EaseOutExpo = 17, EaseInOutExpo = 18,
+        EaseInCirc = 19, EaseOutCirc = 20, EaseInOutCirc = 21, Linear = 22, Spring = 23, EaseInBounce = 24,
+        EaseOutBounce = 25, EaseInOutBounce = 26, EaseInBack = 27, EaseOutBack = 28, EaseInOutBack = 29,
+        EaseInElastic = 30, EaseOutElastic = 31, EaseInOutElastic = 32, Blink = 33
+    }
 
-        // 🪄 核心魔法：动态计算对象名称（严格遵守主人定的规矩：只抓取前三个有值的属性！）
-        public string DisplayName
+    public enum ReferenceUnit { World, StageX, StageY, NoteX, NoteY, CameraX, CameraY }
+    public enum FontWeight { ExtraLight, Regular, Bold, ExtraBold }
+    public enum TriggerType { NoteClear, Combo, Score, None }
+
+
+
+    // ==========================================
+    // 🌟 高级翻译官：专门教程序怎么认 Cytoid 的混合坐标！
+    // ==========================================
+    public class UnitFloatConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) => objectType == typeof(UnitFloat);
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            get
+            JToken token = JToken.Load(reader);
+
+            // 🎯 情况 1：如果是纯数字 (比如 0.5)
+            if (token.Type == JTokenType.Float || token.Type == JTokenType.Integer)
             {
-                var activeProps = new List<string>();
+                return new UnitFloat { Value = (float)token, Unit = ReferenceUnit.World };
+            }
+            // 🎯 情况 2：如果是带单位的字符串 (比如 "noteX:0.02")
+            else if (token.Type == JTokenType.String)
+            {
+                string str = (string)token;
+                var split = str.Split(':');
+                if (split.Length == 2)
+                {
+                    // 尝试把 "noteX" 翻译成枚举 ReferenceUnit.NoteX
+                    if (Enum.TryParse(split[0], true, out ReferenceUnit unit))
+                    {
+                        return new UnitFloat { Value = float.Parse(split[1]), Unit = unit };
+                    }
+                }
+                else if (split.Length == 1)
+                {
+                    // 如果只有数字没有冒号
+                    return new UnitFloat { Value = float.Parse(split[0]), Unit = ReferenceUnit.World };
+                }
+            }
+            // 🎯 情况 3：如果是咱们自己编辑器保存出来的标准对象
+            else if (token.Type == JTokenType.Object)
+            {
+                var obj = token as JObject;
+                var uf = new UnitFloat();
+                if (obj["Value"] != null) uf.Value = (float)obj["Value"];
+                if (obj["Unit"] != null && Enum.TryParse(obj["Unit"].ToString(), true, out ReferenceUnit u)) uf.Unit = u;
+                return uf;
+            }
 
-                // 挨个检查哪些属性被主人宠幸（赋值）了
-                if (type.HasValue) activeProps.Add($"类型={type.Value}");
-                if (page.HasValue) activeProps.Add($"页码={page.Value}");
-                if (id.HasValue) activeProps.Add($"ID={id.Value}");
-                if (min_tick.HasValue) activeProps.Add($"MinTick={min_tick.Value}");
-                if (max_tick.HasValue) activeProps.Add($"MaxTick={max_tick.Value}");
+            return new UnitFloat(); // 兜底保护
+        }
 
-                // 如果全都是空的，给一个温馨的兜底提示
-                if (activeProps.Count == 0) return "未配置选择器";
+        public override bool CanWrite => false; // 序列化时按默认格式输出即可
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) => throw new NotImplementedException();
+    }
 
-                // 🔮 关键点：使用 Linq 的 Take(3) 强行截取前三个有效属性进行拼接
-                var displayList = activeProps.Take(3);
-                return "选择器: {" + string.Join(", ", displayList) + "}";
+    // ==========================================
+    // 🌟 高级翻译官 2 号：专门处理 Cytoid 的多维时间！
+    // ==========================================
+    public class TimeObjectConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) => true;
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JToken token = JToken.Load(reader);
+
+            // 🎯 情况 1：如果是官方的“高级语法糖数组” (比如 ["start:57", "start:123"])
+            if (token.Type == JTokenType.Array)
+            {
+                var list = new List<object>();
+                foreach (var item in token)
+                {
+                    if (item.Type == JTokenType.Float || item.Type == JTokenType.Integer)
+                        list.Add((float)item); // 纯数字
+                    else
+                        list.Add(item.ToString()); // 字符串锚点
+                }
+                return list; // 返回一个 C# 的 List<object>
+            }
+            // 🎯 情况 2：如果是普通的数字 (比如 3.14)
+            else if (token.Type == JTokenType.Float || token.Type == JTokenType.Integer)
+            {
+                return (float)token;
+            }
+            // 🎯 情况 3：如果是单一的字符串锚点 (比如 "start:1134")
+            else
+            {
+                return token.ToString();
             }
         }
+
+        public override bool CanWrite => false;
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) => throw new NotImplementedException();
+    }
+
+
+
+
+    // ==========================================
+    // 🌟 三、 官方核心数据结构 (Structs / Classes)
+    // ==========================================
+    [Serializable]
+    [JsonConverter(typeof(UnitFloatConverter))]
+    public class UnitFloat
+    {
+        public float Value { get; set; }
+        public ReferenceUnit Unit { get; set; }
+        public bool ScaleToCanvas { get; set; }
+        public bool Span { get; set; }
+
+        public UnitFloat() { }
+        public UnitFloat(float value, ReferenceUnit unit, bool scaleToCanvas, bool span)
+        {
+            Value = value; Unit = unit; ScaleToCanvas = scaleToCanvas; Span = span;
+        }
+    }
+
+    [Serializable]
+    public class CytoidColor
+    {
+        public float A { get; set; } = 1;
+        public float B { get; set; } = 255;
+        public float G { get; set; } = 255;
+        public float R { get; set; } = 255;
+    }
+
+    [Serializable]
+    public class LinePosition
+    {
+        public UnitFloat X { get; set; }
+        public UnitFloat Y { get; set; }
+        public UnitFloat Z { get; set; }
+    }
+
+    [Serializable]
+    public class Trigger
+    {
+        public int? Combo { get; set; }
+        [JsonIgnore] public int CurrentUses { get; set; }
+        public List<string> Destroy { get; set; } = new List<string>();
+        public List<int> Notes { get; set; } = new List<int>();
+        public int? Score { get; set; }
+        public List<string> Spawn { get; set; } = new List<string>();
+        public TriggerType Type { get; set; } = TriggerType.None;
+        public int? Uses { get; set; }
+    }
+
+    [Serializable]
+    public class NoteCtrlEventSelect
+    {
+        public HashSet<int> Types { get; set; } = new HashSet<int>();
+        public int Start { get; set; } = int.MinValue;
+        public int End { get; set; } = int.MaxValue;
+        public int? Direction { get; set; }
+        public float MinX { get; set; } = int.MinValue;
+        public float MaxX { get; set; } = int.MaxValue;
+
+        [JsonIgnore]
+        public string DisplayName => $"筛选器: {(Types.Count > 0 ? "Type:" + Types.First() : "范围")} ({Start}~{End})";
+    }
+
+    // ==========================================
+    // 🌟 四、 状态基因组 (States)
+    // ==========================================
+    [Serializable]
+    public class ObjectState
+    {
+        // 🌟 核心修正：为了兼容 "start:xxx" 这种字符串锚点，这里必须用 object！
+        [JsonConverter(typeof(TimeObjectConverter))]
+        public object AddTime { get; set; }
+        public bool? Destroy { get; set; }
+        public Easing? Easing { get; set; }
+
+        // 🌟 核心修正：相对时间也可能有特殊格式，用 object！
+        [JsonConverter(typeof(TimeObjectConverter))]
+        public object RelativeTime { get; set; }
+
+        // 🌟 核心修正：绝对时间/音符锚点，兼容数字与字符串！
+        [JsonConverter(typeof(TimeObjectConverter))]
+        public object Time { get; set; } = float.MaxValue;
+    }
+
+    [Serializable]
+    public class StageObjectState : ObjectState
+    {
+        public bool? FillWidth { get; set; }
+        public UnitFloat Height { get; set; }
+        public int? Layer { get; set; }
+        public float? Opacity { get; set; }
+        public int? Order { get; set; }
+        public float? PivotX { get; set; }
+        public float? PivotY { get; set; }
+        public float? RotX { get; set; }
+        public float? RotY { get; set; }
+        public float? RotZ { get; set; }
+        public float? ScaleX { get; set; }
+        public float? ScaleY { get; set; }
+        public UnitFloat Width { get; set; }
+        public UnitFloat X { get; set; }
+        public UnitFloat Y { get; set; }
+        public UnitFloat Z { get; set; }
+    }
+
+    [Serializable]
+    public class SpriteState : StageObjectState
+    {
+        public CytoidColor Color { get; set; }
+        public string Path { get; set; }
+        public bool? PreserveAspect { get; set; }
+    }
+
+    [Serializable]
+    public class TextState : StageObjectState
+    {
+        public string Align { get; set; }
+        public CytoidColor Color { get; set; }
+        public string Font { get; set; }
+        public int? Size { get; set; }
+        public string Text { get; set; }
+        public float? LetterSpacing { get; set; }
+        public FontWeight? FontWeight { get; set; }
+    }
+
+    [Serializable]
+    public class VideoState : StageObjectState
+    {
+        public CytoidColor Color { get; set; }
+        public string Path { get; set; }
+    }
+
+    [Serializable]
+    public class LineState : StageObjectState
+    {
+        public List<LinePosition> Pos { get; set; } = new List<LinePosition>();
+        public UnitFloat Width { get; set; }
+        public CytoidColor Color { get; set; }
+        public float? Opacity { get; set; }
+        public int? Layer { get; set; }
+        public int? Order { get; set; }
+    }
+
+    [Serializable]
+    public class ControllerState : ObjectState
+    {
+        public bool? Arcade { get; set; }
+        public float? ArcadeContrast { get; set; }
+        public float? ArcadeIntensity { get; set; }
+        // ... (为节省篇幅，省略部分 Controller 高级特效，您需要时可根据官方代码全量补齐)
+        public float? StoryboardOpacity { get; set; }
+        public float? BackgroundDim { get; set; }
+        public float? UiOpacity { get; set; }
+    }
+
+    [Serializable]
+    public class NoteControllerState : ObjectState
+    {
+        public int? Note { get; set; }
+        public bool? OverrideX { get; set; }
+        public UnitFloat X { get; set; }
+        public float? XMultiplier { get; set; }
+        public float? XOffset { get; set; }
+        public float? OpacityMultiplier { get; set; }
+        public float? SizeMultiplier { get; set; }
+    }
+
+    // ==========================================
+    // 🌟 五、 实体基类与泛型 (Objects)
+    // ==========================================
+    [Serializable]
+    public abstract class StoryboardObject
+    {
+        public string Id { get; set; }
+        public string TargetId { get; set; }
+        public string ParentId { get; set; }
+    }
+
+    [Serializable]
+    public class StoryboardObject<T> : StoryboardObject where T : ObjectState
+    {
+        public List<T> States { get; set; } = new List<T>();
+    }
+
+    [Serializable]
+    public class StageObject<TS> : StoryboardObject<TS> where TS : StageObjectState { }
+
+    [Serializable] public class Sprite : StageObject<SpriteState> { }
+    [Serializable] public class Text : StageObject<TextState> { }
+    [Serializable] public class Video : StageObject<VideoState> { }
+    [Serializable] public class Line : StageObject<LineState> { }
+    [Serializable] public class Controller : StoryboardObject<ControllerState> { }
+
+    // 🌟 音符控制器比较特殊，它有一个 note 字段用于绑定目标 (数字 或 JObject 选择器)
+    [Serializable]
+    public class NoteController : StoryboardObject<NoteControllerState>
+    {
+        [JsonProperty("note")]
+        public object NoteTarget { get; set; }
     }
 }

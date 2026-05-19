@@ -13,38 +13,37 @@ namespace Naziki_Editor.Core
         // ==========================================
         // 💍 核心机制：尝试触发谱面与故事板的联姻
         // ==========================================
+        // 🌟 修复：参数类型从 TreeView 改为 ListBox
         public static void TryTriggerAutoLink(
             C2Chart chart,
             StoryboardRoot storyboardRoot,
             ChartTimeEngine engine,
-            TreeView noteCtrlTreeView,
+            ListBox noteCtrlListBox,
             Action updateEmptyHintAction)
         {
-            // 🌟 修正1：全部统一使用传进来的局部参数名（没有下划线）！
             if (chart == null || storyboardRoot == null) return;
             if (storyboardRoot.note_controllers == null || storyboardRoot.note_controllers.Count == 0) return;
 
             var result = MessageBox.Show(
-                "检测到谱面与故事板均已就位！✨\n是否让故事板的音符控制器与谱面文件自动配对？\n(请确保该故事板基于你所上传的谱面文件制作)",
+                "检测到谱面与故事板均已就位！✨\n是否让故事板的音符控制器与谱面文件自动配对？\n(做出选择前，一定要确定这个故事板是基于你所上传的谱面文件制作的哦！)",
                 "自动配对询问",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
             if (result == MessageBoxResult.Yes)
             {
-                // 🌟 修正2：呼叫执行方法时，把口袋里的参数全部打包传过去！
-                ExecuteAutoLink(chart, storyboardRoot, engine, noteCtrlTreeView, updateEmptyHintAction);
+                ExecuteAutoLink(chart, storyboardRoot, engine, noteCtrlListBox, updateEmptyHintAction);
             }
         }
 
         // ==========================================
-        // 💍 核心机制：执行联姻 UI 替换
+        // 💍 核心机制：执行联姻 UI 替换（ListBox 扁平降维版！）
         // ==========================================
         private static void ExecuteAutoLink(
             C2Chart chart,
             StoryboardRoot storyboardRoot,
             ChartTimeEngine engine,
-            TreeView noteCtrlTreeView,
+            ListBox noteCtrlListBox, // 🌟 修复：接收 ListBox
             Action updateEmptyHintAction)
         {
             // 1. 🛡️ 向逻辑兵工厂索要体检报告！
@@ -58,46 +57,47 @@ namespace Naziki_Editor.Core
             }
 
             // 2. 🪄 体检通过！UI 专职负责华丽大变身！
-            noteCtrlTreeView.Items.Clear();
-            TreeViewItem folder = new TreeViewItem() { Header = $"音符控制 NoteCtrls ({storyboardRoot.note_controllers.Count})" };
+            noteCtrlListBox.Items.Clear();
 
+            // 🌟 扁平化：不再需要 Folder 文件夹了，直接把音符控制器拍扁塞进去！
             foreach (var ctrl in storyboardRoot.note_controllers)
             {
-                if (ctrl.note == null) continue;
+                if (ctrl.NoteTarget == null) continue;
 
-                // 情况 A：它是普通的数字 ID（去谱面里找对应的数据画出来）
-                if (ctrl.note is long || ctrl.note is int || long.TryParse(ctrl.note.ToString(), out _))
+                // 情况 A：它是普通的数字 ID
+                if (ctrl.NoteTarget is long || ctrl.NoteTarget is int || long.TryParse(ctrl.NoteTarget.ToString(), out _))
                 {
-                    int targetId = Convert.ToInt32(ctrl.note);
+                    int targetId = Convert.ToInt32(ctrl.NoteTarget);
                     var matchedNote = chart.note_list.FirstOrDefault(n => n.id == targetId);
 
                     if (matchedNote != null)
                     {
-                        double time = engine.TickToSeconds(matchedNote.tick);
-                        string noteInfo = $"ID: {matchedNote.id} | 时间: {time:0.000}s | X: {matchedNote.x}";
-                        folder.Items.Add(new TreeViewItem() { Header = noteInfo });
+                        // 🌟 制造 ListBoxItem，并扣上 Tag！
+                        var item = new ListBoxItem() { Tag = ctrl };
+                        item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = ctrl });
+                        noteCtrlListBox.Items.Add(item);
                     }
                     else
                     {
-                        folder.Items.Add(new TreeViewItem() { Header = $"Note ID: {targetId} (谱面未命中)", Foreground = Brushes.Gray });
+                        var item = new ListBoxItem() { Content = $"Note ID: {targetId} (谱面未命中)", Foreground = Brushes.Gray, Tag = ctrl };
+                        noteCtrlListBox.Items.Add(item);
                     }
                 }
                 // 情况 B：它是强类型的选择器对象
-                else if (ctrl.note is Newtonsoft.Json.Linq.JObject jobj)
+                else if (ctrl.NoteTarget is Newtonsoft.Json.Linq.JObject jobj)
                 {
                     try
                     {
-                        var selector = jobj.ToObject<NoteCtrlEventSelect>();
-                        folder.Items.Add(new TreeViewItem() { Header = selector.DisplayName, Foreground = Brushes.DarkCyan, FontWeight = FontWeights.Bold });
+                        var item = new ListBoxItem() { Tag = ctrl, Foreground = Brushes.DarkCyan, FontWeight = FontWeights.Bold };
+                        item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = ctrl });
+                        noteCtrlListBox.Items.Add(item);
                     }
                     catch
                     {
-                        folder.Items.Add(new TreeViewItem() { Header = $"未知选择器" });
+                        noteCtrlListBox.Items.Add(new ListBoxItem() { Content = $"未知选择器", Tag = ctrl });
                     }
                 }
             }
-
-            noteCtrlTreeView.Items.Add(folder);
 
             // 远程呼叫主窗体刷新“空空如也”
             updateEmptyHintAction?.Invoke();
@@ -117,11 +117,11 @@ namespace Naziki_Editor.Core
             long maxStoryboardId = -1;
             foreach (var ctrl in storyboard.note_controllers)
             {
-                if (ctrl.note != null)
+                if (ctrl.NoteTarget != null)
                 {
-                    if (ctrl.note is long l) maxStoryboardId = System.Math.Max(maxStoryboardId, l);
-                    else if (ctrl.note is int i) maxStoryboardId = System.Math.Max(maxStoryboardId, i);
-                    else if (long.TryParse(ctrl.note.ToString(), out long parsed)) maxStoryboardId = System.Math.Max(maxStoryboardId, parsed);
+                    if (ctrl.NoteTarget is long l) maxStoryboardId = System.Math.Max(maxStoryboardId, l);
+                    else if (ctrl.NoteTarget is int i) maxStoryboardId = System.Math.Max(maxStoryboardId, i);
+                    else if (long.TryParse(ctrl.NoteTarget.ToString(), out long parsed)) maxStoryboardId = System.Math.Max(maxStoryboardId, parsed);
                 }
             }
 

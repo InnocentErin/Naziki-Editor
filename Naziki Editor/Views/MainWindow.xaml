@@ -4,56 +4,123 @@
         xmlns:local="clr-namespace:Naziki_Editor.Views"
         Title="Naziki Editor" 
         Height="720" Width="1280"
-        MinWidth="800" MinHeight="600">
+        MinWidth="800" MinHeight="600"
+        WindowStyle="None" x:Name="MainWindowInstance"
+        Background="{DynamicResource MainBgColor}" 
+        BorderBrush="{DynamicResource BorderColor}"
+        Foreground="{DynamicResource MainTextColor}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="30" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="TitleBarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextColor}"/>
+            <Setter Property="Width" Value="45"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TitleBarCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="30"/>
             <RowDefinition Height="25"/>
-            <RowDefinition Height="*" MinHeight="200"/>
+            <RowDefinition Height="65*" MinHeight="200"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="250" MinHeight="100" MaxHeight="600"/>
+            <RowDefinition Height="35*" MinHeight="200"/>
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0" Background="#F0F0F0" BorderBrush="LightGray" BorderThickness="0,0,0,1">
-            <MenuItem Header="文件(_F)">
-                <MenuItem Header="打开/新建项目..." Name="MenuOpenProject" Click="MenuOpenProject_Click" InputGestureText="Ctrl+O"/>
+        <Border Grid.Row="0" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
+            <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0" IsHitTestVisible="False">
+                    <TextBlock Text="🛸" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Title, ElementName=MainWindowInstance}" Foreground="{DynamicResource SecTextColor}" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="BtnMinimize_Click" ToolTip="最小化">
+                        <Path Data="M 0,5 L 10,5" Stroke="{DynamicResource MainTextColor}" StrokeThickness="1" Width="10" Height="10"/>
+                    </Button>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="BtnMaximize_Click" ToolTip="最大化/还原">
+                        <Path Data="M 1,1 L 9,1 L 9,9 L 1,9 Z" Stroke="{DynamicResource MainTextColor}" StrokeThickness="1" Fill="Transparent" Width="10" Height="10"/>
+                    </Button>
+                    <Button Content="✕" FontSize="14" Style="{StaticResource TitleBarCloseButtonStyle}" Click="BtnClose_Click" ToolTip="关闭程序"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Menu Grid.Row="1" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" >
+            <MenuItem Header="文件(_F)" >
+                <MenuItem Header="导入 storyboard..." Name="MenuOpenProject" Click="MenuOpenProject_Click" InputGestureText="Ctrl+O"/>
                 <MenuItem Header="导入谱面文件..." Name="MenuImportChart" Click="MenuImportChart_Click" InputGestureText="Ctrl+I"/>
-                <MenuItem Header="保存(_S)" Name="MenuSave" InputGestureText="Ctrl+S"/>
-                <MenuItem Header="导出为 Storyboard.json"/>
-                <Separator/>
+                <MenuItem Header="保存(_S)" Name="MenuSave" Click="MenuSave_Click" InputGestureText="Ctrl+S"/>
+                <MenuItem Header="导出为 Storyboard.json" />
+                <MenuItem Header="打开项目 (Open)"/>
+                <MenuItem Header="导入音频 (Import Audio)..." Click="MenuImportAudio_Click"/>
+                <Separator Background="{DynamicResource SeparatorColor}"/>
                 <MenuItem Header="退出(_X)" Name="MenuExit" Click="MenuExit_Click" InputGestureText="Alt+F4"/>
+            </MenuItem>
+
+            <MenuItem Header="编辑(_E)">
+                <MenuItem Header="撤回时光(_U)" Name="MenuUndo" Click="MenuUndo_Click" InputGestureText="Ctrl+Z"/>
+                <MenuItem Header="快进时光(_R)" Name="MenuRedo" Click="MenuRedo_Click" InputGestureText="Ctrl+Y"/>
+            </MenuItem>
+
+            <MenuItem Header="关于(_A)">
+                <MenuItem Header="关于 Naziki Studio..." Name="MenuAbout" Click="MenuAbout_Click"/>
             </MenuItem>
         </Menu>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="20*" MinWidth="150"/>
+                <ColumnDefinition Width="15*" MinWidth="150"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="25*" MinWidth="250"/>
+                <ColumnDefinition Width="18*" MinWidth="250"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="40*" MinWidth="300"/>
+                <ColumnDefinition Width="52*" MinWidth="400"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="15*" MinWidth="150"/>
             </Grid.ColumnDefinitions>
 
             <local:EventListControl x:Name="EventList" Grid.Column="0" />
-
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
-
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
             <local:NoteListControl x:Name="NoteList" Grid.Column="2" />
-
-            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
-
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
             <local:CanvasControl x:Name="CanvasArea" Grid.Column="4" />
-
-            <GridSplitter Grid.Column="5" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
-
+            <GridSplitter Grid.Column="5" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
             <local:PropertyPanelControl x:Name="PropertyPanel" Grid.Column="6" />
         </Grid>
 
-        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#D0D0D0" Cursor="SizeNS"/>
+        <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
 
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="35*" MinWidth="200"/>
                 <ColumnDefinition Width="5"/>
@@ -61,9 +128,7 @@
             </Grid.ColumnDefinitions>
 
             <local:AssetListControl x:Name="AssetList" Grid.Column="0" />
-
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E0E0E0" Cursor="SizeWE"/>
-
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
             <local:TimelineControl x:Name="TimelineConsole" Grid.Column="2" />
         </Grid>
     </Grid>

@@ -193,6 +193,9 @@ namespace Naziki_Editor.Views
                 }
             }
         }
+
+
+
         // 🎨 辅助法术：过滤器的点击事件 (所有过滤器共用一个事件处理器，简化代码！)
         private void Filter_Click(object sender, RoutedEventArgs e)
         {
@@ -204,6 +207,17 @@ namespace Naziki_Editor.Views
             }
             RefreshNoteList();
         }
+
+
+
+        // ==========================================
+        // 🚀 触发搜索法术：呼叫核心引擎重新过滤！
+        // ==========================================
+        private void BtnSearch_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshNoteList();
+        }
+
 
         // ==========================================
         // 🌟 谱面列表里的全选按钮 (注意：这只是 UI 上的全选，真正的数据选中状态是通过 CheckBox 的事件来维护的！)

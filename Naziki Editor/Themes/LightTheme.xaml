@@ -1,0 +1,23 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="MainBgColor" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="BoardBgColor" Color="#F9F9F9"/>
+    <SolidColorBrush x:Key="SideBgColor" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="MenuBgColor" Color="#F5F5F5"/>
+
+    <SolidColorBrush x:Key="MainTextColor" Color="#000000"/>
+    <SolidColorBrush x:Key="SecTextColor" Color="#666666"/>
+    <SolidColorBrush x:Key="TipsColor" Color="Gray"/>
+
+    <SolidColorBrush x:Key="BorderColor" Color="LightGray"/>
+    <SolidColorBrush x:Key="SeparatorColor" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="HighlightBorderColor" Color="#007ACC"/>
+
+
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#000000"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
+
+
+</ResourceDictionary>

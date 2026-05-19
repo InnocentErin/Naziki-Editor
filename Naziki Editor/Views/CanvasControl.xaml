@@ -3,14 +3,55 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800">
 
-    <Border Background="#333333">
-        <Viewbox>
-            <Canvas Width="800" Height="600" Background="Black" ClipToBounds="True">
-                <TextBlock Text="预览画布 800x600" Foreground="White" Canvas.Left="350" Canvas.Top="280"/>
-            </Canvas>
-        </Viewbox>
-    </Border>
+    <TabControl Background="{DynamicResource MainBgColor}" BorderThickness="0"
+                ItemContainerStyle="{DynamicResource HorizontalTabItemStyle}"
+                SelectionChanged="TabControl_SelectionChanged">
+
+        <TabItem Header="画面实时预览 (Canvas)">
+            <Border Background="#333333">
+                <Viewbox>
+                    <Canvas Width="800" Height="600" Background="Black" ClipToBounds="True">
+                        <TextBlock Text="预览画布 800x600" Foreground="White" Canvas.Left="350" Canvas.Top="280"/>
+                    </Canvas>
+                </Viewbox>
+            </Border>
+        </TabItem>
+
+        <TabItem Header="检查编辑后的 JSON 源代码">
+            <Grid Background="{DynamicResource MainBgColor}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="10,5">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="BtnApplyJson" Content="🚀 应用修改 (Apply)" Click="BtnApplyJson_Click" 
+                                    Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" 
+                                    Padding="15,5" BorderThickness="0" Cursor="Hand"/>
+                            <TextBlock x:Name="TxtJsonStatus" Text="💡 请在下方编辑代码，完成后点击应用以同步到事件列表。" 
+                                       Foreground="{DynamicResource TipsColor}" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <avalonEdit:TextEditor Grid.Row="1" x:Name="JsonEditor"
+                                       FontFamily="Consolas" 
+                                       FontSize="13" 
+                                       ShowLineNumbers="True"
+                                       Background="{DynamicResource MainBgColor}"
+                                       Foreground="{DynamicResource MainTextColor}"
+                                       HorizontalScrollBarVisibility="Auto" 
+                                       VerticalScrollBarVisibility="Auto"
+                                       Padding="5"
+                                       TextChanged="JsonEditor_TextChanged"/>
+            </Grid>
+        </TabItem>
+        
+    </TabControl>
 </UserControl>

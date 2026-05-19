@@ -4,18 +4,21 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="300">
+             d:DesignHeight="600" d:DesignWidth="300"
+             Background="{DynamicResource MainBgColor}" 
+             BorderBrush="{DynamicResource BorderColor}"
+             Foreground="{DynamicResource MainTextColor}">
 
     <UserControl.Resources>
         <Style x:Key="FilterButtonStyle" TargetType="ToggleButton">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextColor}"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="Margin" Value="2"/>
             <Setter Property="Padding" Value="5,2"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="Gray" BorderThickness="1" CornerRadius="2">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="2">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -23,7 +26,7 @@
             </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="False">
-                    <Setter Property="Background" Value="#A0A0A0"/>
+                    <Setter Property="Background" Value="{DynamicResource MainBgColor}"/>
                     <Setter Property="Foreground" Value="White"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="True">
@@ -33,7 +36,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Background="#F9F9F9" BorderBrush="Gray" BorderThickness="0,0,1,0">
+    <Border Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
         <Grid Margin="5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -44,15 +47,15 @@
             </Grid.RowDefinitions>
 
             <WrapPanel Grid.Row="0" Margin="0,0,0,5" HorizontalAlignment="Center">
-                <ToggleButton x:Name="FilterClick" Content="Click" Background="LightSeaGreen" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
-                <ToggleButton x:Name="FilterCDrag" Content="CDrag" Background="SkyBlue" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
-                <ToggleButton x:Name="FilterDrag" Content="Drag" Background="MediumPurple" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
-                <ToggleButton x:Name="FilterFlick" Content="Flick" Background="IndianRed" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
-                <ToggleButton x:Name="FilterHold" Content="Hold" Background="Magenta" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
-                <ToggleButton x:Name="FilterLHold" Content="L-Hold" Background="Gold" Style="{StaticResource FilterButtonStyle}" IsChecked="True"/>
+                <ToggleButton x:Name="FilterClick" Content="Click" Background="LightSeaGreen" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
+                <ToggleButton x:Name="FilterCDrag" Content="CDrag" Background="SkyBlue" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
+                <ToggleButton x:Name="FilterDrag" Content="Drag" Background="MediumPurple" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
+                <ToggleButton x:Name="FilterFlick" Content="Flick" Background="IndianRed" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
+                <ToggleButton x:Name="FilterHold" Content="Hold" Background="Magenta" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
+                <ToggleButton x:Name="FilterLHold" Content="L-Hold" Background="Gold" Style="{StaticResource FilterButtonStyle}" IsChecked="True" Click="Filter_Click"/>
             </WrapPanel>
 
-            <Grid Grid.Row="1" Margin="0,0,0,5">
+            <Grid Grid.Row="1" Background="{DynamicResource MainBgColor}" Margin="0,0,0,5">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -60,17 +63,17 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <ComboBox x:Name="SearchMode" Grid.Column="0" SelectedIndex="0" FontSize="10" Margin="0,0,5,0">
+                <ComboBox x:Name="SearchMode" Grid.Column="0" SelectedIndex="0" FontSize="10" Background="{DynamicResource MainBgColor}" Margin="0,0,5,0">
                     <ComboBoxItem Content="按时间(s)"/>
                     <ComboBoxItem Content="按 X轴"/>
                 </ComboBox>
                 <TextBox x:Name="SearchMinBox" Grid.Column="1" MaxLength="10" FontSize="10" VerticalContentAlignment="Center"/>
                 <TextBlock Grid.Column="2" Text=" ~ " VerticalAlignment="Center" FontSize="10"/>
                 <TextBox x:Name="SearchMaxBox" Grid.Column="3" MaxLength="10" FontSize="10" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="4" Content="🔍 搜索" FontSize="10" Margin="5,0,0,0" Padding="5,0"/>
+                <Button x:Name="BtnSearch" Grid.Column="4" Content="🔍 搜索" FontSize="10" Margin="5,0,0,0" Padding="5,0" Click="BtnSearch_Click"/>
             </Grid>
 
-            <Grid Grid.Row="2" Background="#E0E0E0" Margin="0,0,0,2">
+            <Grid Grid.Row="2" Background="{DynamicResource MainBgColor}" Margin="0,0,0,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="25"/>
                     <ColumnDefinition Width="55"/>
@@ -85,8 +88,7 @@
                 <TextBlock Grid.Column="4" Text=" X轴" FontSize="10" VerticalAlignment="Center"/>
             </Grid>
 
-            <TreeView x:Name="NoteTreeView" Grid.Row="3" Background="White" BorderBrush="LightGray"/>
-
+            <TreeView x:Name="NoteTreeView" Grid.Row="3" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1"/>
             <Grid Grid.Row="4" Margin="0,5,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

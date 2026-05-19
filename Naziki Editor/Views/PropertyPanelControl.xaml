@@ -7,20 +7,505 @@
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="300">
 
-    <Border Background="#F0F0F0" BorderBrush="Gray" BorderThickness="1,0,0,0">
-        <ContentControl x:Name="PropertyInspector">
-            <ContentControl.Resources>
+    <Border Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1,0,0,0">
 
-                <Style TargetType="TextBox">
-                    <Setter Property="Background" Value="#2D2D30"/>
-                    <Setter Property="Foreground" Value="White"/>
-                    <Setter Property="BorderBrush" Value="#3F3F46"/>
-                    <Setter Property="Padding" Value="4,2"/>
-                </Style>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            </ContentControl.Resources>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-            <TextBlock Text="请在左侧选择一个事件" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        </ContentControl>
+                <ContentControl x:Name="PropertyInspector" Margin="15">
+                    <ContentControl.Resources>
+
+                        <Style TargetType="TextBlock" x:Key="GroupTitleStyle">
+                            <Setter Property="Foreground" Value="#888888"/>
+                            <Setter Property="FontSize" Value="12"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Margin" Value="0,15,0,8"/>
+                            <Setter Property="Background" Value="#222222"/>
+                            <Setter Property="Padding" Value="5,2"/>
+                        </Style>
+
+                        <Style TargetType="TextBlock" x:Key="LabelStyle">
+                            <Setter Property="Foreground" Value="{DynamicResource SecTextColor}"/>
+                            <Setter Property="FontSize" Value="11"/>
+                            <Setter Property="Margin" Value="0,0,0,4"/>
+                        </Style>
+
+
+                        <DataTemplate DataType="{x:Type local:Sprite}">
+                            <StackPanel>
+                                <TextBlock Text="🖼️ 图片属性 (Sprite)" Foreground="{DynamicResource HighlightBorderColor}" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="▶ 基础设置 (Basic)" Style="{StaticResource GroupTitleStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="对象 ID (id)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding Id, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBox Text="{Binding States[0].Path, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="素材路径 (path)" Style="{StaticResource LabelStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="出现时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="不透明度 (opacity)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding opacity, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 空间与旋转 (Transform)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 层级 (z)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 旋转(rot_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 旋转(rot_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 旋转(rot_z)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 尺寸与锚点 (Size &amp; Pivot)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 缩放 (scale_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding scale_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 缩放 (scale_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding scale_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="绝对宽 (w)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding w, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="绝对高 (h)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding h, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 锚点 (pivot_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding pivot_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 锚点 (pivot_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding pivot_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 动画系统 (Animation)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个缓动动画帧 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 帧细节编辑功能已封印，需等待“时间轴引擎”接入后解封" Foreground="#666666" FontSize="10" Margin="0,5,0,10" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:Text}">
+                            <StackPanel>
+                                <TextBlock Text="📝 文字属性 (Text)" Foreground="#CE9178" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="▶ 基础设置 (Basic)" Style="{StaticResource GroupTitleStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="对象 ID (id)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding id, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="文本内容 (text)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding text, UpdateSourceTrigger=PropertyChanged}" Height="50" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="字号 (size)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding size, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="颜色 (color)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding color, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="对齐 (align)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding align, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="出现时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="不透明度 (opacity)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding opacity, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 空间与旋转 (Transform)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 层级 (z)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 旋转(rot_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 旋转(rot_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 旋转(rot_z)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 尺寸与锚点 (Size &amp; Pivot)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 缩放 (scale_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding scale_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 缩放 (scale_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding scale_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 锚点 (pivot_x)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding pivot_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 锚点 (pivot_y)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding pivot_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 动画系统 (Animation)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个缓动动画帧 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 帧细节编辑功能已封印，需等待“时间轴引擎”接入后解封" Foreground="#666666" FontSize="10" Margin="0,5,0,10" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:Video}">
+                            <StackPanel>
+                                <TextBlock Text="🎬 视频属性 (Video)" Foreground="#B5CEA8" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="▶ 基础设置 (Basic)" Style="{StaticResource GroupTitleStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="对象 ID (id)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding id, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="视频路径 (path)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding path, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="叠加颜色 (color)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding color, UpdateSourceTrigger=PropertyChanged}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="出现时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="不透明度 (opacity)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding opacity, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 空间与变换 (Transform)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 坐标" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 层级 (z)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="绝对宽 (w)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding w, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="绝对高 (h)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding h, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 动画系统 (Animation)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个缓动动画帧 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 帧细节编辑功能已封印，需等待“时间轴引擎”接入后解封" Foreground="#666666" FontSize="10" Margin="0,5,0,10" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:Line}">
+                            <StackPanel>
+                                <TextBlock Text="〰️ 线条属性 (Line)" Foreground="#DCDCAA" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="▶ 基础设置 (Basic)" Style="{StaticResource GroupTitleStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="对象 ID (id)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding id, UpdateSourceTrigger=PropertyChanged}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="线宽 (width)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding width, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="颜色 (color)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding color, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="出现时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="透明度 (opacity)" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding opacity, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 整体变换 (Transform)" Style="{StaticResource GroupTitleStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="整体 X" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="整体 Y" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="整体 Z" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="X 旋转" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_x, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Y 旋转" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_y, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Z 旋转" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding rot_z, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="▶ 结构与动画 (Structure &amp; Anim)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding pos.Count, StringFormat='💡 包含 \{0\} 个实体线条端点 (Pos)'}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,5"/>
+                                <TextBlock Text="⏳ 端点轨迹编辑已封印，需等画笔工具接入" Foreground="#666666" FontSize="10" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个缓动动画帧 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 帧细节编辑已封印，需等时间轴接入" Foreground="#666666" FontSize="10" Margin="0,5,0,10" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:Controller}">
+                            <StackPanel>
+                                <TextBlock Text="🎛️ 场景控制器 (Controller)" Foreground="#C586C0" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+                                <TextBlock Text="触发时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="▶ 动画系统 (Animation)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个全局特效指令 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 特效指令细节已封印，需等时间轴接入" Foreground="#666666" FontSize="10" Margin="0,5,0,10"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:NoteController}">
+                            <StackPanel>
+                                <TextBlock Text="🎵 音符控制器 (Note Ctrl)" Foreground="#4FC1FF" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+                                <TextBlock Text="绑定的目标音符 (note)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding note, UpdateSourceTrigger=PropertyChanged}" Height="80" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+                                <TextBlock Text="触发时间 (time)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding time, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="▶ 动画系统 (Animation)" Style="{StaticResource GroupTitleStyle}"/>
+                                <TextBlock Text="{Binding states.Count, StringFormat='💡 包含 \{0\} 个音符特效帧 (States)'}" Foreground="{DynamicResource TipsColor}"/>
+                                <TextBlock Text="⏳ 特效帧编辑已封印，需等时间轴接入" Foreground="#666666" FontSize="10" Margin="0,5,0,10"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:StoryboardTemplate}">
+                            <StackPanel>
+                                <TextBlock Text="📦 模板组 (Template)" Foreground="#E51400" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+                                <TextBlock Text="这是一个封装好的微型故事板容器。当前选中的模板内部包含以下实体：" 
+                                       Foreground="{DynamicResource SecTextColor}" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                                <TextBlock Text="{Binding sprites.Count, StringFormat='🖼️ 图片数量: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                                <TextBlock Text="{Binding texts.Count, StringFormat='📝 文字数量: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                                <TextBlock Text="{Binding lines.Count, StringFormat='〰️ 线条数量: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                                <TextBlock Text="{Binding videos.Count, StringFormat='🎬 视频数量: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                                <TextBlock Text="{Binding controllers.Count, StringFormat='🎛️ 场景控制: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                                <TextBlock Text="{Binding note_controllers.Count, StringFormat='🎵 音符控制: \{0\}'}" Style="{StaticResource LabelStyle}" Foreground="{DynamicResource MainTextColor}"/>
+                            </StackPanel>
+                        </DataTemplate>
+
+                    </ContentControl.Resources>
+
+                    <TextBlock Text="选择左边的事件对象来编辑..." 
+                           Foreground="{DynamicResource TipsColor}" 
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center" 
+                           Margin="0,0,0,0"/>
+                </ContentControl>
+
+            </ScrollViewer>
+            <UniformGrid Grid.Row="1" Columns="2" Margin="15,10">
+                <Button x:Name="BtnApplyProperties" Content="🚀 应用修改" Click="BtnApplyProperties_Click"
+                        Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold"
+                        Padding="15,8" Margin="0,0,5,0" BorderThickness="0" Cursor="Hand"/>
+
+                <Button x:Name="BtnSaveAsMaterial" Content="⭐ 存为预设素材" Click="BtnSaveAsMaterial_Click"
+                        Background="DarkOrange" Foreground="White" FontWeight="Bold"
+                        Padding="15,8" Margin="5,0,0,0" BorderThickness="0" Cursor="Hand"/>
+            </UniformGrid>
+        </Grid>
     </Border>
 </UserControl>
