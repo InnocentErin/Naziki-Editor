@@ -1,89 +1,96 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace Naziki_Editor.Core
 {
-    // 🌟 泛型时光管理器：可以倒流任何纯数据对象的状态！
-    public class UndoRedoManager<T>
+    public class UndoRedoManager
     {
-        private readonly Stack<string> _undoStack = new Stack<string>();
-        private readonly Stack<string> _redoStack = new Stack<string>();
-        private readonly int _maxHistory;
+        // 🌍 唯一的主宇宙时光机（供主窗口使用）
+        public static UndoRedoManager Global { get; } = new UndoRedoManager();
 
-        public UndoRedoManager(int maxHistory = 30)
+        // 内部使用 List 模拟栈，方便剔除最旧的记录以控制内存
+        private List<string> _undoStack = new List<string>();
+        private List<string> _redoStack = new List<string>();
+
+        // 记忆容量限制（弹窗里随便调，最多记 50 步）
+        public int MaxCapacity { get; set; } = 50;
+
+        /// <summary>
+        /// 📸 拍下当前快照并压入时光机
+        /// </summary>
+        public void RecordSnapshot(object currentState)
         {
-            _maxHistory = maxHistory; // 默认最多记录 30 步时光痕迹
-        }
+            if (currentState == null) return;
 
-        // ==========================================
-        // 📸 拍照存证：在进行任何修改前，把当前的完美状态拍个快照
-        // ==========================================
-        public void RecordSnapshot(T state)
-        {
-            if (state == null) return;
+            // 将对象化为纯粹的 JSON 字符串，彻底斩断引用纠葛！
+            string jsonSnapshot = JsonConvert.SerializeObject(currentState);
 
-            // 将当前状态深度序列化为一条独立的物理快照文本
-            string jsonSnapshot = JsonConvert.SerializeObject(state);
+            // 如果和上一步一模一样，就不记录（防止无意义的重复存档）
+            if (_undoStack.Count > 0 && _undoStack[_undoStack.Count - 1] == jsonSnapshot)
+                return;
 
-            // 防呆优化：如果当前快照和上一动一模一样，就不重复记录，省内存！
-            if (_undoStack.Count > 0 && _undoStack.Peek() == jsonSnapshot) return;
+            _undoStack.Add(jsonSnapshot);
+            _redoStack.Clear(); // 产生了新的世界线，未来的重做记录必须抹除
 
-            _undoStack.Push(jsonSnapshot);
-            _redoStack.Clear(); // 一旦用户在撤回后干了新坏事，重做堆栈立刻清空！
-
-            // 满了就扔掉最古老的记忆
-            if (_undoStack.Count > _maxHistory)
+            // 超过记忆上限，遗忘最古老的记忆
+            if (_undoStack.Count > MaxCapacity)
             {
-                // 简单维护，防止内存无限爆满
-                var list = new List<string>(_undoStack);
-                list.RemoveAt(list.Count - 1);
-                _undoStack.Clear();
-                for (int i = list.Count - 1; i >= 0; i--) _undoStack.Push(list[i]);
+                _undoStack.RemoveAt(0);
             }
         }
 
-        // ==========================================
-        // ⏪ 时光倒流 (Undo)
-        // ==========================================
-        public T Undo(T currentState, out bool success)
+        public bool CanUndo => _undoStack.Count > 0;
+        public bool CanRedo => _redoStack.Count > 0;
+
+        /// <summary>
+        /// ⏪ 撤销 (Ctrl+Z)
+        /// </summary>
+        public T Undo<T>(T currentState, out bool success) where T : class
         {
-            success = false;
-            // 至少要留一个底稿状态，或者当前堆栈还有之前踩过的脚印
-            if (_undoStack.Count <= 1) return currentState;
+            if (!CanUndo)
+            {
+                success = false;
+                return null;
+            }
 
-            // 1. 把当前的现状扔进重做池里备用
-            string currentJson = JsonConvert.SerializeObject(currentState);
-            _redoStack.Push(currentJson);
+            // 把当前状态压入重做栈
+            _redoStack.Add(JsonConvert.SerializeObject(currentState));
 
-            // 2. 扔掉当前的副本，拔出上一步留下的远古快照
-            _undoStack.Pop();
-            string previousJson = _undoStack.Peek();
+            // 提取上一个状态的 JSON 并移除
+            string previousStateJson = _undoStack[_undoStack.Count - 1];
+            _undoStack.RemoveAt(_undoStack.Count - 1);
 
             success = true;
-            return JsonConvert.DeserializeObject<T>(previousJson);
+            // 魔法：自动把 JSON 变回指挥官想要的类型（比如 StoryboardRoot）
+            return JsonConvert.DeserializeObject<T>(previousStateJson);
         }
 
-        // ==========================================
-        // ⏩ 时光快进 (Redo)
-        // ==========================================
-        public T Redo(T currentState, out bool success)
+        /// <summary>
+        /// ⏩ 重做 (Ctrl+Y)
+        /// </summary>
+        public T Redo<T>(T currentState, out bool success) where T : class
         {
-            success = false;
-            if (_redoStack.Count == 0) return currentState;
+            if (!CanRedo)
+            {
+                success = false;
+                return null;
+            }
 
-            // 1. 把现状压入撤回池
-            string currentJson = JsonConvert.SerializeObject(currentState);
-            _undoStack.Push(currentJson);
+            // 把当前状态压入撤销栈
+            _undoStack.Add(JsonConvert.SerializeObject(currentState));
 
-            // 2. 从重做池里把未来的记忆捞出来
-            string nextJson = _redoStack.Pop();
+            // 提取下一个状态的 JSON 并移除
+            string nextStateJson = _redoStack[_redoStack.Count - 1];
+            _redoStack.RemoveAt(_redoStack.Count - 1);
 
             success = true;
-            return JsonConvert.DeserializeObject<T>(nextJson);
+            return JsonConvert.DeserializeObject<T>(nextStateJson);
         }
 
-        // 🧹 洗脑法术：切换谱面或清空项目时调用
+        /// <summary>
+        /// 🧹 清空时光机 (比如新建工程、关闭弹窗时调用)
+        /// </summary>
         public void Reset()
         {
             _undoStack.Clear();

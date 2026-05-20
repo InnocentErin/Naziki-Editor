@@ -28,7 +28,7 @@ namespace Naziki_Editor.Views
 
         private string _currentStoryboardPath = null;
         private StoryboardRoot _currentStoryboardRoot = new StoryboardRoot();
-        private Core.UndoRedoManager<StoryboardRoot> _undoRedoManager = new Core.UndoRedoManager<StoryboardRoot>();
+        private Core.UndoRedoManager _undoRedoManager = new Core.UndoRedoManager();
 
         private bool _isVisualDirty = false;
 
