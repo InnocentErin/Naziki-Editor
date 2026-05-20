@@ -25,7 +25,13 @@ namespace Naziki_Editor.Core
                 {
                     NamingStrategy = new SnakeCaseNamingStrategy()
                 },
-                Formatting = Formatting.Indented
+                Formatting = Formatting.Indented,
+                Converters = new List<JsonConverter>
+        {
+             new StoryboardObjectConverter(), // 添加自定义转换器
+             new UnitFloatConverter(),   // 添加自定义转换器
+             new TimeObjectConverter()   // 如果有也需要添加
+        }
             };
         }
 
@@ -45,7 +51,8 @@ namespace Naziki_Editor.Core
         public static StoryboardRoot Load(string filePath)
         {
             string jsonText = File.ReadAllText(filePath);
-            StoryboardRoot root = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText);
+            var settings = StoryboardSerializer.GetSettings();
+            StoryboardRoot root = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText, settings);
 
             // 🛡️ 验明正身：极其严密且防崩溃的安检门！
             bool hasContent = false;

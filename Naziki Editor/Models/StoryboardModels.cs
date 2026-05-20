@@ -1,8 +1,9 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json.Linq;
+using System.Reflection;
 
 namespace Naziki_Editor.Models
 {
@@ -115,7 +116,7 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class TimeObjectConverter : JsonConverter
     {
-        public override bool CanConvert(Type objectType) => true;
+        public override bool CanConvert(Type objectType) => objectType == typeof(object);
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
@@ -140,15 +141,22 @@ namespace Naziki_Editor.Models
                 return (float)token;
             }
             // 🎯 情况 3：如果是单一的字符串锚点 (比如 "start:1134")
-            else
+            else if (token.Type == JTokenType.String)
             {
                 return token.ToString();
+            }
+            else
+            {
+                // 如果遇到其他类型（理论上不应该出现），返回 null 或抛出异常
+                return null;
             }
         }
 
         public override bool CanWrite => false;
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) => throw new NotImplementedException();
     }
+
+
 
 
 
@@ -333,7 +341,9 @@ namespace Naziki_Editor.Models
         public string ParentId { get; set; }
     }
 
+
     [Serializable]
+    [JsonConverter(typeof(StoryboardObjectConverter))]
     public class StoryboardObject<T> : StoryboardObject where T : ObjectState
     {
         public List<T> States { get; set; } = new List<T>();
@@ -355,4 +365,116 @@ namespace Naziki_Editor.Models
         [JsonProperty("note")]
         public object NoteTarget { get; set; }
     }
+
+
+    // =========================================
+    // 🌟 六、 万能翻译官：专门负责把 JSON 反序列化成 StoryboardObject<T> 的神奇工具！
+    // 🌟 核心功能：在反序列化时，自动把 JSON 根部的属性（如 time、x、y 等）也填充到 States[0] 中，完美兼容官方的“语法糖”写法！
+    // 🌟 适用范围：所有 StoryboardObject<T> 派生类（Sprite、Text、Line、Video、Controller、NoteController）都可以使用这个转换器，无需额外配置！
+    // 🌟 使用方法：在 JsonSerializerSettings 中添加这个转换器，或者直接在 StoryboardObject<T> 类上使用 [JsonConverter(typeof(StoryboardObjectConverter))] 特性即可！
+    // =========================================
+    public class StoryboardObjectConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            // 检查类型本身或其任一基类是否为 StoryboardObject<T>
+            Type current = objectType;
+            while (current != null && current != typeof(object))
+            {
+                if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(StoryboardObject<>))
+                    return true;
+                current = current.BaseType;
+            }
+            return false;
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject obj = JObject.Load(reader);
+
+            // 创建目标对象实例（必须有无参构造函数）
+            var target = (StoryboardObject)Activator.CreateInstance(objectType);
+
+            // 获取 States 属性信息
+            var statesProp = objectType.GetProperty("States");
+            // 获取状态类型 T
+            Type stateType = objectType.GetGenericArguments()[0];
+
+            // 处理基类 StoryboardObject 的属性
+            target.Id = obj["id"]?.ToString();
+            target.TargetId = obj["target_id"]?.ToString();
+            target.ParentId = obj["parent_id"]?.ToString();
+
+            // 处理 NoteController 的特殊 note 字段
+            if (target is NoteController noteCtrl && obj["note"] != null)
+            {
+                var noteToken = obj["note"];
+                if (noteToken.Type == JTokenType.Integer || noteToken.Type == JTokenType.Float)
+                    noteCtrl.NoteTarget = noteToken.Value<int>();
+                else if (noteToken.Type == JTokenType.Object)
+                    noteCtrl.NoteTarget = noteToken.ToObject<NoteCtrlEventSelect>();
+                else
+                    noteCtrl.NoteTarget = noteToken.ToString();
+            }
+
+            // 1. 创建初始状态对象，并从 JSON 根部填充属性
+            object initialState = Activator.CreateInstance(stateType);
+            foreach (var prop in stateType.GetProperties())
+            {
+                if (!prop.CanWrite) continue;
+                string jsonName = GetJsonPropertyName(prop);
+                if (obj[jsonName] != null)
+                {
+                    try
+                    {
+                        var value = obj[jsonName].ToObject(prop.PropertyType, serializer);
+                        prop.SetValue(initialState, value);
+                    }
+                    catch { /* 忽略无法转换的属性 */ }
+                }
+            }
+
+            // 2. 准备最终的 States 列表（先添加初始状态）
+            var finalStates = new List<object> { initialState };
+
+            // 3. 如果有 states 数组，将其每个元素反序列化后加入列表
+            if (obj["states"] is JArray statesArray)
+            {
+                foreach (var item in statesArray)
+                {
+                    var stateObj = item.ToObject(stateType, serializer);
+                    finalStates.Add(stateObj);
+                }
+            }
+
+            // 4. 将 finalStates 转换为目标类型 List<T> 并赋值
+            var typedList = Activator.CreateInstance(statesProp.PropertyType);
+            var addMethod = statesProp.PropertyType.GetMethod("Add");
+            if (addMethod == null)
+                throw new InvalidOperationException($"Type {statesProp.PropertyType.Name} does not have an Add method.");
+
+            foreach (var state in finalStates)
+            {
+                addMethod.Invoke(typedList, new[] { state });
+            }
+
+            statesProp.SetValue(target, typedList);
+            return target;
+        }
+
+        public override bool CanWrite => false;
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            => throw new NotImplementedException();
+
+        private string GetJsonPropertyName(System.Reflection.PropertyInfo prop)
+        {
+            var attr = prop.GetCustomAttribute<JsonPropertyAttribute>();
+            if (attr != null && !string.IsNullOrEmpty(attr.PropertyName))
+                return attr.PropertyName;
+            // 将属性名转换为 snake_case
+            string name = prop.Name;
+            return char.ToLower(name[0]) + name.Substring(1);
+        }
+    }
+
 }
