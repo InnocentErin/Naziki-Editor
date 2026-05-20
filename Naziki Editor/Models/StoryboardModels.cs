@@ -37,7 +37,7 @@ namespace Naziki_Editor.Models
 
     public enum ReferenceUnit { World, StageX, StageY, NoteX, NoteY, CameraX, CameraY }
     public enum FontWeight { ExtraLight, Regular, Bold, ExtraBold }
-    public enum TriggerType { NoteClear, Combo, Score, None }UnitFloat
+    public enum TriggerType { NoteClear, Combo, Score, None }
 
 
 
@@ -157,7 +157,6 @@ namespace Naziki_Editor.Models
     // 🌟 三、 官方核心数据结构 (Structs / Classes)
     // ==========================================
     [Serializable]
-    [JsonConverter(typeof(UnitFloatConverter))]
     public class UnitFloat
     {
         public float Value { get; set; }

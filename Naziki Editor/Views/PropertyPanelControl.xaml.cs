@@ -1,475 +1,312 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
+﻿using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Naziki_Editor.Models;
 
-namespace Naziki_Editor.Models
+namespace Naziki_Editor.Views
 {
-    // ==========================================
-    // 🌟 一、 缓动函数枚举 (完全匹配 Cytoid 官方)
-    // ==========================================
-    public enum Ease
+    public partial class PropertyPanelControl : UserControl
     {
-        None = 0,
-        EaseInQuad = 1,
-        EaseOutQuad = 2,
-        EaseInOutQuad = 3,
-        EaseInCubic = 4,
-        EaseOutCubic = 5,
-        EaseInOutCubic = 6,
-        EaseInQuart = 7,
-        EaseOutQuart = 8,
-        EaseInOutQuart = 9,
-        EaseInQuint = 10,
-        EaseOutQuint = 11,
-        EaseInOutQuint = 12,
-        EaseInSine = 13,
-        EaseOutSine = 14,
-        EaseInOutSine = 15,
-        EaseInExpo = 16,
-        EaseOutExpo = 17,
-        EaseInOutExpo = 18,
-        EaseInCirc = 19,
-        EaseOutCirc = 20,
-        EaseInOutCirc = 21,
-        Linear = 22,
-        Spring = 23,
-        EaseInBounce = 24,
-        EaseOutBounce = 25,
-        EaseInOutBounce = 26,
-        EaseInBack = 27,
-        EaseOutBack = 28,
-        EaseInOutBack = 29,
-        EaseInElastic = 30,
-        EaseOutElastic = 31,
-        EaseInOutElastic = 32,
-        Blink = 33
-    }
+        // 事件：请求编辑属性（携带当前选中对象）
+        public event Action<object> OnEditPropertiesRequested;
+        // 事件：请求另存为素材
+        public event Action<object> OnSaveAsMaterialRequested;
+        // 新增：请求直接应用属性修改（不需要弹出对话框）
+        public event Action OnApplyPropertiesRequested;
+        // 新增：数据被修改（属性值发生变化）时触发
+        public event Action OnDataModified;
 
-    // ==========================================
-    // 🌟 二、 参考系枚举
-    // ==========================================
-    public enum ReferenceUnit
-    {
-        World,
-        StageX, StageY,   // 800x600 画布
-        NoteX, NoteY,     // 音符坐标系 (0~1)
-        CameraX, CameraY   // 正交相机坐标系
-    }
+        private object _currentObject;
 
-    // ==========================================
-    // 🌟 三、 自定义颜色 (RGBA，范围 0~255，Alpha 0~1)
-    // ==========================================
-    [Serializable]
-    public class CytoidColor
-    {
-        public float A = 1f;
-        public float R = 255f;
-        public float G = 255f;
-        public float B = 255f;
-
-        public CytoidColor() { }
-        public CytoidColor(float r, float g, float b, float a = 1f)
+        public PropertyPanelControl()
         {
-            R = r; G = g; B = b; A = a;
-        }
-    }
-
-    // ==========================================
-    // 🌟 四、 带参考系的数值 (支持 "noteX:0.5" 或纯数字)
-    // ==========================================
-    [JsonConverter(typeof(UnitFloatConverter))]
-    public class UnitFloat
-    {
-        public float Value { get; set; }
-        public ReferenceUnit Unit { get; set; }
-        public bool ScaleToCanvas { get; set; } = false;
-        public bool Span { get; set; } = false;
-
-        public UnitFloat() { }
-        public UnitFloat(float value, ReferenceUnit unit, bool scaleToCanvas = false, bool span = false)
-        {
-            Value = value;
-            Unit = unit;
-            ScaleToCanvas = scaleToCanvas;
-            Span = span;
+            InitializeComponent();
         }
 
-        public UnitFloat WithValue(float newValue) =>
-            new UnitFloat(newValue, Unit, ScaleToCanvas, Span);
-    }
-
-    // ==========================================
-    // 🌟 五、 高级时间转换器 (支持数字/字符串/数组)
-    // ==========================================
-    public class TimeObjectConverter : JsonConverter
-    {
-        public override bool CanConvert(Type objectType) => true;
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        // 外部调用：设置要显示的对象
+        public void SetSelectedObject(object obj)
         {
-            JToken token = JToken.Load(reader);
-            if (token.Type == JTokenType.Array)
+            _currentObject = obj;
+            RefreshPropertyDisplay();
+        }
+
+        // 刷新属性表单
+        private void RefreshPropertyDisplay()
+        {
+            PropertyContainer.Children.Clear();
+
+            if (_currentObject == null)
             {
-                var list = new List<object>();
-                foreach (var item in token)
+                PropertyContainer.Children.Add(new TextBlock
                 {
-                    if (item.Type == JTokenType.Float || item.Type == JTokenType.Integer)
-                        list.Add((float)item);
-                    else
-                        list.Add(item.ToString());
-                }
-                return list;
+                    Text = "未选中任何对象",
+                    Foreground = (Brush)FindResource("TipsColor"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 20, 0, 0)
+                });
+                return;
             }
-            else if (token.Type == JTokenType.Float || token.Type == JTokenType.Integer)
-                return (float)token;
-            else
-                return token.ToString();
-        }
-        public override bool CanWrite => false;
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) =>
-            throw new NotImplementedException();
-    }
 
-    // ==========================================
-    // 🌟 六、 UnitFloat 专用转换器 (纯数字/字符串互转)
-    // ==========================================
-    public class UnitFloatConverter : JsonConverter<UnitFloat>
-    {
-        public override UnitFloat ReadJson(JsonReader reader, Type objectType, UnitFloat existingValue, bool hasExistingValue, JsonSerializer serializer)
-        {
-            JToken token = JToken.Load(reader);
-            if (token.Type == JTokenType.Float || token.Type == JTokenType.Integer)
+            // 根据对象类型调用不同的构建方法
+            switch (_currentObject)
             {
-                return new UnitFloat { Value = (float)token, Unit = ReferenceUnit.World };
+                case Sprite sprite:
+                    BuildSpriteForm(sprite);
+                    break;
+                case Text text:
+                    BuildTextForm(text);
+                    break;
+                case Line line:
+                    BuildLineForm(line);
+                    break;
+                case Video video:
+                    BuildVideoForm(video);
+                    break;
+                case Controller controller:
+                    BuildControllerForm(controller);
+                    break;
+                case NoteController noteCtrl:
+                    BuildNoteControllerForm(noteCtrl);
+                    break;
+                case StoryboardTemplate template:
+                    BuildTemplateForm(template);
+                    break;
+                default:
+                    PropertyContainer.Children.Add(new TextBlock
+                    {
+                        Text = $"不支持的类型：{_currentObject.GetType().Name}",
+                        Foreground = Brushes.Red
+                    });
+                    break;
             }
-            else if (token.Type == JTokenType.String)
-            {
-                string str = token.Value<string>();
-                var parts = str.Split(':');
-                if (parts.Length == 2 && Enum.TryParse(parts[0], true, out ReferenceUnit unit))
-                {
-                    return new UnitFloat { Value = float.Parse(parts[1]), Unit = unit };
-                }
-                else if (parts.Length == 1 && float.TryParse(parts[0], out float val))
-                {
-                    return new UnitFloat { Value = val, Unit = ReferenceUnit.World };
-                }
-            }
-            else if (token.Type == JTokenType.Object)
-            {
-                var obj = token as JObject;
-                var uf = new UnitFloat();
-                if (obj["Value"] != null) uf.Value = (float)obj["Value"];
-                if (obj["Unit"] != null && Enum.TryParse(obj["Unit"].ToString(), true, out ReferenceUnit u)) uf.Unit = u;
-                if (obj["ScaleToCanvas"] != null) uf.ScaleToCanvas = (bool)obj["ScaleToCanvas"];
-                if (obj["Span"] != null) uf.Span = (bool)obj["Span"];
-                return uf;
-            }
-            return new UnitFloat();
         }
 
-        public override void WriteJson(JsonWriter writer, UnitFloat value, JsonSerializer serializer)
+        // ========== 辅助方法 ==========
+        private void AddPropertyRow(string label, string value)
         {
-            if (value.Unit == ReferenceUnit.World)
-                writer.WriteValue(value.Value);
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.Margin = new Thickness(0, 5, 0, 5);
+
+            var labelBlock = new TextBlock
+            {
+                Text = label,
+                Foreground = (Brush)FindResource("SecTextColor"),
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = FontWeights.Bold
+            };
+            Grid.SetColumn(labelBlock, 0);
+            grid.Children.Add(labelBlock);
+
+            var valueBlock = new TextBlock
+            {
+                Text = value,
+                Foreground = (Brush)FindResource("MainTextColor"),
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(valueBlock, 1);
+            grid.Children.Add(valueBlock);
+
+            PropertyContainer.Children.Add(grid);
+        }
+
+        private void AddSectionHeader(string title)
+        {
+            var header = new TextBlock
+            {
+                Text = title,
+                Foreground = (Brush)FindResource("HighlightBorderColor"),
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 15, 0, 5),
+                FontSize = 13
+            };
+            PropertyContainer.Children.Add(header);
+        }
+
+        // ========== 各对象表单构建 ==========
+        private void BuildSpriteForm(Sprite sprite)
+        {
+            AddSectionHeader("🖼️ 图片属性");
+            AddPropertyRow("ID", sprite.Id ?? "（无）");
+            if (sprite.States != null && sprite.States.Count > 0)
+            {
+                var state = sprite.States[0];
+                AddPropertyRow("素材路径", state.Path ?? "（未设置）");
+                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
+                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
+                AddPropertyRow("X缩放", state.ScaleX?.ToString() ?? "1");
+                AddPropertyRow("Y缩放", state.ScaleY?.ToString() ?? "1");
+                AddPropertyRow("X旋转", state.RotX?.ToString() ?? "0");
+                AddPropertyRow("Y旋转", state.RotY?.ToString() ?? "0");
+                AddPropertyRow("Z旋转", state.RotZ?.ToString() ?? "0");
+                AddPropertyRow("X锚点", state.PivotX?.ToString() ?? "0");
+                AddPropertyRow("Y锚点", state.PivotY?.ToString() ?? "0");
+                AddPropertyRow("颜色", FormatColor(state.Color));
+            }
             else
             {
-                string unitStr = char.ToLower(value.Unit.ToString()[0]) + value.Unit.ToString().Substring(1);
-                writer.WriteValue($"{unitStr}:{value.Value}");
+                AddPropertyRow("提示", "无状态数据");
             }
         }
-    }
 
-    // ==========================================
-    // 🌟 七、 音符选择器 (用于批量绑定)
-    // ==========================================
-    public class NoteSelector
-    {
-        public HashSet<int> Types { get; set; } = new HashSet<int>();
-        public int Start { get; set; } = int.MinValue;
-        public int End { get; set; } = int.MaxValue;
-        public int? Direction { get; set; }
-        public float MinX { get; set; } = int.MinValue;
-        public float MaxX { get; set; } = int.MaxValue;
+        private void BuildTextForm(Text text)
+        {
+            AddSectionHeader("📝 文字属性");
+            AddPropertyRow("ID", text.Id ?? "（无）");
+            if (text.States != null && text.States.Count > 0)
+            {
+                var state = text.States[0];
+                AddPropertyRow("文字内容", state.Text ?? "（空）");
+                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
+                AddPropertyRow("字号", state.Size?.ToString() ?? "默认");
+                AddPropertyRow("对齐", state.Align ?? "Center");
+                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
+                AddPropertyRow("X缩放", state.ScaleX?.ToString() ?? "1");
+                AddPropertyRow("Y缩放", state.ScaleY?.ToString() ?? "1");
+                AddPropertyRow("X旋转", state.RotX?.ToString() ?? "0");
+                AddPropertyRow("Y旋转", state.RotY?.ToString() ?? "0");
+                AddPropertyRow("Z旋转", state.RotZ?.ToString() ?? "0");
+                AddPropertyRow("X锚点", state.PivotX?.ToString() ?? "0");
+                AddPropertyRow("Y锚点", state.PivotY?.ToString() ?? "0");
+                AddPropertyRow("颜色", FormatColor(state.Color));
+            }
+            else
+            {
+                AddPropertyRow("提示", "无状态数据");
+            }
+        }
 
-        public string DisplayName => $"选择器: {(Types.Count > 0 ? $"Type={string.Join(",", Types)}" : "所有类型")} ({Start}~{End})";
-    }
+        private void BuildLineForm(Line line)
+        {
+            AddSectionHeader("〰️ 线条属性");
+            AddPropertyRow("ID", line.Id ?? "（无）");
+            if (line.States != null && line.States.Count > 0)
+            {
+                var state = line.States[0];
+                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("线宽", FormatUnitFloat(state.Width));
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
+                AddPropertyRow("颜色", FormatColor(state.Color));
+                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
+                AddPropertyRow("端点数量", state.Pos?.Count.ToString() ?? "0");
+            }
+            else
+            {
+                AddPropertyRow("提示", "无状态数据");
+            }
+        }
 
-    // ==========================================
-    // 🌟 八、 线条端点坐标
-    // ==========================================
-    public class LinePosition
-    {
-        public UnitFloat X { get; set; }
-        public UnitFloat Y { get; set; }
-        public UnitFloat Z { get; set; }
-    }
+        private void BuildVideoForm(Video video)
+        {
+            AddSectionHeader("🎬 视频属性");
+            AddPropertyRow("ID", video.Id ?? "（无）");
+            if (video.States != null && video.States.Count > 0)
+            {
+                var state = video.States[0];
+                AddPropertyRow("视频路径", state.Path ?? "（未设置）");
+                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
+                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
+                AddPropertyRow("宽度", FormatUnitFloat(state.Width));
+                AddPropertyRow("高度", FormatUnitFloat(state.Height));
+                AddPropertyRow("颜色", FormatColor(state.Color));
+            }
+            else
+            {
+                AddPropertyRow("提示", "无状态数据");
+            }
+        }
 
-    // ==========================================
-    // 🌟 九、 触发器 (暂未使用，完整保留)
-    // ==========================================
-    public enum TriggerType { NoteClear, Combo, Score, None }
+        private void BuildControllerForm(Controller controller)
+        {
+            AddSectionHeader("🎛️ 场景控制器");
+            AddPropertyRow("ID", controller.Id ?? "（无）");
+            if (controller.States != null && controller.States.Count > 0)
+            {
+                var state = controller.States[0];
+                AddPropertyRow("触发时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("Arcade模式", state.Arcade?.ToString() ?? "未设置");
+                AddPropertyRow("背景暗化", state.BackgroundDim?.ToString() ?? "未设置");
+                AddPropertyRow("UI透明度", state.UiOpacity?.ToString() ?? "未设置");
+                AddPropertyRow("故事板透明度", state.StoryboardOpacity?.ToString() ?? "未设置");
+            }
+            else
+            {
+                AddPropertyRow("提示", "无状态数据");
+            }
+        }
 
-    public class Trigger
-    {
-        public int? Combo { get; set; }
-        [JsonIgnore] public int CurrentUses { get; set; }
-        public List<string> Destroy { get; set; } = new List<string>();
-        public List<int> Notes { get; set; } = new List<int>();
-        public int? Score { get; set; }
-        public List<string> Spawn { get; set; } = new List<string>();
-        public TriggerType Type { get; set; } = TriggerType.None;
-        public int? Uses { get; set; }
-    }
+        private void BuildNoteControllerForm(NoteController noteCtrl)
+        {
+            AddSectionHeader("🎵 音符控制器");
+            AddPropertyRow("ID", noteCtrl.Id ?? "（无）");
+            AddPropertyRow("绑定目标", noteCtrl.NoteTarget?.ToString() ?? "（未绑定）");
+            if (noteCtrl.States != null && noteCtrl.States.Count > 0)
+            {
+                var state = noteCtrl.States[0];
+                AddPropertyRow("触发时间", state.Time?.ToString() ?? "0");
+                AddPropertyRow("覆盖X坐标", state.OverrideX?.ToString() ?? "未设置");
+                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("X偏移", state.XOffset?.ToString() ?? "0");
+                AddPropertyRow("X倍率", state.XMultiplier?.ToString() ?? "1");
+                AddPropertyRow("大小倍率", state.SizeMultiplier?.ToString() ?? "1");
+                AddPropertyRow("不透明度倍率", state.OpacityMultiplier?.ToString() ?? "1");
+            }
+            else
+            {
+                AddPropertyRow("提示", "无状态数据");
+            }
+        }
 
-    // ==========================================
-    // 🌟 十、 状态基类 (所有状态共享)
-    // ==========================================
-    [Serializable]
-    public class ObjectState
-    {
-        [JsonConverter(typeof(TimeObjectConverter))]
-        public object AddTime { get; set; }
-        public bool? Destroy { get; set; }
-        public Ease? Easing { get; set; }
-        [JsonConverter(typeof(TimeObjectConverter))]
-        public object RelativeTime { get; set; }
-        [JsonConverter(typeof(TimeObjectConverter))]
-        public object Time { get; set; } = float.MaxValue;
-    }
+        private void BuildTemplateForm(StoryboardTemplate template)
+        {
+            AddSectionHeader("📦 模板组");
+            AddPropertyRow("图片数量", template.sprites?.Count.ToString() ?? "0");
+            AddPropertyRow("文字数量", template.texts?.Count.ToString() ?? "0");
+            AddPropertyRow("线条数量", template.lines?.Count.ToString() ?? "0");
+            AddPropertyRow("视频数量", template.videos?.Count.ToString() ?? "0");
+            AddPropertyRow("场景控制数量", template.controllers?.Count.ToString() ?? "0");
+            AddPropertyRow("音符控制数量", template.note_controllers?.Count.ToString() ?? "0");
+        }
 
-    // ==========================================
-    // 🌟 十一、 场景对象状态 (所有带坐标/旋转/缩放的状态)
-    // ==========================================
-    [Serializable]
-    public class StageObjectState : ObjectState
-    {
-        public bool? FillWidth { get; set; }
-        public UnitFloat Height { get; set; }
-        public int? Layer { get; set; }
-        public float? Opacity { get; set; }
-        public int? Order { get; set; }
-        public float? PivotX { get; set; }
-        public float? PivotY { get; set; }
-        public float? RotX { get; set; }
-        public float? RotY { get; set; }
-        public float? RotZ { get; set; }
-        public float? ScaleX { get; set; }
-        public float? ScaleY { get; set; }
-        public UnitFloat Width { get; set; }
-        public UnitFloat X { get; set; }
-        public UnitFloat Y { get; set; }
-        public UnitFloat Z { get; set; }
-    }
+        // ========== 格式化辅助方法 ==========
+        private string FormatUnitFloat(UnitFloat uf)
+        {
+            if (uf == null) return "0 (World)";
+            string unit = uf.Unit == ReferenceUnit.World ? "World" : uf.Unit.ToString();
+            return $"{uf.Value} ({unit})";
+        }
 
-    // ==========================================
-    // 🌟 十二、 各类型详细状态
-    // ==========================================
-    [Serializable]
-    public class SpriteState : StageObjectState
-    {
-        public CytoidColor Color { get; set; }
-        public string Path { get; set; }
-        public bool? PreserveAspect { get; set; }
-    }
+        private string FormatColor(CytoidColor color)
+        {
+            if (color == null) return "默认白色";
+            return $"R:{color.R} G:{color.G} B:{color.B} A:{color.A}";
+        }
 
-    [Serializable]
-    public class TextState : StageObjectState
-    {
-        public string Align { get; set; }
-        public CytoidColor Color { get; set; }
-        public string Font { get; set; }
-        public int? Size { get; set; }
-        public string Text { get; set; }
-        public float? LetterSpacing { get; set; }
-        public FontWeight? FontWeight { get; set; }
-    }
+        // ========== 按钮事件 ==========
+        private void BtnEditProperties_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentObject != null)
+                OnEditPropertiesRequested?.Invoke(_currentObject);
+        }
 
-    [Serializable]
-    public class VideoState : StageObjectState
-    {
-        public CytoidColor Color { get; set; }
-        public string Path { get; set; }
-    }
-
-    [Serializable]
-    public class LineState : StageObjectState
-    {
-        public List<LinePosition> Pos { get; set; } = new List<LinePosition>();
-        public UnitFloat Width { get; set; }
-        public CytoidColor Color { get; set; }
-        public float? Opacity { get; set; }
-        public int? Layer { get; set; }
-        public int? Order { get; set; }
-    }
-
-    [Serializable]
-    public class ControllerState : ObjectState
-    {
-        // 所有官方特效字段
-        public bool? Arcade { get; set; }
-        public float? ArcadeContrast { get; set; }
-        public float? ArcadeIntensity { get; set; }
-        public float? ArcadeInterferanceSize { get; set; }
-        public float? ArcadeInterferanceSpeed { get; set; }
-        public bool? Artifact { get; set; }
-        public float? ArtifactColorisation { get; set; }
-        public float? ArtifactIntensity { get; set; }
-        public float? ArtifactNoise { get; set; }
-        public float? ArtifactParasite { get; set; }
-        public float? BackgroundDim { get; set; }
-        public bool? Bloom { get; set; }
-        public float? BloomIntensity { get; set; }
-        public float? Brightness { get; set; }
-        public bool? Chromatic { get; set; }
-        public bool? Chromatical { get; set; }
-        public float? ChromaticalFade { get; set; }
-        public float? ChromaticalIntensity { get; set; }
-        public float? ChromaticalSpeed { get; set; }
-        public float? ChromaticEnd { get; set; }
-        public float? ChromaticIntensity { get; set; }
-        public float? ChromaticStart { get; set; }
-        public bool? ColorAdjustment { get; set; }
-        public bool? ColorFilter { get; set; }
-        public CytoidColor ColorFilterColor { get; set; }
-        public float? Contrast { get; set; }
-        public bool? Dream { get; set; }
-        public float? DreamIntensity { get; set; }
-        public bool? Fisheye { get; set; }
-        public float? FisheyeIntensity { get; set; }
-        public bool? Focus { get; set; }
-        public CytoidColor FocusColor { get; set; }
-        public float? FocusIntensity { get; set; }
-        public float? FocusSize { get; set; }
-        public float? FocusSpeed { get; set; }
-        public float? Fov { get; set; }
-        public bool? Glitch { get; set; }
-        public float? GlitchIntensity { get; set; }
-        public bool? GrayScale { get; set; }
-        public float? GrayScaleIntensity { get; set; }
-        public bool? Noise { get; set; }
-        public float? NoiseIntensity { get; set; }
-        public List<CytoidColor> NoteFillColors { get; set; }
-        public float? NoteOpacityMultiplier { get; set; }
-        public CytoidColor NoteRingColor { get; set; }
-        public bool? OverrideScanlinePos { get; set; }
-        public bool? Perspective { get; set; }
-        public bool? RadialBlur { get; set; }
-        public float? RadialBlurIntensity { get; set; }
-        public float? RotX { get; set; }
-        public float? RotY { get; set; }
-        public float? RotZ { get; set; }
-        public float? Saturation { get; set; }
-        public CytoidColor ScanlineColor { get; set; }
-        public float? ScanlineOpacity { get; set; }
-        public UnitFloat ScanlinePos { get; set; }
-        public bool? ScanlineSmoothing { get; set; }
-        public bool? Sepia { get; set; }
-        public float? SepiaIntensity { get; set; }
-        public bool? Shockwave { get; set; }
-        public float? ShockwaveSpeed { get; set; }
-        public float? Size { get; set; }
-        public float? StoryboardOpacity { get; set; }
-        public bool? Tape { get; set; }
-        public float? UiOpacity { get; set; }
-        public bool? Vignette { get; set; }
-        public CytoidColor VignetteColor { get; set; }
-        public float? VignetteEnd { get; set; }
-        public float? VignetteIntensity { get; set; }
-        public float? VignetteStart { get; set; }
-        public UnitFloat X { get; set; }
-        public UnitFloat Y { get; set; }
-        public UnitFloat Z { get; set; }
-    }
-
-    [Serializable]
-    public class NoteControllerState : ObjectState
-    {
-        public int? Note { get; set; }
-        public bool? OverrideX { get; set; }
-        public UnitFloat X { get; set; }
-        public float? XMultiplier { get; set; }
-        public float? XOffset { get; set; }
-        public bool? OverrideY { get; set; }
-        public UnitFloat Y { get; set; }
-        public float? YMultiplier { get; set; }
-        public float? YOffset { get; set; }
-        public bool? OverrideZ { get; set; }
-        public UnitFloat Z { get; set; }
-        public bool? OverrideRotX { get; set; }
-        public float? RotX { get; set; }
-        public bool? OverrideRotY { get; set; }
-        public float? RotY { get; set; }
-        public bool? OverrideRotZ { get; set; }
-        public float? RotZ { get; set; }
-        public bool? OverrideRingColor { get; set; }
-        public CytoidColor RingColor { get; set; }
-        public bool? OverrideFillColor { get; set; }
-        public CytoidColor FillColor { get; set; }
-        public float? OpacityMultiplier { get; set; }
-        public float? SizeMultiplier { get; set; }
-        public float? HitboxMultiplier { get; set; }
-        public int? HoldDirection { get; set; }
-        public int? Style { get; set; }
-    }
-
-    // ==========================================
-    // 🌟 十三、 对象层次结构 (完全匹配官方)
-    // ==========================================
-    [Serializable]
-    public abstract class StoryboardObject
-    {
-        public string Id { get; set; }
-        public string TargetId { get; set; }
-        public string ParentId { get; set; }
-    }
-
-    [Serializable]
-    public class StoryboardObject<T> : StoryboardObject where T : ObjectState
-    {
-        public List<T> States { get; set; } = new List<T>();
-    }
-
-    [Serializable]
-    public class StageObject<TS> : StoryboardObject<TS> where TS : StageObjectState { }
-
-    // 具体类型
-    [Serializable] public class Sprite : StageObject<SpriteState> { }
-    [Serializable] public class Text : StageObject<TextState> { }
-    [Serializable] public class Video : StageObject<VideoState> { }
-    [Serializable] public class Line : StageObject<LineState> { }
-    [Serializable] public class Controller : StoryboardObject<ControllerState> { }
-
-    [Serializable]
-    public class NoteController : StoryboardObject<NoteControllerState>
-    {
-        [JsonProperty("note")]
-        public object NoteTarget { get; set; }  // 可以是 int 或 NoteSelector
-    }
-
-    // ==========================================
-    // 🌟 十四、 故事板根节点 & 模板
-    // ==========================================
-    [Serializable]
-    public class StoryboardRoot
-    {
-        public List<Sprite> sprites { get; set; } = new List<Sprite>();
-        public List<Text> texts { get; set; } = new List<Text>();
-        public List<Line> lines { get; set; } = new List<Line>();
-        public List<Video> videos { get; set; } = new List<Video>();
-        public List<Controller> controllers { get; set; } = new List<Controller>();
-        public List<NoteController> note_controllers { get; set; } = new List<NoteController>();
-        public Dictionary<string, StoryboardTemplate> templates { get; set; } = new Dictionary<string, StoryboardTemplate>();
-    }
-
-    [Serializable]
-    public class StoryboardTemplate : StoryboardRoot { }
-
-    // ==========================================
-    // 🌟 十五、 字体粗细枚举 (官方值)
-    // ==========================================
-    public enum FontWeight
-    {
-        ExtraLight, Regular, Bold, ExtraBold
+        private void BtnSaveAsMaterial_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentObject != null)
+                OnSaveAsMaterialRequested?.Invoke(_currentObject);
+        }
     }
 }
