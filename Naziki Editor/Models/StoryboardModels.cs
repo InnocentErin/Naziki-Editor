@@ -326,8 +326,11 @@ namespace Naziki_Editor.Models
     [Serializable]
     public abstract class StoryboardObject
     {
+        [JsonProperty(NullValueHandling = NullValueHandling.Include)]
         public string Id { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Include)]
         public string TargetId { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Include)]
         public string ParentId { get; set; }
     }
 

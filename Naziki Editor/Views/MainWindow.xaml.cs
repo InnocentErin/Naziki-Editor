@@ -104,6 +104,8 @@ namespace Naziki_Editor.Views
                     _currentStoryboardRoot = root;
 
                     EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                    // 🌟 新增：强制雷达归零，切断历史残影！
+                    CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
 
@@ -120,6 +122,8 @@ namespace Naziki_Editor.Views
             {
                 // 如果是全新项目，初始化白板环境
                 EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                // 🌟 新增：强制雷达归零，切断历史残影！
+                CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
 
                 // 录入【第0步真空底稿】
@@ -186,6 +190,8 @@ namespace Naziki_Editor.Views
                 // 录入故事板导入快照
                 _currentStoryboardPath = path;
                 _currentStoryboardRoot = root;
+                // 🌟 新增：强制雷达归零，切断历史残影！
+                CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
 

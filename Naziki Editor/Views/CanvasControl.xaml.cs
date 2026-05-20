@@ -67,7 +67,6 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void RefreshJsonView()
         {
-            _isRefreshing = true;
 
             if (JsonEditor == null) return;
 
@@ -82,8 +81,18 @@ namespace Naziki_Editor.Views
             {
                 _isRefreshing = true; // 开启系统保护锁，防止触发变脏监控
 
-                // ✅ 全新官方蛇形大一统写法：隐藏 null，自动转换为小写蛇形命名！
-                JsonEditor.Text = StoryboardSerializer.ToJson(_lastSelectedObject);
+                // 🎯 核心抉择：全家福 vs 单体方块
+                if (_lastSelectedObject == null)
+                {
+                    // 如果雷达没有锁定目标，打印整个根节点（全宇宙）！
+                    JsonEditor.Text = StoryboardSerializer.ToJson(currentModel);
+                }
+                else
+                {
+                    // 如果锁定了具体目标，就只打印这个具体方块！
+                    JsonEditor.Text = StoryboardSerializer.ToJson(_lastSelectedObject);
+                }
+
                 HasUnappliedChanges = false; // 重置本端脏标记
 
                 TxtJsonStatus.Text = "✅ 代码已刷新为最新状态。";
