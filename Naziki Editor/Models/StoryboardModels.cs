@@ -37,7 +37,7 @@ namespace Naziki_Editor.Models
 
     public enum ReferenceUnit { World, StageX, StageY, NoteX, NoteY, CameraX, CameraY }
     public enum FontWeight { ExtraLight, Regular, Bold, ExtraBold }
-    public enum TriggerType { NoteClear, Combo, Score, None }
+    public enum TriggerType { NoteClear, Combo, Score, None }UnitFloat
 
 
 

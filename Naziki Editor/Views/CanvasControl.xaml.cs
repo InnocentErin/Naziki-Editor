@@ -175,6 +175,10 @@ namespace Naziki_Editor.Views
             {
                 ExecuteRadarJump(obj);
             }
+            if (CanvasTabControl != null && CanvasTabControl.SelectedIndex == 1)
+            {
+                RefreshJsonView();
+            }
         }
 
         // ==========================================

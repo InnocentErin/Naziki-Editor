@@ -32,7 +32,11 @@ namespace Naziki_Editor.Views
         {
             InitializeComponent();
             UpdateEmptyHintVisibility();
+            // 在 MainWindow.xaml.cs 的构造函数或加载逻辑里：
+            
         }
+
+
         // ==========================================
         // 🌟 核心：打开故事板 (脏活全甩给解析和扫描引擎！)
         // ==========================================
@@ -172,6 +176,11 @@ namespace Naziki_Editor.Views
                 {
                     OnEventNodeSelected?.Invoke(selectedItem.Tag);
                 }
+            }
+            else if (e.AddedItems.Count == 0)
+            {
+                // 🌟 新增兜底：如果用户点击空白处导致没有项被选中，直接发送 null 触发全家福！
+                OnEventNodeSelected?.Invoke(null);
             }
         }
 
