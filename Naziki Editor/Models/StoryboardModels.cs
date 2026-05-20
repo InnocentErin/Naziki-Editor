@@ -157,6 +157,73 @@ namespace Naziki_Editor.Models
     }
 
 
+    // ==========================================
+    // 🌟 高级翻译官 3 号：专门教程序怎么认 Cytoid 的十六进制颜色！
+    // ==========================================
+    public class CytoidColorConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) => objectType == typeof(CytoidColor);
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JToken token = JToken.Load(reader);
+
+            // 🎯 情况 1：如果是官方的十六进制字符串 (比如 "#FFFFFF" 或 "#4568dc")
+            if (token.Type == JTokenType.String)
+            {
+                string hex = token.ToString().TrimStart('#');
+                var color = new CytoidColor();
+                try
+                {
+                    if (hex.Length == 6) // 标准 RGB
+                    {
+                        color.R = Convert.ToInt32(hex.Substring(0, 2), 16);
+                        color.G = Convert.ToInt32(hex.Substring(2, 2), 16);
+                        color.B = Convert.ToInt32(hex.Substring(4, 2), 16);
+                        color.A = 1f;
+                    }
+                    else if (hex.Length == 8) // 带透明度的 RGBA
+                    {
+                        color.R = Convert.ToInt32(hex.Substring(0, 2), 16);
+                        color.G = Convert.ToInt32(hex.Substring(2, 2), 16);
+                        color.B = Convert.ToInt32(hex.Substring(4, 2), 16);
+                        color.A = Convert.ToInt32(hex.Substring(6, 2), 16) / 255f;
+                    }
+                }
+                catch { /* 解析失败则保留默认白色 */ }
+                return color;
+            }
+            // 🎯 情况 2：如果是咱们编辑器自己存出来的标准对象，正常兜底读取
+            else if (token.Type == JTokenType.Object)
+            {
+                var obj = (JObject)token;
+                return new CytoidColor
+                {
+                    R = obj["R"] != null ? (float)obj["R"] : 255,
+                    G = obj["G"] != null ? (float)obj["G"] : 255,
+                    B = obj["B"] != null ? (float)obj["B"] : 255,
+                    A = obj["A"] != null ? (float)obj["A"] : 1
+                };
+            }
+
+            return new CytoidColor();
+        }
+
+        public override bool CanWrite => true; // 支持保存工程时输出
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            var c = (CytoidColor)value;
+            if (c == null) { writer.WriteNull(); return; }
+
+            // 保存时转回十六进制，保持官方原汁原味
+            if (c.A >= 1f)
+                writer.WriteValue($"#{(int)c.R:X2}{(int)c.G:X2}{(int)c.B:X2}");
+            else
+                writer.WriteValue($"#{(int)c.R:X2}{(int)c.G:X2}{(int)c.B:X2}{(int)(c.A * 255):X2}");
+        }
+    }
+
+
 
 
 
@@ -180,6 +247,7 @@ namespace Naziki_Editor.Models
     }
 
     [Serializable]
+    [JsonConverter(typeof(CytoidColorConverter))] // ✨ 挂载新的颜色翻译官！
     public class CytoidColor
     {
         public float A { get; set; } = 1;
@@ -234,6 +302,7 @@ namespace Naziki_Editor.Models
         public object AddTime { get; set; }
         public bool? Destroy { get; set; }
         public Easing? Easing { get; set; }
+        public string Template { get; set; }
 
         // 🌟 核心修正：相对时间也可能有特殊格式，用 object！
         [JsonConverter(typeof(TimeObjectConverter))]
@@ -263,6 +332,7 @@ namespace Naziki_Editor.Models
         public UnitFloat X { get; set; }
         public UnitFloat Y { get; set; }
         public UnitFloat Z { get; set; }
+        public float? Scale { get; set; }
     }
 
     [Serializable]
@@ -395,17 +465,16 @@ namespace Naziki_Editor.Models
             // 创建目标对象实例（必须有无参构造函数）
             var target = (StoryboardObject)Activator.CreateInstance(objectType);
 
-            // 获取 States 属性信息
+            // 🌟 修复点 1：安全获取 States 属性与真正的泛型参数 T (例如 SpriteState)
             var statesProp = objectType.GetProperty("States");
-            // 获取状态类型 T
-            Type stateType = objectType.GetGenericArguments()[0];
+            Type stateType = statesProp.PropertyType.GetGenericArguments()[0]; // 完美避开越界报错！
 
             // 处理基类 StoryboardObject 的属性
             target.Id = obj["id"]?.ToString();
             target.TargetId = obj["target_id"]?.ToString();
             target.ParentId = obj["parent_id"]?.ToString();
 
-            // 处理 NoteController 的特殊 note 字段
+            // 处理 NoteController 的特殊 note 字段 (保留了你的原始逻辑)
             if (target is NoteController noteCtrl && obj["note"] != null)
             {
                 var noteToken = obj["note"];
@@ -417,54 +486,84 @@ namespace Naziki_Editor.Models
                     noteCtrl.NoteTarget = noteToken.ToString();
             }
 
-            // 1. 创建初始状态对象，并从 JSON 根部填充属性
-            object initialState = Activator.CreateInstance(stateType);
-            foreach (var prop in stateType.GetProperties())
-            {
-                if (!prop.CanWrite) continue;
-                string jsonName = GetJsonPropertyName(prop);
-                if (obj[jsonName] != null)
-                {
-                    try
-                    {
-                        var value = obj[jsonName].ToObject(prop.PropertyType, serializer);
-                        prop.SetValue(initialState, value);
-                    }
-                    catch { /* 忽略无法转换的属性 */ }
-                }
-            }
+            // 准备构建状态列表
+            Type listType = typeof(List<>).MakeGenericType(stateType);
+            System.Collections.IList statesList = (System.Collections.IList)Activator.CreateInstance(listType);
 
-            // 2. 准备最终的 States 列表（先添加初始状态）
-            var finalStates = new List<object> { initialState };
+            // 🌟 修复点 2：放弃之前的粗暴 foreach，直接使用 serializer 解析！
+            // 这样做会让 Newtonsoft 自动触发挂载在 Time 上的 TimeObjectConverter！
+            object initialState = serializer.Deserialize(obj.CreateReader(), stateType);
+            statesList.Add(initialState);
 
-            // 3. 如果有 states 数组，将其每个元素反序列化后加入列表
+            // 🌟 修复点 3：如果有 states 数组，同样使用 serializer 解析并加入列表
             if (obj["states"] is JArray statesArray)
             {
                 foreach (var item in statesArray)
                 {
-                    var stateObj = item.ToObject(stateType, serializer);
-                    finalStates.Add(stateObj);
+                    object extraState = serializer.Deserialize(item.CreateReader(), stateType);
+                    statesList.Add(extraState);
                 }
             }
 
-            // 4. 将 finalStates 转换为目标类型 List<T> 并赋值
-            var typedList = Activator.CreateInstance(statesProp.PropertyType);
-            var addMethod = statesProp.PropertyType.GetMethod("Add");
-            if (addMethod == null)
-                throw new InvalidOperationException($"Type {statesProp.PropertyType.Name} does not have an Add method.");
+            // 将拼装好的完整状态链赋值给主对象的 States 属性
+            statesProp.SetValue(target, statesList);
 
-            foreach (var state in finalStates)
-            {
-                addMethod.Invoke(typedList, new[] { state });
-            }
-
-            statesProp.SetValue(target, typedList);
             return target;
         }
 
-        public override bool CanWrite => false;
+        // ✨ 开启自定义写出魔法！
+        public override bool CanWrite => true;
+
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-            => throw new NotImplementedException();
+        {
+            var target = (StoryboardObject)value;
+            var objType = target.GetType();
+
+            // 创建一个空白的 JSON 容器，准备手动按官方格式组装
+            var jObj = new JObject();
+
+            // 1. 写入基类属性 (id, target_id, parent_id)
+            if (!string.IsNullOrEmpty(target.Id)) jObj["id"] = target.Id;
+            if (!string.IsNullOrEmpty(target.TargetId)) jObj["target_id"] = target.TargetId;
+            if (!string.IsNullOrEmpty(target.ParentId)) jObj["parent_id"] = target.ParentId;
+
+            // 特殊处理 NoteController 的 note 字段
+            if (target is NoteController noteCtrl && noteCtrl.NoteTarget != null)
+            {
+                jObj["note"] = JToken.FromObject(noteCtrl.NoteTarget, serializer);
+            }
+
+            // 2. 提取咱们存储的状态列表 States
+            var statesProp = objType.GetProperty("States");
+            var statesList = statesProp.GetValue(target) as System.Collections.IList;
+
+            if (statesList != null && statesList.Count > 0)
+            {
+                // 🌟 3. 核心修复：把第 0 帧（初始状态）“平铺”到根节点！
+                var initialState = statesList[0];
+                var initialToken = JObject.FromObject(initialState, serializer);
+
+                // 将第 0 帧里的所有属性（比如 time, x, y, opacity）直接贴在根部
+                foreach (var prop in initialToken.Properties())
+                {
+                    jObj[prop.Name] = prop.Value; // ✨ 完美修复：使用索引器赋值。如果遇到重复的 note，它会温柔地覆盖，绝不报错！
+                }
+
+                // 🌟 4. 如果还有更多的关键帧，才把它们塞进 states 数组里
+                if (statesList.Count > 1)
+                {
+                    var statesArray = new JArray();
+                    for (int i = 1; i < statesList.Count; i++)
+                    {
+                        statesArray.Add(JObject.FromObject(statesList[i], serializer));
+                    }
+                    jObj["states"] = statesArray;
+                }
+            }
+
+            // 将拼装好的纯正官方格式写出！
+            jObj.WriteTo(writer);
+        }
 
         private string GetJsonPropertyName(System.Reflection.PropertyInfo prop)
         {
