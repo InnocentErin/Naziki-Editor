@@ -73,83 +73,35 @@ namespace Naziki_Editor.Views
         // ==========================================
         // 🎨 UI 专职：扁平化列表渲染 (解除文件夹封装)
         // ==========================================
+        // 🎨 UI 专职：扁平化列表渲染 (一键大一统！)
         public void LoadStoryboardUI(StoryboardRoot root)
         {
             ClearAllDrawers();
 
-            if (root.sprites?.Count > 0)
+            if (root.sprites?.Count > 0) foreach (var obj in root.sprites)
+                SpriteListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+
+            if (root.texts?.Count > 0) foreach (var obj in root.texts)
+                TextListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+
+            if (root.videos?.Count > 0) foreach (var obj in root.videos)
+                VideoListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+
+            if (root.lines?.Count > 0) foreach (var obj in root.lines)
+                LinesListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+
+            if (root.controllers?.Count > 0) foreach (var obj in root.controllers)
+                SceneListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+
+            if (root.note_controllers?.Count > 0) foreach (var obj in root.note_controllers)
             {
-                foreach (var sprite in root.sprites)
-                {
-                    ListBoxItem item = new ListBoxItem { Tag = sprite };
-                    item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = sprite });
-                    SpriteListBox.Items.Add(item);
-                }
+                ListBoxItem item = new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj };
+                if (obj.NoteTarget is JObject) { item.Foreground = Brushes.DarkCyan; item.FontWeight = FontWeights.Bold; }
+                NoteCtrlListBox.Items.Add(item);
             }
 
-            if (root.texts?.Count > 0)
-            {
-                foreach (var txt in root.texts)
-                {
-                    ListBoxItem item = new ListBoxItem { Tag = txt };
-                    item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = txt });
-                    TextListBox.Items.Add(item);
-                }
-            }
-
-            if (root.videos?.Count > 0)
-            {
-                foreach (var video in root.videos)
-                {
-                    ListBoxItem item = new ListBoxItem { Tag = video };
-                    item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = video });
-                    VideoListBox.Items.Add(item);
-                }
-            }
-
-            if (root.lines?.Count > 0)
-            {
-                foreach (var line in root.lines)
-                {
-                    ListBoxItem item = new ListBoxItem { Tag = line };
-                    item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = line });
-                    LinesListBox.Items.Add(item);
-                }
-            }
-
-            if (root.controllers?.Count > 0)
-            {
-                int index = 1;
-                foreach (var ctrl in root.controllers)
-                {
-                    ListBoxItem item = new ListBoxItem { Content = $"场景控制器 {index++}", Tag = ctrl };
-                    SceneListBox.Items.Add(item);
-                }
-            }
-
-            if (root.note_controllers?.Count > 0)
-            {
-                foreach (var ctrl in root.note_controllers)
-                {
-                    ListBoxItem item = new ListBoxItem { Tag = ctrl };
-                    item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("DisplayName") { Source = ctrl });
-                    if (ctrl.NoteTarget is JObject)
-                    {
-                        item.Foreground = Brushes.DarkCyan;
-                        item.FontWeight = FontWeights.Bold;
-                    }
-                    NoteCtrlListBox.Items.Add(item);
-                }
-            }
-
-            if (root.templates?.Count > 0)
-            {
-                foreach (var kvp in root.templates)
-                {
-                    ListBoxItem item = new ListBoxItem { Content = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key, Tag = kvp.Value };
-                    EventTemplateListBox.Items.Add(item);
-                }
-            }
+            if (root.templates?.Count > 0) foreach (var kvp in root.templates)
+                EventTemplateListBox.Items.Add(new ListBoxItem { Content = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key, Tag = kvp.Value });
 
             UpdateEmptyHintVisibility();
         }

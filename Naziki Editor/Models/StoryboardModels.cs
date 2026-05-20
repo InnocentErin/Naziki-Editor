@@ -89,8 +89,25 @@ namespace Naziki_Editor.Models
             return new UnitFloat(); // 兜底保护
         }
 
-        public override bool CanWrite => false; // 序列化时按默认格式输出即可
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) => throw new NotImplementedException();
+        public override bool CanWrite => true; // 序列化时按默认格式输出即可
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            var uf = (UnitFloat)value;
+            if (uf == null) { writer.WriteNull(); return; }
+
+            // 🎯 如果是默认世界坐标系，直接输出纯数字 (比如 10.5)
+            if (uf.Unit == ReferenceUnit.World)
+            {
+                writer.WriteValue(uf.Value);
+            }
+            else
+            {
+                // 🎯 如果有特殊参考系，转成官方驼峰字符串 (比如 "noteX:10.5")
+                string unitStr = uf.Unit.ToString();
+                unitStr = char.ToLower(unitStr[0]) + unitStr.Substring(1);
+                writer.WriteValue($"{unitStr}:{uf.Value}");
+            }
+        }
     }
 
     // ==========================================
