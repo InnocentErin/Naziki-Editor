@@ -232,6 +232,7 @@ namespace Naziki_Editor.Models
     // 🌟 三、 官方核心数据结构 (Structs / Classes)
     // ==========================================
     [Serializable]
+    [JsonConverter(typeof(UnitFloatConverter))] // ✨ 贴上这句！强制让所有序列化都走翻译官！
     public class UnitFloat
     {
         public float Value { get; set; }
@@ -514,6 +515,26 @@ namespace Naziki_Editor.Models
         // ✨ 开启自定义写出魔法！
         public override bool CanWrite => true;
 
+        // 🧹 专用状态净化器：剔除空值，并将 C# 命名转为官方蛇形命名
+        private JObject CleanUpStateObject(JObject rawToken)
+        {
+            var cleanObj = new JObject();
+            foreach (var prop in rawToken.Properties())
+            {
+                // 🛡️ 核心防御 1：坚决丢弃所有 null 值！
+                if (prop.Value.Type == JTokenType.Null) continue;
+
+                // 🛡️ 核心防御 2：强制把 PascalCase 变成 Cytoid 官方的 snake_case！
+                // 比如：AddTime -> add_time，PivotX -> pivot_x，Color -> color
+                string snakeName = string.Concat(prop.Name.Select((x, i) => i > 0 && char.IsUpper(x) ? "_" + x.ToString() : x.ToString())).ToLower();
+
+                cleanObj[snakeName] = prop.Value;
+            }
+            return cleanObj;
+        }
+
+
+
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             var target = (StoryboardObject)value;
@@ -542,11 +563,12 @@ namespace Naziki_Editor.Models
                 // 🌟 3. 核心修复：把第 0 帧（初始状态）“平铺”到根节点！
                 var initialState = statesList[0];
                 var initialToken = JObject.FromObject(initialState, serializer);
+                var cleanInitialToken = CleanUpStateObject(initialToken); // 🧹 呼叫净化器！
 
-                // 将第 0 帧里的所有属性（比如 time, x, y, opacity）直接贴在根部
-                foreach (var prop in initialToken.Properties())
+                // 将净化后的属性直接贴在根部
+                foreach (var prop in cleanInitialToken.Properties())
                 {
-                    jObj[prop.Name] = prop.Value; // ✨ 完美修复：使用索引器赋值。如果遇到重复的 note，它会温柔地覆盖，绝不报错！
+                    jObj[prop.Name] = prop.Value;
                 }
 
                 // 🌟 4. 如果还有更多的关键帧，才把它们塞进 states 数组里
@@ -555,7 +577,8 @@ namespace Naziki_Editor.Models
                     var statesArray = new JArray();
                     for (int i = 1; i < statesList.Count; i++)
                     {
-                        statesArray.Add(JObject.FromObject(statesList[i], serializer));
+                        var rawState = JObject.FromObject(statesList[i], serializer);
+                        statesArray.Add(CleanUpStateObject(rawState)); // 🧹 呼叫净化器处理后续关键帧！
                     }
                     jObj["states"] = statesArray;
                 }

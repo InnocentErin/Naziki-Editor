@@ -22,7 +22,7 @@
             </Border>
         </TabItem>
 
-        <TabItem Header="检查编辑后的 JSON 源代码">
+        <TabItem Header="事件源代码">
             <Grid Background="{DynamicResource MainBgColor}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -34,7 +34,12 @@
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="BtnApplyJson" Content="🚀 应用修改 (Apply)" Click="BtnApplyJson_Click" 
                                     Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" 
+                                    Padding="15,5" BorderThickness="0" Cursor="Hand" Margin="0,0,10,0"/>
+
+                            <Button x:Name="BtnPreviewGlobal" Content="🔍 预览全局代码" Click="BtnPreviewGlobal_Click" 
+                                    Background="#444444" Foreground="White" FontWeight="Bold" 
                                     Padding="15,5" BorderThickness="0" Cursor="Hand"/>
+
                             <TextBlock x:Name="TxtJsonStatus" Text="💡 请在下方编辑代码，完成后点击应用以同步到事件列表。" 
                                        Foreground="{DynamicResource TipsColor}" VerticalAlignment="Center" Margin="15,0,0,0"/>
                         </StackPanel>
@@ -42,15 +47,16 @@
                 </Border>
 
                 <avalonEdit:TextEditor Grid.Row="1" x:Name="JsonEditor"
-                                       FontFamily="Consolas" 
-                                       FontSize="13" 
-                                       ShowLineNumbers="True"
-                                       Background="{DynamicResource MainBgColor}"
-                                       Foreground="{DynamicResource MainTextColor}"
-                                       HorizontalScrollBarVisibility="Auto" 
-                                       VerticalScrollBarVisibility="Auto"
-                                       Padding="5"
-                                       TextChanged="JsonEditor_TextChanged"/>
+                                       FontFamily="Consolas" FontSize="13" ShowLineNumbers="True"
+                                       Background="{DynamicResource MainBgColor}" Foreground="{DynamicResource MainTextColor}"
+                                       HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                       Padding="5" TextChanged="JsonEditor_TextChanged"/>
+
+                <Grid x:Name="NoSelectionHint" Grid.Row="1" Background="{DynamicResource MainBgColor}" Visibility="Collapsed">
+                    <TextBlock Text="选择左侧事件列表中的事件以查看其源代码，或点击上方「预览全局代码」。"
+                               Foreground="{DynamicResource TipsColor}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontSize="14" Opacity="0.7"/>
+                </Grid>
             </Grid>
         </TabItem>
         

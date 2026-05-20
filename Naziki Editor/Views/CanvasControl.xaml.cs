@@ -25,6 +25,15 @@ namespace Naziki_Editor.Views
         // 雷达缓存：记录主窗口当前选中的对象
         private object _lastSelectedObject;
 
+        private bool _isGlobalPreviewMode = false;
+        // 在类最上方定义全局开关，并新增按钮事件
+        private void BtnPreviewGlobal_Click(object sender, RoutedEventArgs e)
+        {
+            _isGlobalPreviewMode = true;
+            _lastSelectedObject = null;
+            RefreshJsonView();
+        }
+
         public CanvasControl()
         {
             InitializeComponent();
@@ -67,50 +76,47 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void RefreshJsonView()
         {
-
             if (JsonEditor == null) return;
-
             var currentModel = RequestCurrentStoryboardRoot?.Invoke();
-            if (currentModel == null)
-            {
-                JsonEditor.Text = "{\n  \"提示\": \"当前无数据\"\n}";
-                return;
-            }
+            if (currentModel == null) return;
 
             try
             {
-                _isRefreshing = true; // 开启系统保护锁，防止触发变脏监控
-
-                // 🎯 核心抉择：全家福 vs 单体方块
-                if (_lastSelectedObject == null)
+                _isRefreshing = true;
+                // 🌟 全局预览模式：不管选中什么，都直接展示整个故事板的 JSON，且隐藏“未选中提示”。
+                if (_isGlobalPreviewMode)
                 {
-                    // 如果雷达没有锁定目标，打印整个根节点（全宇宙）！
+                    NoSelectionHint.Visibility = Visibility.Collapsed;
+                    JsonEditor.Visibility = Visibility.Visible;
                     JsonEditor.Text = StoryboardSerializer.ToJson(currentModel);
+                }
+                else if (_lastSelectedObject == null)
+                {
+                    NoSelectionHint.Visibility = Visibility.Visible;
+                    JsonEditor.Visibility = Visibility.Collapsed;
+                    JsonEditor.Text = "";
                 }
                 else
                 {
-                    // 如果锁定了具体目标，就只打印这个具体方块！
+                    NoSelectionHint.Visibility = Visibility.Collapsed;
+                    JsonEditor.Visibility = Visibility.Visible;
                     JsonEditor.Text = StoryboardSerializer.ToJson(_lastSelectedObject);
                 }
-
-                HasUnappliedChanges = false; // 重置本端脏标记
-
+                // 刷新完毕，重置状态
+                HasUnappliedChanges = false;
                 TxtJsonStatus.Text = "✅ 代码已刷新为最新状态。";
                 TxtJsonStatus.Foreground = new SolidColorBrush(Colors.LightGreen);
-
-                if (_lastSelectedObject != null)
-                {
+                // 🌟 修复：刷新后如果不是全局预览模式，才执行雷达跳转！避免全局模式下的频繁跳跃引发崩溃。
+                if (_lastSelectedObject != null && !_isGlobalPreviewMode)
                     ExecuteRadarJump(_lastSelectedObject);
-                }
             }
             catch (Exception ex)
             {
+                JsonEditor.Visibility = Visibility.Visible;
+                NoSelectionHint.Visibility = Visibility.Collapsed;
                 JsonEditor.Text = "// 序列化异常: " + ex.Message;
             }
-            finally
-            {
-                _isRefreshing = false; // 解除保护锁
-            }
+            finally { _isRefreshing = false; }
         }
 
         // ==========================================
@@ -135,10 +141,21 @@ namespace Naziki_Editor.Views
         {
             try
             {
-                var newRoot = JsonConvert.DeserializeObject<StoryboardRoot>(JsonEditor.Text);
-                if (newRoot == null) throw new Exception("解析结果为空！");
+                var root = RequestCurrentStoryboardRoot?.Invoke();
 
-                OnApplyJsonSuccess?.Invoke(newRoot);
+                if (_isGlobalPreviewMode)
+                {
+                    // 🌍 全局模式：重塑整个宇宙
+                    var newRoot = JsonConvert.DeserializeObject<StoryboardRoot>(JsonEditor.Text);
+                    if (newRoot == null) throw new Exception("解析结果为空！");
+                    OnApplyJsonSuccess?.Invoke(newRoot);
+                }
+                else if (_lastSelectedObject != null)
+                {
+                    // 🎯 局部模式：直接把修改像“打点滴”一样灌入内存中的单体对象！
+                    JsonConvert.PopulateObject(JsonEditor.Text, _lastSelectedObject);
+                    OnApplyJsonSuccess?.Invoke(root);
+                }
 
                 HasUnappliedChanges = false;
                 TxtJsonStatus.Text = "🎉 应用成功！事件列表与属性面板已同步。";
@@ -171,13 +188,17 @@ namespace Naziki_Editor.Views
         public void TrackSelectedObject(object obj)
         {
             _lastSelectedObject = obj;
-            if (JsonEditor.IsVisible)
-            {
-                ExecuteRadarJump(obj);
-            }
+            _isGlobalPreviewMode = false; // ✨ 只要点击了列表，立刻退出全局模式
+
+            // 🌟 修复：如果当前停留在源代码页面，直接交给 RefreshJsonView 刷新，它刷新后会自动呼叫雷达。
+            // 绝对不能先跳跃再刷新，否则会引发时空崩溃！
             if (CanvasTabControl != null && CanvasTabControl.SelectedIndex == 1)
             {
                 RefreshJsonView();
+            }
+            else if (JsonEditor.IsVisible)
+            {
+                ExecuteRadarJump(obj);
             }
         }
 
@@ -242,6 +263,10 @@ namespace Naziki_Editor.Views
                     // 这会让 TreeView 先安安稳稳地把“选中冒泡”处理完，然后再执行我们的代码跳转
                     Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
+
+                        // 🛡️ 绝对防御盾：在执行跳转前，确认文本没有被瞬间缩短或清空！
+                        if (JsonEditor.Document == null || index >= JsonEditor.Document.TextLength) return;
+
                         JsonEditor.Focus(); // 此时夺取焦点，就不会干扰左侧的树了
                         var documentLine = JsonEditor.Document.GetLineByOffset(index);
 
