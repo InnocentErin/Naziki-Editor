@@ -79,7 +79,7 @@
     <Grid Background="Transparent">
         <TabControl x:Name="AssetTabControl" Background="Transparent" BorderThickness="0" ItemContainerStyle="{DynamicResource HorizontalTabItemStyle}">
             <TabItem Header="媒体">
-                <ListBox x:Name="MediaListBox" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
+                <ListBox x:Name="MediaListBox" MouseDoubleClick="ListAssets_MouseDoubleClick" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -88,7 +88,7 @@
                 </ListBox>
             </TabItem>
             <TabItem Header="文本">
-                <ListBox x:Name="TextListBox" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
+                <ListBox x:Name="TextListBox" MouseDoubleClick="ListAssets_MouseDoubleClick" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -97,7 +97,7 @@
                 </ListBox>
             </TabItem>
             <TabItem Header="线条">
-                <ListBox x:Name="LineListBox" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
+                <ListBox x:Name="LineListBox" MouseDoubleClick="ListAssets_MouseDoubleClick" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -106,7 +106,7 @@
                 </ListBox>
             </TabItem>
             <TabItem Header="模板">
-                <ListBox x:Name="TemplateListBox" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
+                <ListBox x:Name="TemplateListBox" MouseDoubleClick="ListAssets_MouseDoubleClick" ItemTemplate="{StaticResource AssetTileTemplate}" SelectionMode="Extended" ContextMenu="{StaticResource ListBoxGlobalMenu}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>

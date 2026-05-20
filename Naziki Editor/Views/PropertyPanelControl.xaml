@@ -28,7 +28,7 @@
 
             <!-- 底部按钮栏 -->
             <UniformGrid Grid.Row="1" Columns="2" Margin="15,10">
-                <Button x:Name="BtnEditProperties" Content="✏️ 编辑属性" Click="BtnEditProperties_Click"
+                <Button x:Name="BtnEditProperties" Content="编辑属性" Click="BtnEditProperties_Click"
                         Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold"
                         Padding="15,8" Margin="0,0,5,0" BorderThickness="0" Cursor="Hand"/>
                 <Button x:Name="BtnSaveAsMaterial" Content="⭐ 存为预设素材" Click="BtnSaveAsMaterial_Click"

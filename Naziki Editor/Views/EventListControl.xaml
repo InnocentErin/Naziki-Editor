@@ -55,25 +55,25 @@
                 </TabControl.Template>
 
                 <TabItem Header="图片">
-                    <ListBox x:Name="SpriteListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="SpriteListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="文字">
-                    <ListBox x:Name="TextListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="TextListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="线条">
-                    <ListBox x:Name="LinesListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="LinesListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="视频">
-                    <ListBox x:Name="VideoListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="VideoListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="场景">
-                    <ListBox x:Name="SceneListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="SceneListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="音符">
-                    <ListBox x:Name="NoteCtrlListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="NoteCtrlListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
                 <TabItem Header="模板">
-                    <ListBox x:Name="EventTemplateListBox" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    <ListBox x:Name="EventTemplateListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
                 </TabItem>
             </TabControl>
 

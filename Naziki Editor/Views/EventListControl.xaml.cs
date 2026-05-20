@@ -7,6 +7,7 @@ using System;
 using System.Linq; // 🌟 补上 Linq 扩展支持
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Naziki_Editor.Views
@@ -186,5 +187,23 @@ namespace Naziki_Editor.Views
 
 
         private void EventTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateEmptyHintVisibility();
+
+
+
+
+        private void EventTree_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // ✨ 魔法：不管是哪个分类的 ListBox 被双击了，sender 就是它！
+            if (sender is ListBox listBox && listBox.SelectedItem is Models.StoryboardObject selectedObj)
+            {
+                // 呼叫主窗口的传送门
+                if (Application.Current.MainWindow is MainWindow main)
+                {
+                    main.OpenPropertyEditor(selectedObj);
+                    e.Handled = true; // 拦截鼠标事件，防止冒泡
+                }
+            }
+        }
+
     }
 }

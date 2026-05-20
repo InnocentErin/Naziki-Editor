@@ -299,8 +299,13 @@ namespace Naziki_Editor.Views
         // ========== 按钮事件 ==========
         private void BtnEditProperties_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentObject != null)
-                OnEditPropertiesRequested?.Invoke(_currentObject);
+            if (_currentObject is StoryboardObject selectedObj)
+            {
+                if (Application.Current.MainWindow is MainWindow main)
+                {
+                    main.OpenPropertyEditor(selectedObj);
+                }
+            }
         }
 
         private void BtnSaveAsMaterial_Click(object sender, RoutedEventArgs e)
@@ -308,5 +313,10 @@ namespace Naziki_Editor.Views
             if (_currentObject != null)
                 OnSaveAsMaterialRequested?.Invoke(_currentObject);
         }
+
+        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
+
+        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
+        
     }
 }

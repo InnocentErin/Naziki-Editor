@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using Naziki_Editor.Core;
 using Naziki_Editor.Models;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -532,5 +533,52 @@ namespace Naziki_Editor.Views
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => this.WindowState = (this.WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
         private void BtnClose_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) Application.Current.Shutdown(); }
+
+
+        // ==========================================
+        // 🚀 核心枢纽：呼唤属性编辑器并处理全局存档
+        // ==========================================
+        public void OpenPropertyEditor(StoryboardObject targetObj)
+        {
+            if (targetObj == null) return;
+
+            // 1. 召唤弹窗，并设置 Owner 让它在主窗口正中间弹出
+            PropertyEditor editor = new PropertyEditor(targetObj)
+            {
+                Owner = this
+            };
+
+            // 2. 阻塞等待用户操作
+            if (editor.ShowDialog() == true)
+            {
+                // 3. 用户点击了“保存魔法”！提取改好的克隆体
+                StoryboardObject modifiedObj = (StoryboardObject)editor.Tag;
+
+                // ✨ 黑科技：把修改后的数据化为流，直接“灌”回原本的对象内存中！原地升级！
+                string modifiedJson = JsonConvert.SerializeObject(modifiedObj);
+                JsonConvert.PopulateObject(modifiedJson, targetObj);
+
+                // 4. 呼叫全局时光机，记录这次原子的打包操作！
+                Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
+
+                // 5. 刷新战舰上的所有雷达面板
+                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                CanvasArea.RefreshJsonView();
+                _isVisualDirty = false;
+            }
+        }
+
+        // 供素材列表双击使用：新建事件并直接弹出编辑
+        public void AddNewEventAndEdit(StoryboardObject newObj)
+        {
+            // 这里根据实际类型塞进对应的列表，例如：
+            if (newObj is Sprite s) _currentStoryboardRoot.sprites.Add(s);
+            else if (newObj is Text t) _currentStoryboardRoot.texts.Add(t);
+            // ...以此类推
+
+            // 先存一个创建操作的快照，然后立刻弹窗让用户编辑！
+            Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
+            OpenPropertyEditor(newObj);
+        }
     }
 }
