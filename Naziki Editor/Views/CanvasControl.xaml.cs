@@ -5,6 +5,7 @@ using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Highlighting;
 using Newtonsoft.Json;
 using Naziki_Editor.Models;
+using Naziki_Editor.Core;
 
 namespace Naziki_Editor.Views
 {
@@ -66,6 +67,8 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void RefreshJsonView()
         {
+            _isRefreshing = true;
+
             if (JsonEditor == null) return;
 
             var currentModel = RequestCurrentStoryboardRoot?.Invoke();
@@ -79,7 +82,8 @@ namespace Naziki_Editor.Views
             {
                 _isRefreshing = true; // 开启系统保护锁，防止触发变脏监控
 
-                JsonEditor.Text = JsonConvert.SerializeObject(currentModel, Formatting.Indented);
+                // ✅ 全新官方蛇形大一统写法：隐藏 null，自动转换为小写蛇形命名！
+                JsonEditor.Text = StoryboardSerializer.ToJson(_lastSelectedObject);
                 HasUnappliedChanges = false; // 重置本端脏标记
 
                 TxtJsonStatus.Text = "✅ 代码已刷新为最新状态。";

@@ -3,7 +3,6 @@ using Naziki_Editor.Core;
 using Naziki_Editor.Models;
 using System;
 using System.Collections.Generic;
-using System.Drawing.Design;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -64,8 +63,7 @@ namespace Naziki_Editor.Views
             try
             {
                 _currentProjectData.LastModifiedTime = DateTime.Now;
-                // ✅ 全新官方蛇形大一统写法：隐藏 null，自动转换为小写蛇形命名！
-                JsonEditor.Text = StoryboardSerializer.ToJson(selectedEvent);
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(_currentProjectData, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(_currentProjectFilePath, json);
             }
             catch (Exception ex)
