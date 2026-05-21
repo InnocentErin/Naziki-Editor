@@ -122,52 +122,38 @@ namespace Naziki_Editor.Views
 
         private void ListAssets_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // ✨ 用 sender 获取双击的具体是哪个 ListBox
             if (sender is ListBox listBox && listBox.SelectedItem is Models.AssetItemModel selectedAsset)
             {
                 Models.StoryboardObject newEvent = null;
+                // 生成一个暂时的身份证，等进了编辑器玩家还会改
+                string tempId = selectedAsset.AssetType.ToLower() + "_" + DateTime.Now.Ticks;
 
-                // 根据 AssetType 字符串分类，生成对应的白板事件！
                 if (selectedAsset.AssetType == "Image")
                 {
                     newEvent = new Models.Sprite
                     {
-                        Id = "sprite_" + DateTime.Now.Ticks,
-                        // ✨ 修正：路径要写在初始状态 States[0] 里面！
+                        Id = tempId,
                         States = new System.Collections.Generic.List<Models.SpriteState>
-                {
-                    new Models.SpriteState
-                    {
-                        Time = 0f,
-                        Path = selectedAsset.FileName,
-                        Color = new Models.CytoidColor()
-                    }
-                }
+                { new Models.SpriteState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() } }
                     };
                 }
                 else if (selectedAsset.AssetType == "Video")
                 {
                     newEvent = new Models.Video
                     {
-                        Id = "video_" + DateTime.Now.Ticks,
+                        Id = tempId,
                         States = new System.Collections.Generic.List<Models.VideoState>
-                {
-                    new Models.VideoState
-                    {
-                        Time = 0f,
-                        Path = selectedAsset.FileName, // VideoState 里也是叫 Path 哦
-                        Color = new Models.CytoidColor()
-                    }
-                }
+                { new Models.VideoState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() } }
                     };
                 }
+                // TODO: 如果是 Template (.nem)，稍后我们在这里加入解析逻辑！
 
                 if (newEvent != null)
                 {
-                    // 呼叫主窗口：新建并编辑！
-                    if (Application.Current.MainWindow is MainWindow main)
+                    // ✨ 穿甲弹雷达：绝对能找到主窗口！
+                    if (Window.GetWindow(this) is MainWindow main)
                     {
-                        main.AddNewEventAndEdit(newEvent);
+                        main.CreateNewEventFromAsset(newEvent);
                         e.Handled = true;
                     }
                 }

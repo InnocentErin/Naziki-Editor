@@ -540,10 +540,12 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void OpenPropertyEditor(StoryboardObject targetObj)
         {
+
             if (targetObj == null) return;
 
             // 1. 召唤弹窗，并设置 Owner 让它在主窗口正中间弹出
-            PropertyEditor editor = new PropertyEditor(targetObj)
+            // 注意中间多传了一个 _currentStoryboardRoot 进去！
+            PropertyEditor editor = new PropertyEditor(targetObj, _currentStoryboardRoot)
             {
                 Owner = this
             };
@@ -568,17 +570,38 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // 供素材列表双击使用：新建事件并直接弹出编辑
-        public void AddNewEventAndEdit(StoryboardObject newObj)
+        // ==========================================
+        // 🚀 专供素材列表使用：先编辑，保存了才入库！
+        // ==========================================
+        public void CreateNewEventFromAsset(StoryboardObject newObj)
         {
-            // 这里根据实际类型塞进对应的列表，例如：
-            if (newObj is Sprite s) _currentStoryboardRoot.sprites.Add(s);
-            else if (newObj is Text t) _currentStoryboardRoot.texts.Add(t);
-            // ...以此类推
+            if (newObj == null || _currentStoryboardRoot == null) return;
 
-            // 先存一个创建操作的快照，然后立刻弹窗让用户编辑！
-            Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
-            OpenPropertyEditor(newObj);
+            // 1. 带着全局字典弹窗！
+            PropertyEditor editor = new PropertyEditor(newObj, _currentStoryboardRoot)
+            {
+                Owner = this,
+                Title = "属性编辑器 - [✨ 导入新素材并设置]" // 给个酷炫的标题
+            };
+
+            // 2. 如果玩家点击了保存 (且通过了不重名的防线)
+            if (editor.ShowDialog() == true)
+            {
+                StoryboardObject modifiedObj = (StoryboardObject)editor.Tag;
+
+                // 3. 根据类型，正式将其加入到大宇宙中！
+                if (modifiedObj is Sprite s) _currentStoryboardRoot.sprites.Add(s);
+                else if (modifiedObj is Text t) _currentStoryboardRoot.texts.Add(t);
+                else if (modifiedObj is Video v) _currentStoryboardRoot.videos.Add(v);
+                else if (modifiedObj is Line l) _currentStoryboardRoot.lines.Add(l);
+                // 如果是控制器等也可以在这里继续 else if...
+
+                // 4. 存入时光机并刷新所有面板
+                Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
+                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                CanvasArea.RefreshJsonView();
+            }
+            // 如果点击了取消，对象直接烟消云散，列表里干干净净！
         }
     }
 }

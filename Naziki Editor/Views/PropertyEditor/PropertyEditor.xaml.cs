@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Linq;
 
 namespace Naziki_Editor.Views
 {
@@ -12,17 +13,23 @@ namespace Naziki_Editor.Views
     {
         // 🔮 正在编辑的克隆体对象（绝不直接修改传入的原件）
         private StoryboardObject _editingObject;
-
         // ⏱️ 弹窗专属的“局部时光机”
         private UndoRedoManager _localTimeMachine = new UndoRedoManager();
+        // ✨ 新增：保存整个宇宙的引用和最初的身份证号
+        private StoryboardRoot _root;
+        private string _originalId;
 
-        public PropertyEditor(StoryboardObject targetObject)
+        public PropertyEditor(StoryboardObject targetObject, StoryboardRoot root)
         {
             InitializeComponent();
 
+            _root = root;
+            _originalId = targetObject.Id ?? ""; // 记住原来的名字
+
             // 1. 深拷贝：把传进来的对象序列化再反序列化，彻底斩断灵魂连结！
+            // 🌟 完美多态克隆：让 Json 解析器按照目标最真实的类型（比如 Sprite）去复原肉体！
             string jsonClone = JsonConvert.SerializeObject(targetObject);
-            _editingObject = JsonConvert.DeserializeObject<StoryboardObject>(jsonClone);
+            _editingObject = (StoryboardObject)JsonConvert.DeserializeObject(jsonClone, targetObject.GetType());
 
             // 2. 拍下最初的快照，作为时光机的起点
             _localTimeMachine.RecordSnapshot(_editingObject);
@@ -131,16 +138,49 @@ namespace Naziki_Editor.Views
         // ==========================================
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            // 🛡️ 强制焦点转移陷阱化解：强制当前控件失去焦点并触发最终的属性绑定！
             Keyboard.ClearFocus();
             FocusManager.SetFocusedElement(this, this);
 
-            // 最终把 UI 上的 ID 等属性写回到 _editingObject
-            _editingObject.Id = TxtObjectId.Text;
+            string newId = TxtObjectId.Text.Trim();
 
-            // 宣告成功，并将修改好的对象存入窗口的 Tag 属性供主窗口提取，然后关闭
+            // 🛡️ 防线一：不许为空！
+            if (string.IsNullOrEmpty(newId))
+            {
+                TxtIdWarning.Text = "⚠️ ID 绝对不能为空哦！";
+                TxtIdWarning.Visibility = Visibility.Visible;
+                return; // 拦截！不让窗口关闭！
+            }
+
+            // 🛡️ 防线二：不许重名！(且要排除自己原来的名字)
+            if (newId != _originalId && IsIdConflict(newId))
+            {
+                TxtIdWarning.Text = $"⚠️ ID '{newId}' 已经被占用啦，请换一个名称！";
+                TxtIdWarning.Visibility = Visibility.Visible;
+                return; // 拦截！
+            }
+
+            // 警报解除
+            TxtIdWarning.Visibility = Visibility.Collapsed;
+
+            // 保存并放行
+            _editingObject.Id = newId;
             this.Tag = _editingObject;
             this.DialogResult = true;
+        }
+
+        // 🔍 查字典：遍历整个宇宙，看看有没有人叫这个名字
+        private bool IsIdConflict(string id)
+        {
+            if (_root == null) return false;
+
+            if (_root.sprites?.Any(x => x.Id == id) == true) return true;
+            if (_root.texts?.Any(x => x.Id == id) == true) return true;
+            if (_root.lines?.Any(x => x.Id == id) == true) return true;
+            if (_root.videos?.Any(x => x.Id == id) == true) return true;
+            if (_root.controllers?.Any(x => x.Id == id) == true) return true;
+            if (_root.note_controllers?.Any(x => x.Id == id) == true) return true;
+
+            return false;
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)

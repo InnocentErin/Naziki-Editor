@@ -23,7 +23,12 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="对象 ID:" VerticalAlignment="Center" FontWeight="Bold"/>
-                    <TextBox x:Name="TxtObjectId" Grid.Column="1" Padding="5"/>
+
+                    <StackPanel Grid.Column="1" Orientation="Vertical">
+                        <TextBox x:Name="TxtObjectId" Padding="5"/>
+                        <TextBlock x:Name="TxtIdWarning" Text="⚠️ ID 已存在，请换一个名称！" 
+                                   Foreground="#FF5555" FontWeight="Bold" Margin="0,5,0,0" Visibility="Collapsed"/>
+                    </StackPanel>
                 </Grid>
 
                 <StackPanel x:Name="PanelRenderObject" Visibility="Collapsed">

@@ -301,7 +301,8 @@ namespace Naziki_Editor.Views
         {
             if (_currentObject is StoryboardObject selectedObj)
             {
-                if (Application.Current.MainWindow is MainWindow main)
+                // ✨ 雷达修正：同样按族谱向上查找 MainWindow！
+                if (Window.GetWindow(this) is MainWindow main)
                 {
                     main.OpenPropertyEditor(selectedObj);
                 }

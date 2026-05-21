@@ -193,11 +193,11 @@ namespace Naziki_Editor.Views
 
         private void EventTree_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // ✨ 魔法：不管是哪个分类的 ListBox 被双击了，sender 就是它！
-            if (sender is ListBox listBox && listBox.SelectedItem is Models.StoryboardObject selectedObj)
+            // ✨ 魔法：不管是哪个分类的 ListBox 被双击了，sender 就是它！先剥开 ListBoxItem 的外壳，再去拿 Tag 肚子里的数据！
+            if (sender is ListBox listBox && listBox.SelectedItem is ListBoxItem item && item.Tag is Models.StoryboardObject selectedObj)
             {
-                // 呼叫主窗口的传送门
-                if (Application.Current.MainWindow is MainWindow main)
+                // 呼叫主窗口的传送门,直接按着当前控件的族谱往上找它真正所在的窗口！
+                if (Window.GetWindow(this) is MainWindow main)
                 {
                     main.OpenPropertyEditor(selectedObj);
                     e.Handled = true; // 拦截鼠标事件，防止冒泡
