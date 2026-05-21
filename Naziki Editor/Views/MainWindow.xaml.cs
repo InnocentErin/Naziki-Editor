@@ -567,7 +567,7 @@ namespace Naziki_Editor.Views
             // 注意中间多传了一个 _currentStoryboardRoot 进去！
             // 加上具体的命名空间和新类名
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, _currentStoryboardRoot)
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, _currentStoryboardRoot, _currentChart)
                 {
                     Owner = this
                 };
@@ -602,11 +602,11 @@ namespace Naziki_Editor.Views
 
             // 1. 带着全局字典弹窗！
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, _currentStoryboardRoot)
-                {
-                    Owner = this,
-                    Title = "属性编辑器 - [✨ 导入新素材并设置]"
-                };
+                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, _currentStoryboardRoot, _currentChart)
+                 {
+                     Owner = this,
+                     Title = "属性编辑器 - [✨ 导入新素材并设置]"
+                 };
 
             // 2. 如果玩家点击了保存 (且通过了不重名的防线)
             if (editor.ShowDialog() == true)
