@@ -1,103 +1,46 @@
 ﻿<Window x:Class="Naziki_Editor.Views.PropertyEditor"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d"
-        Title="属性编辑器 - 正在施展魔法..." Height="700" Width="900"
+        xmlns:local="clr-namespace:Naziki_Editor.Views" 
+        Title="属性编辑器 - [对象重构中...]" Height="760" Width="1000"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource MainBgColor}" Foreground="{DynamicResource MainTextColor}">
 
-    <Grid Margin="10">
+    <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Grid.Row="0" Header="🎭 对象基础身份 (全局唯一)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10" Padding="10">
-            <StackPanel Orientation="Vertical">
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="对象 ID:" VerticalAlignment="Center" FontWeight="Bold"/>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
+            <Button x:Name="BtnCancel" Content="取消 (Cancel)" Padding="20,8" Margin="0,0,10,0" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+            <Button x:Name="BtnSave" Content="💾 确认并保存魔法" Padding="20,8" Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+        </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Vertical">
-                        <TextBox x:Name="TxtObjectId" Padding="5"/>
-                        <TextBlock x:Name="TxtIdWarning" Text="⚠️ ID 已存在，请换一个名称！" 
-                                   Foreground="#FF5555" FontWeight="Bold" Margin="0,5,0,0" Visibility="Collapsed"/>
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel x:Name="PanelRenderObject" Visibility="Collapsed">
-                    <TextBlock Text="跟随挂靠 (Parent ID):" Margin="0,0,0,5"/>
-                    <ComboBox x:Name="ComboParentId" Margin="0,0,0,10"/>
-                    <TextBlock Text="资源内容 (Path/Text):" Margin="0,0,0,5"/>
-                    <TextBox x:Name="TxtResource" Padding="5"/>
-                </StackPanel>
-
-                <StackPanel x:Name="PanelController" Visibility="Collapsed">
-                    <TextBlock Text="施法目标 (Target ID):" Margin="0,0,0,5" Foreground="#FF9E67"/>
-                    <ComboBox x:Name="ComboTargetId" Padding="5"/>
-                </StackPanel>
-
-                <StackPanel x:Name="PanelNoteController" Visibility="Collapsed">
-                    <TextBlock Text="音符目标 (Note ID):" Margin="0,0,0,5" Foreground="#67C2FF"/>
-                    <TextBox x:Name="TxtNoteTarget" Padding="5"/>
-                </StackPanel>
-            </StackPanel>
+        <GroupBox Grid.Row="1" Header="🎭 对象基础身份 (Identity)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
+            <local:PropertyEditor_Identity x:Name="ModIdentity" Margin="5"/>
         </GroupBox>
 
-        <Grid Grid.Row="1">
+        <GroupBox Grid.Row="2" Header="🎬 初始属性 (Root Properties)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
+            <local:PropertyEditor_InitialState x:Name="ModInitialState" Margin="5"/>
+        </GroupBox>
+
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250"/>
                 <ColumnDefinition Width="10"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <GroupBox Grid.Column="0" Header="🎞️ 状态帧列表 (States)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <ListBox x:Name="ListStates" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" Margin="0,5,0,5"/>
-                    <Button Grid.Row="1" x:Name="BtnAddState" Content="➕ 添加新关键帧" Padding="5" Background="#444444" Foreground="White" Cursor="Hand"/>
-                </Grid>
+            <GroupBox Grid.Column="0" Header="🎞️ 状态关键帧 (States)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
+                <local:PropertyEditor_FrameList x:Name="ModFrameList" Margin="5"/>
             </GroupBox>
 
-            <GroupBox Grid.Column="2" Header="⚙️ 关键帧参数编辑 (State Properties)" 
-          BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="10">
-
-                        <TextBlock Text="⏱️ 触发时间配置:" FontWeight="Bold" Margin="0,0,0,10"/>
-                        <Border Background="{DynamicResource MenuBgColor}" Padding="10" CornerRadius="5" Margin="0,0,0,15">
-                            <TextBlock Text="(这里将嵌入多重时间锚点UI...)" Foreground="{DynamicResource TipsColor}" HorizontalAlignment="Center"/>
-                        </Border>
-
-                        <Grid Margin="0,0,0,10">
-                            <TextBlock Text="📐 物理变换与效果 (Tracks)" FontWeight="Bold" VerticalAlignment="Center"/>
-                            <Button x:Name="BtnActivateTrack" Content="➕ 激活新属性轨道" HorizontalAlignment="Right"
-                        Background="#333333" Foreground="#FFB84D" FontWeight="Bold" BorderThickness="1" BorderBrush="#FFB84D" 
-                        Cursor="Hand" Padding="10,2"/>
-                        </Grid>
-
-                        <Border Background="{DynamicResource MenuBgColor}" Padding="10" CornerRadius="5">
-                            <StackPanel x:Name="ActiveTracksContainer" Margin="0,5,0,0">
-                            </StackPanel>
-                        </Border>
-
-                    </StackPanel>
-                </ScrollViewer>
+            <GroupBox Grid.Column="2" Header="⚙️ 选中帧参数编辑 (Active Track Details)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
+                <local:PropertyEditor_FrameDetails x:Name="ModFrameDetails" Margin="5"/>
             </GroupBox>
         </Grid>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="BtnCancel" Content="取消 (Cancel)" Padding="20,8" Margin="0,0,10,0" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-            <Button x:Name="BtnSave" Content="💾 确认并保存魔法" Padding="20,8" Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-        </StackPanel>
     </Grid>
 </Window>
