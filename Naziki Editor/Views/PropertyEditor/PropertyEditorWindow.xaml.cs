@@ -1,7 +1,7 @@
 ﻿using Naziki_Editor.Models;
 using System.Windows;
 
-namespace Naziki_Editor.Views
+namespace Naziki_Editor.Views.PropertyEditor
 {
     public partial class PropertyEditor : Window
     {
@@ -9,7 +9,7 @@ namespace Naziki_Editor.Views
         private StoryboardRoot _root;
         private string _originalId;
 
-        public PropertyEditor(StoryboardObject targetObject, StoryboardRoot root)
+        public PropertyEditorWindow(StoryboardObject targetObject, StoryboardRoot root)
         {
             InitializeComponent();
             _root = root;

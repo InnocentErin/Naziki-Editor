@@ -565,10 +565,13 @@ namespace Naziki_Editor.Views
 
             // 1. 召唤弹窗，并设置 Owner 让它在主窗口正中间弹出
             // 注意中间多传了一个 _currentStoryboardRoot 进去！
-            PropertyEditor editor = new PropertyEditor(targetObj, _currentStoryboardRoot)
-            {
-                Owner = this
-            };
+            // 加上具体的命名空间和新类名
+            Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, _currentStoryboardRoot)
+                {
+                    Owner = this
+                };
+            editor.ShowDialog();
 
             // 2. 阻塞等待用户操作
             if (editor.ShowDialog() == true)
