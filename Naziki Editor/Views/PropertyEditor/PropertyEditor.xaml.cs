@@ -49,6 +49,18 @@ namespace Naziki_Editor.Views
             // 绑定下方按钮事件
             BtnSave.Click += BtnSave_Click;
             BtnCancel.Click += BtnCancel_Click;
+
+
+
+            BtnActivateTrack.Click += (s, e) =>
+            {
+                if (BtnActivateTrack.ContextMenu != null)
+                {
+                    BtnActivateTrack.ContextMenu.PlacementTarget = BtnActivateTrack;
+                    BtnActivateTrack.ContextMenu.IsOpen = true;
+                }
+            };
+
         }
 
         // ==========================================
@@ -306,6 +318,70 @@ namespace Naziki_Editor.Views
 
             // 把做好的菜单绑定到按钮上
             BtnActivateTrack.ContextMenu = addTrackMenu;
+        }
+
+
+
+        // 🌟 核心方法：根据蓝图和当前状态，生成一个轨道的 UI 控件
+        private UIElement CreateTrackControl(Core.TrackBlueprint bp, object currentState, object initialValue)
+        {
+            // 外层的大容器：包含名字、输入框和删除按钮
+            Grid trackRow = new Grid { Margin = new Thickness(0, 5, 0, 5) };
+            trackRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            trackRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            trackRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // 左侧的名字标签
+            TextBlock label = new TextBlock { Text = bp.DisplayName, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(label, 0);
+            trackRow.Children.Add(label);
+
+            // ❌ 删除轨道按钮（即把数据重新变回 null）
+            Button btnDelete = new Button { Content = "❌", Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0), Cursor = Cursors.Hand, Margin = new Thickness(5, 0, 0, 0) };
+            btnDelete.Click += (s, e) =>
+            {
+                SetPropertyValue(currentState, bp.JsonName, null);
+                RefreshDynamicTracks(currentState);
+                _localTimeMachine.RecordSnapshot(_editingObject);
+            };
+            Grid.SetColumn(btnDelete, 2);
+            trackRow.Children.Add(btnDelete);
+
+            // 中间的动态输入区
+            if (bp.DataType == Core.TrackDataType.Float || bp.DataType == Core.TrackDataType.String)
+            {
+                // 如果是 UnitFloat，要拆出里面的 Value 显示
+                string displayString = initialValue.ToString();
+                if (initialValue.GetType().Name == "UnitFloat")
+                {
+                    var valField = initialValue.GetType().GetField("Value");
+                    displayString = valField?.GetValue(initialValue)?.ToString() ?? "0";
+                }
+
+                TextBox textBox = new TextBox { Text = displayString, Padding = new Thickness(2) };
+
+                // ✨ 核心绑定：失焦时写回数据，利用“全局雷达”触发存档！
+                textBox.LostFocus += (s, e) =>
+                {
+                    if (float.TryParse(textBox.Text, out float floatVal))
+                    {
+                        SetPropertyValue(currentState, bp.JsonName, floatVal);
+                    }
+                };
+                Grid.SetColumn(textBox, 1);
+                trackRow.Children.Add(textBox);
+            }
+            else if (bp.DataType == Core.TrackDataType.Boolean)
+            {
+                CheckBox chk = new CheckBox { IsChecked = (bool)initialValue, VerticalAlignment = VerticalAlignment.Center };
+                chk.Checked += (s, e) => { SetPropertyValue(currentState, bp.JsonName, true); _localTimeMachine.RecordSnapshot(_editingObject); };
+                chk.Unchecked += (s, e) => { SetPropertyValue(currentState, bp.JsonName, false); _localTimeMachine.RecordSnapshot(_editingObject); };
+                Grid.SetColumn(chk, 1);
+                trackRow.Children.Add(chk);
+            }
+            // TODO: Color 和 NoteColorArray 可以先放一个占位 TextBox，后续我们再接上拾色器窗口！
+
+            return trackRow;
         }
 
     }

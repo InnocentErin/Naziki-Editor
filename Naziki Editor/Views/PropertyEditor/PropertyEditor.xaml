@@ -68,18 +68,28 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Column="2" Header="⚙️ 关键帧参数编辑 (State Properties)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
+            <GroupBox Grid.Column="2" Header="⚙️ 关键帧参数编辑 (State Properties)" 
+          BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
+
                         <TextBlock Text="⏱️ 触发时间配置:" FontWeight="Bold" Margin="0,0,0,10"/>
                         <Border Background="{DynamicResource MenuBgColor}" Padding="10" CornerRadius="5" Margin="0,0,0,15">
                             <TextBlock Text="(这里将嵌入多重时间锚点UI...)" Foreground="{DynamicResource TipsColor}" HorizontalAlignment="Center"/>
                         </Border>
 
-                        <TextBlock Text="📐 物理变换与效果:" FontWeight="Bold" Margin="0,0,0,10"/>
+                        <Grid Margin="0,0,0,10">
+                            <TextBlock Text="📐 物理变换与效果 (Tracks)" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <Button x:Name="BtnActivateTrack" Content="➕ 激活新属性轨道" HorizontalAlignment="Right"
+                        Background="#333333" Foreground="#FFB84D" FontWeight="Bold" BorderThickness="1" BorderBrush="#FFB84D" 
+                        Cursor="Hand" Padding="10,2"/>
+                        </Grid>
+
                         <Border Background="{DynamicResource MenuBgColor}" Padding="10" CornerRadius="5">
-                            <TextBlock Text="(这里将嵌入坐标、颜色、销毁复选框等...)" Foreground="{DynamicResource TipsColor}" HorizontalAlignment="Center"/>
+                            <StackPanel x:Name="ActiveTracksContainer" Margin="0,5,0,0">
+                            </StackPanel>
                         </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </GroupBox>
