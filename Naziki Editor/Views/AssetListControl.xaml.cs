@@ -155,12 +155,12 @@ namespace Naziki_Editor.Views
                 }
 
 
-                else if (selectedAsset.AssetType == "Template" && selectedAsset.FileName.EndsWith(".nem"))
+                else if (selectedAsset.AssetType == "Text" || selectedAsset.AssetType == "Line" || selectedAsset.AssetType == "Template")
                 {
                     try
                     {
                         // 1. 读取纯正的 JSON 文本
-                        string jsonContent = System.IO.File.ReadAllText(selectedAsset.FileName);
+                        string jsonContent = System.IO.File.ReadAllText(selectedAsset.FilePath);
 
                         // 2. 将其视为一个微型宇宙进行反序列化
                         var miniRoot = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.StoryboardRoot>(jsonContent);
@@ -179,9 +179,9 @@ namespace Naziki_Editor.Views
                             newEvent.Id = newEvent.Id + "_nem_" + DateTime.Now.Ticks;
                         }
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
-                        System.Windows.MessageBox.Show($"解析模板失败啦！原因：{ex.Message}", "小艾的报错提醒");
+                        System.Windows.MessageBox.Show($"解析胶囊失败啦！是不是文件坏了呢？\n原因：{ex.Message}", "小艾的报错提醒");
                     }
                 }
 
@@ -190,11 +190,11 @@ namespace Naziki_Editor.Views
                 if (newEvent != null)
                 {
                     // 🚀 穿甲弹雷达：使用本文件最上方定义好的 ParentMainWindow，绝对不会迷路！
-                    if (ParentMainWindow != null)
+                    if (Window.GetWindow(this) is MainWindow main)
                     {
                         // 呼叫全新的流程：带上字典检查重名，编辑完再决定要不要保存！
-                        ParentMainWindow.CreateNewEventFromAsset(newEvent);
-                        e.Handled = true; // 拦截鼠标事件，防止穿透
+                        main.CreateNewEventFromAsset(newEvent);
+                        e.Handled = true;// 拦截鼠标事件，防止穿透
                     }
                 }
             }
