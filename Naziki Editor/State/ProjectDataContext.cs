@@ -1,54 +1,36 @@
-﻿using Naziki_Editor.Models; // 引入实体模型
+﻿using Naziki_Editor.Models;
+using Naziki_Editor.Core;
 
 namespace Naziki_Editor.State
 {
     /// <summary>
     /// 全局工程上下文数据包 (Context Injection)
-    /// 包含了当前正在编辑的这个项目所有的核心数据实体。
-    /// 无论 UI 嵌套多深，只要把这个包裹传下去，所有人都能拿到所需数据！
     /// </summary>
     public class ProjectDataContext
     {
         // ==========================================
+        // 🌟 物理工程账本环境
+        // ==========================================
+        public string ProjectFilePath { get; set; }
+        public NazikiProjectModel ProjectData { get; set; }
+
+        // ==========================================
         // 🌟 核心数据资产
         // ==========================================
+        public string StoryboardPath { get; set; }
+        public StoryboardRoot Storyboard { get; set; } = new StoryboardRoot();
 
-        /// <summary>
-        /// 当前的故事板宇宙 (包含所有的 Sprite, Text, Controller 等)
-        /// </summary>
-        public StoryboardRoot Storyboard { get; set; }
-
-        /// <summary>
-        /// 当前加载的谱面数据 (包含所有的音符 Notes)
-        /// </summary>
         public C2Chart Chart { get; set; }
 
-        // ==========================================
-        // 📁 工程环境信息
-        // ==========================================
-
         /// <summary>
-        /// 当前项目的根目录路径
+        /// 谱面时间转换引擎，有了它，所有窗口都能随时算时间！
         /// </summary>
-        public string ProjectDirectory { get; set; }
-
-        /// <summary>
-        /// 当前音频文件的绝对路径
-        /// </summary>
-        public string AudioFilePath { get; set; }
+        public ChartTimeEngine TimeEngine { get; set; }
 
         // ==========================================
         // 🔍 状态快捷判定
         // ==========================================
-
-        /// <summary>
-        /// 检查是否已经初始化了故事板
-        /// </summary>
         public bool HasStoryboard => Storyboard != null;
-
-        /// <summary>
-        /// 检查是否已经加载了谱面
-        /// </summary>
         public bool HasChart => Chart != null;
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using Naziki_Editor.Core;
 using Naziki_Editor.Models;
+using Naziki_Editor.State; // ✨ 新增：引入 State 别墅区的命名空间！
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -15,24 +16,20 @@ namespace Naziki_Editor.Views
 {
     public partial class MainWindow : Window
     {
-        private C2Chart _currentChart;
-        private ChartTimeEngine _currentEngine;
+        // ==========================================
+        // 📦 ✨ 核心重构：全局万能数据包来啦！
+        // ==========================================
+        public ProjectDataContext Context { get; private set; } = new ProjectDataContext();
+
         private HashSet<C2Note> _selectedNotes = new HashSet<C2Note>();
         private double _maxChartTime = 0;
 
-        // 🌟 物理航线缓存
-        private string _currentProjectFilePath = null;
-        private NazikiProjectModel _currentProjectData = null;
+        // 兼容原有的公开属性（直接指向 Context）
+        public string CurrentProjectFilePath => Context.ProjectFilePath;
+        public NazikiProjectModel CurrentProjectData => Context.ProjectData;
 
-        public string CurrentProjectFilePath => _currentProjectFilePath;
-        public NazikiProjectModel CurrentProjectData => _currentProjectData;
-
-        private string _currentStoryboardPath = null;
-        private StoryboardRoot _currentStoryboardRoot = new StoryboardRoot();
         private Core.UndoRedoManager _undoRedoManager = new Core.UndoRedoManager();
-
         private bool _isVisualDirty = false;
-
 
         // ==========================================
         // 📥 顶部菜单栏：共享职能的音频导入法术
@@ -47,25 +44,21 @@ namespace Naziki_Editor.Views
 
             if (openFileDialog.ShowDialog() == true)
             {
-                // 🚀 直接喂给全局单例大总管！
-                // 剩下的“隐藏时间轴按钮”、“拉伸画布”、“重绘刻度”、“重绘波形”全都会触发连锁反应自动完成！
                 await Core.AudioSyncEngine.Instance.LoadAudioAsync(openFileDialog.FileName);
             }
         }
 
-
-
         // ==========================================
-        // 💾 核心加装：.nep 工程物理存盘记账引擎 (彻底击碎白板 Bug)
+        // 💾 核心加装：.nep 工程物理存盘记账引擎
         // ==========================================
         private void SaveProjectNepFile()
         {
-            if (string.IsNullOrEmpty(_currentProjectFilePath) || _currentProjectData == null) return;
+            if (string.IsNullOrEmpty(Context.ProjectFilePath) || Context.ProjectData == null) return;
             try
             {
-                _currentProjectData.LastModifiedTime = DateTime.Now;
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(_currentProjectData, Newtonsoft.Json.Formatting.Indented);
-                File.WriteAllText(_currentProjectFilePath, json);
+                Context.ProjectData.LastModifiedTime = DateTime.Now;
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(Context.ProjectData, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(Context.ProjectFilePath, json);
             }
             catch (Exception ex)
             {
@@ -75,9 +68,9 @@ namespace Naziki_Editor.Views
 
         public void RefreshAllAssets()
         {
-            if (string.IsNullOrEmpty(_currentProjectFilePath) || _currentProjectData == null) return;
-            string projectDir = System.IO.Path.GetDirectoryName(_currentProjectFilePath);
-            string matFolder = _currentProjectData.MaterialFolderPath;
+            if (string.IsNullOrEmpty(Context.ProjectFilePath) || Context.ProjectData == null) return;
+            string projectDir = System.IO.Path.GetDirectoryName(Context.ProjectFilePath);
+            string matFolder = Context.ProjectData.MaterialFolderPath;
             var bundle = Core.AssetScanner.ScanProjectAssets(projectDir, matFolder);
             AssetList.RefreshAssetListUI(bundle);
         }
@@ -89,30 +82,26 @@ namespace Naziki_Editor.Views
         {
             if (projectData == null) return;
 
-            _currentProjectFilePath = projectPath;
-            _currentProjectData = projectData;
+            Context.ProjectFilePath = projectPath;
+            Context.ProjectData = projectData;
 
-            // 1. 🦾 悬挂主权徽章标题 text
             this.Title = $"Naziki Editor - {projectData.ProjectName} ［{projectPath}］";
 
-            // 2. 🔍 分流读取故事板历史
             if (!string.IsNullOrEmpty(projectData.StoryboardExportPath) && File.Exists(projectData.StoryboardExportPath))
             {
                 try
                 {
-                    _currentStoryboardPath = projectData.StoryboardExportPath;
+                    Context.StoryboardPath = projectData.StoryboardExportPath;
                     StoryboardRoot root = StoryboardParser.Load(projectData.StoryboardExportPath);
-                    _currentStoryboardRoot = root;
+                    Context.Storyboard = root;
 
-                    EventList.LoadStoryboardUI(_currentStoryboardRoot);
-                    // 🌟 新增：强制雷达归零，切断历史残影！
+                    EventList.LoadStoryboardUI(Context.Storyboard);
                     CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
 
-                    // 录入【第0步历史底稿】
                     _undoRedoManager.Reset();
-                    _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+                    _undoRedoManager.RecordSnapshot(Context.Storyboard);
                 }
                 catch (Exception ex)
                 {
@@ -121,30 +110,22 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                // 如果是全新项目，初始化白板环境
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
-                // 🌟 新增：强制雷达归零，切断历史残影！
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
 
-                // 录入【第0步真空底稿】
                 _undoRedoManager.Reset();
-                _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+                _undoRedoManager.RecordSnapshot(Context.Storyboard);
             }
 
-            // 3. 🎵 自动加载遗留的谱面血脉
             if (!string.IsNullOrEmpty(projectData.ChartFilePath) && File.Exists(projectData.ChartFilePath))
             {
                 SilentImportChart(projectData.ChartFilePath);
             }
 
-            // =======================================================
-            // 🌟 核心修改：只保留刷新素材网格，彻底删除原本躺在这里的 TriggerAutoLinkIfReady();
-            // =======================================================
             RefreshAllAssets();
         }
 
-        // 静默后台加载已有谱面，防止二次确认骚扰
         private void SilentImportChart(string chartPath)
         {
             try
@@ -153,17 +134,15 @@ namespace Naziki_Editor.Views
                 C2Chart chart = Newtonsoft.Json.JsonConvert.DeserializeObject<C2Chart>(jsonText);
                 if (chart != null)
                 {
-                    _currentChart = chart;
-                    _currentEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
-                    NoteList._currentChart = _currentChart;
-                    NoteList._currentEngine = _currentEngine;
-                    NoteList.BuildFullNoteTree();
-                    if (_currentChart.note_list.Count > 0)
-                        NoteList._maxChartTime = _currentEngine.TickToSeconds(_currentChart.note_list.Max(n => n.tick));
-                    NoteList.RefreshNoteList();
+                    Context.Chart = chart;
+                    Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
 
-                    // 🌟 核心修改：彻底删除原本躺在这里的 TriggerAutoLinkIfReady();
-                    // 确保老项目启动数据恢复时，绝对不会触发任何弹窗！
+                    NoteList._currentChart = Context.Chart;
+                    NoteList._currentEngine = Context.TimeEngine;
+                    NoteList.BuildFullNoteTree();
+                    if (Context.Chart.note_list.Count > 0)
+                        NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
+                    NoteList.RefreshNoteList();
                 }
             }
             catch { }
@@ -179,8 +158,7 @@ namespace Naziki_Editor.Views
             {
                 if (ResolveDataConflictIfNeeded())
                 {
-                    // 录入音符批量灌入快照
-                    _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+                    _undoRedoManager.RecordSnapshot(Context.Storyboard);
                     _isVisualDirty = true;
                     EventList.AddNoteGroupToTree(groupItem);
                 }
@@ -188,43 +166,39 @@ namespace Naziki_Editor.Views
 
             EventList.OnStoryboardLoaded += (path, root) =>
             {
-                // 录入故事板导入快照
-                _currentStoryboardPath = path;
-                _currentStoryboardRoot = root;
-                // 🌟 新增：强制雷达归零，切断历史残影！
+                Context.StoryboardPath = path;
+                Context.Storyboard = root;
+
                 CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
 
-                // 🌟 核心增补：手动外部导入 json 时，也同步更新工程账本并记录底稿！
-                if (_currentProjectData != null)
+                if (Context.ProjectData != null)
                 {
-                    _currentProjectData.StoryboardExportPath = path;
+                    Context.ProjectData.StoryboardExportPath = path;
                     SaveProjectNepFile();
                 }
                 _undoRedoManager.Reset();
-                _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+                _undoRedoManager.RecordSnapshot(Context.Storyboard);
 
                 TriggerAutoLinkIfReady();
             };
-            // 🌟 核心修改：将应用属性修改的时机，改为专门的【应用】按钮，彻底删除原本躺在这里的自动刷新逻辑！
+
             PropertyPanel.OnApplyPropertiesRequested += () =>
             {
                 if (ResolveDataConflictIfNeeded())
                 {
-                    // 可视化修改应用前快照
-                    _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+                    _undoRedoManager.RecordSnapshot(Context.Storyboard);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
                     MessageBox.Show("属性修改已成功应用并同步至源代码！(๑•̀ㅂ•́)و✧", "应用成功");
                 }
             };
-            // 🌟 核心增补：新增【另存为素材】功能，允许用户将当前选中事件封装成独立的胶囊文件，方便在其他项目中复用！(≧∇≦)
+
             PropertyPanel.OnSaveAsMaterialRequested += (obj) =>
             {
-                if (string.IsNullOrEmpty(_currentProjectFilePath) || _currentProjectData == null) return;
+                if (string.IsNullOrEmpty(Context.ProjectFilePath) || Context.ProjectData == null) return;
 
-                // 智能判定对象类型
                 string matType = "";
                 if (obj is Sprite) matType = "Image";
                 else if (obj is Text) matType = "Text";
@@ -236,17 +210,15 @@ namespace Naziki_Editor.Views
 
                 try
                 {
-                    string projectDir = Path.GetDirectoryName(_currentProjectFilePath);
-                    string materialsDir = Path.Combine(projectDir, _currentProjectData.MaterialFolderPath);
+                    string projectDir = Path.GetDirectoryName(Context.ProjectFilePath);
+                    string materialsDir = Path.Combine(projectDir, Context.ProjectData.MaterialFolderPath);
                     if (!Directory.Exists(materialsDir)) Directory.CreateDirectory(materialsDir);
 
                     string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     string fileName = $"{matType}_Preset_{timeStamp}.nem";
 
-                    // ✨ 核心重构：抛弃 NemDocument，直接创造一个微型的纯净宇宙！
                     StoryboardRoot miniRoot = new StoryboardRoot();
 
-                    // 把选中的对象放进宇宙对应的空间里 (确保 List 不为 null)
                     if (obj is Sprite s) miniRoot.sprites = new List<Sprite> { s };
                     else if (obj is Text t) miniRoot.texts = new List<Text> { t };
                     else if (obj is Line l) miniRoot.lines = new List<Line> { l };
@@ -254,13 +226,11 @@ namespace Naziki_Editor.Views
                     else if (obj is Controller c) miniRoot.controllers = new List<Controller> { c };
                     else if (obj is NoteController nc) miniRoot.note_controllers = new List<NoteController> { nc };
 
-                    // ✨ 将微型宇宙直接序列化为最纯正的 JSON 文本！
                     string pureJson = Newtonsoft.Json.JsonConvert.SerializeObject(miniRoot, Newtonsoft.Json.Formatting.Indented);
 
                     File.WriteAllText(Path.Combine(materialsDir, fileName), pureJson);
                     MessageBox.Show($"素材制造成功！(≧∇≦)ﾉ\n已安全存入沙盒：\n{fileName}", "纯净资产封装完成");
 
-                    // 重新扫描呼叫雷达！
                     RefreshAllAssets();
                 }
                 catch (Exception ex) { MessageBox.Show($"胶囊压制失败 QAQ：{ex.Message}"); }
@@ -268,56 +238,51 @@ namespace Naziki_Editor.Views
 
             EventList.OnAddTextRequested += () => CreateAndInjectObject(new Text
             {
-                Id = "text_" + (_currentStoryboardRoot.texts.Count + 1),
+                Id = "text_" + (Context.Storyboard.texts.Count + 1),
                 States = new List<TextState>
-    {
-        new TextState
-        {
-            Time = 0.0f, // 绝对时间
-            Text = "Naziki Text", 
-            // 坐标现在必须用 UnitFloat 包装！
-            X = new UnitFloat { Value = 0.0f, Unit = ReferenceUnit.StageX },
-            Y = new UnitFloat { Value = 0.0f, Unit = ReferenceUnit.StageY },
-            // 颜色默认用 CytoidColor (默认就是白色 R=255, G=255, B=255, A=1)
-            Color = new CytoidColor()
-        }
-    }
+                {
+                    new TextState
+                    {
+                        Time = 0.0f,
+                        Text = "Naziki Text",
+                        X = new UnitFloat { Value = 0.0f, Unit = ReferenceUnit.StageX },
+                        Y = new UnitFloat { Value = 0.0f, Unit = ReferenceUnit.StageY },
+                        Color = new CytoidColor()
+                    }
+                }
             });
             EventList.OnAddLineRequested += () => CreateAndInjectObject(new Line
             {
-                Id = "line_" + (_currentStoryboardRoot.lines.Count + 1),
+                Id = "line_" + (Context.Storyboard.lines.Count + 1),
                 States = new List<LineState>
-    {
-        new LineState
-        {
-            Time = 0.0f,
-            Width = new UnitFloat { Value = 0.05f, Unit = ReferenceUnit.StageX },
-            Color = new CytoidColor()
-        }
-    }
+                {
+                    new LineState
+                    {
+                        Time = 0.0f,
+                        Width = new UnitFloat { Value = 0.05f, Unit = ReferenceUnit.StageX },
+                        Color = new CytoidColor()
+                    }
+                }
             });
             EventList.OnAddSceneRequested += () => CreateAndInjectObject(new Controller
             {
-                // 场景控制器没有 ID，只有状态列表
                 States = new List<ControllerState>
-    {
-        new ControllerState { Time = 0.0f }
-    }
+                {
+                    new ControllerState { Time = 0.0f }
+                }
             });
 
-            CanvasArea.RequestCurrentStoryboardRoot = () => _currentStoryboardRoot;
+            CanvasArea.RequestCurrentStoryboardRoot = () => Context.Storyboard;
             CanvasArea.OnBeforeActionCheckConflict = () => ResolveDataConflictIfNeeded();
 
-            // 🌟 核心修改：将应用 JSON 修改的时机，改为专门的【应用】按钮，彻底删除原本躺在这里的自动刷新逻辑！
             CanvasArea.OnApplyJsonSuccess += (newRoot) =>
             {
-                _undoRedoManager.RecordSnapshot(_currentStoryboardRoot); // 代码块录入快照
-                _currentStoryboardRoot = newRoot;
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                _undoRedoManager.RecordSnapshot(Context.Storyboard);
+                Context.Storyboard = newRoot;
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 _isVisualDirty = false;
             };
 
-            // 🌟 核心增补：属性面板修改事件改为单纯的“修改了”，不直接刷新界面，彻底删除原本躺在这里的自动刷新逻辑！
             PropertyPanel.OnDataModified += () =>
             {
                 _isVisualDirty = true;
@@ -328,7 +293,6 @@ namespace Naziki_Editor.Views
                 }
             };
 
-            // 🌟 核心增补：当事件节点被选中时，除了在属性面板显示对应属性外，还让画布追踪选中状态，彻底删除原本躺在这里的自动刷新逻辑！
             EventList.OnEventNodeSelected += (obj) =>
             {
                 PropertyPanel.SetSelectedObject(obj);
@@ -336,20 +300,15 @@ namespace Naziki_Editor.Views
             };
         }
 
-        // ==========================================
-        // ⌨️ 核心加装：【方案 b：双轨自治热键嗅探模块】
-        // ==========================================
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 if (e.Key == Key.Z)
                 {
-                    // 如果焦点正死死停留在 AvalonEdit 源码编辑器内部，双手双脚放开，任由它自治打字撤回！
                     if (CanvasArea != null && CanvasArea.JsonEditor != null && CanvasArea.JsonEditor.IsKeyboardFocusWithin)
                         return;
 
-                    // 反之，强行拦截，调用全局模型时空回溯！
                     e.Handled = true;
                     ExecuteGlobalUndo();
                 }
@@ -367,20 +326,14 @@ namespace Naziki_Editor.Views
         private void MenuUndo_Click(object sender, RoutedEventArgs e) => ExecuteGlobalUndo();
         private void MenuRedo_Click(object sender, RoutedEventArgs e) => ExecuteGlobalRedo();
 
-
-
-
-        // ==========================================
-        // 🌟 核心加装：全局撤销重做执行器，彻底解放双手双脚，专注于创作本体！
-        // ==========================================
         private void ExecuteGlobalUndo()
         {
             bool success;
-            StoryboardRoot prevState = _undoRedoManager.Undo(_currentStoryboardRoot, out success);
+            StoryboardRoot prevState = _undoRedoManager.Undo(Context.Storyboard, out success);
             if (success)
             {
-                _currentStoryboardRoot = prevState;
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                Context.Storyboard = prevState;
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
@@ -390,15 +343,14 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // 🌟 核心加装：全局撤销重做执行器，彻底解放双手双脚，专注于创作本体！
         private void ExecuteGlobalRedo()
         {
             bool success;
-            StoryboardRoot nextState = _undoRedoManager.Redo(_currentStoryboardRoot, out success);
+            StoryboardRoot nextState = _undoRedoManager.Redo(Context.Storyboard, out success);
             if (success)
             {
-                _currentStoryboardRoot = nextState;
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                Context.Storyboard = nextState;
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
@@ -408,22 +360,11 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // ==========================================
-        // 🌟 核心加装：关于界面，增加一点点人情味小彩蛋~
-        // ==========================================
         private void MenuAbout_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("🛸 Naziki Editor v1.0.0\n" +
-                "\n一款专为 Cytoid 故事板设计师打造的" +
-                "\nCytoid 故事板可视化编辑器。" +
-                "\nPowered by Erin & You！\n" +
-                "\n祝您顺利创作出神级故事板分镜~ (★ω★)ノ",
-                "关于 Naziki Studio");
+            MessageBox.Show("🛸 Naziki Editor v1.0.0\n\n一款专为 Cytoid 故事板设计师打造的可视化编辑器。\nPowered by Erin & You！\n\n祝您顺利创作出神级故事板分镜~ (★ω★)ノ", "关于 Naziki Studio");
         }
 
-        // =========================================
-        // 🌟 核心加装：数据分歧智能侦测与友好调解机制
-        // =========================================
         public bool ResolveDataConflictIfNeeded()
         {
             if (CanvasArea.HasUnappliedChanges && _isVisualDirty)
@@ -453,8 +394,6 @@ namespace Naziki_Editor.Views
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
         private void MenuImportChart_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) ExecuteImportChart(); }
 
-
-        // 🌟 核心加装：独立谱面导入执行器，彻底解放菜单事件，专注于业务逻辑！
         private void ExecuteImportChart()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog { Filter = "Cytus II 谱面 (*.json)|*.json", Title = "请选择你的谱面文件" };
@@ -466,19 +405,19 @@ namespace Naziki_Editor.Views
                     C2Chart chart = Newtonsoft.Json.JsonConvert.DeserializeObject<C2Chart>(jsonText);
                     if (chart == null || chart.time_base == 0) return;
 
-                    _currentChart = chart;
-                    _currentEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
-                    NoteList._currentChart = _currentChart;
-                    NoteList._currentEngine = _currentEngine;
+                    Context.Chart = chart;
+                    Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
+                    NoteList._currentChart = Context.Chart;
+                    NoteList._currentEngine = Context.TimeEngine;
                     NoteList.BuildFullNoteTree();
-                    if (_currentChart.note_list.Count > 0)
-                        NoteList._maxChartTime = _currentEngine.TickToSeconds(_currentChart.note_list.Max(n => n.tick));
+
+                    if (Context.Chart.note_list.Count > 0)
+                        NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
                     NoteList.RefreshNoteList();
 
-                    // 🌟 核心增补：导入谱面文件后，立刻写入工程账本物理存盘！
-                    if (_currentProjectData != null)
+                    if (Context.ProjectData != null)
                     {
-                        _currentProjectData.ChartFilePath = openFileDialog.FileName;
+                        Context.ProjectData.ChartFilePath = openFileDialog.FileName;
                         SaveProjectNepFile();
                     }
 
@@ -490,20 +429,18 @@ namespace Naziki_Editor.Views
             TriggerAutoLinkIfReady();
         }
 
-        // 🌟 核心加装：创造物体并注入全局模型的统一执行器，彻底解放菜单事件，专注于业务逻辑！
         private void CreateAndInjectObject(object obj)
         {
             if (!ResolveDataConflictIfNeeded()) return;
 
-            // 创造物体前拍照存证
-            _undoRedoManager.RecordSnapshot(_currentStoryboardRoot);
+            _undoRedoManager.RecordSnapshot(Context.Storyboard);
 
-            if (obj is Text txt) _currentStoryboardRoot.texts.Add(txt);
-            else if (obj is Line line) _currentStoryboardRoot.lines.Add(line);
-            else if (obj is Controller ctrl) _currentStoryboardRoot.controllers.Add(ctrl);
+            if (obj is Text txt) Context.Storyboard.texts.Add(txt);
+            else if (obj is Line line) Context.Storyboard.lines.Add(line);
+            else if (obj is Controller ctrl) Context.Storyboard.controllers.Add(ctrl);
 
             _isVisualDirty = true;
-            EventList.LoadStoryboardUI(_currentStoryboardRoot);
+            EventList.LoadStoryboardUI(Context.Storyboard);
             if (!CanvasArea.HasUnappliedChanges)
             {
                 CanvasArea.RefreshJsonView();
@@ -511,29 +448,27 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // 🌟 核心加装：全盘保存执行器，彻底解放菜单事件，专注于业务逻辑！
         private void MenuSave_Click(object sender, RoutedEventArgs e)
         {
             if (!ResolveDataConflictIfNeeded()) return;
 
-            if (string.IsNullOrEmpty(_currentStoryboardPath))
+            if (string.IsNullOrEmpty(Context.StoryboardPath))
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog { Filter = "Cytoid 故事板 (*.json)|*.json", Title = "选择保存位置", FileName = "storyboard.json" };
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    _currentStoryboardPath = saveFileDialog.FileName;
-                    if (_currentProjectData != null)
-                        _currentProjectData.StoryboardExportPath = _currentStoryboardPath;
+                    Context.StoryboardPath = saveFileDialog.FileName;
+                    if (Context.ProjectData != null)
+                        Context.ProjectData.StoryboardExportPath = Context.StoryboardPath;
                 }
                 else return;
             }
 
             try
             {
-                string jsonOutput = Newtonsoft.Json.JsonConvert.SerializeObject(_currentStoryboardRoot, Newtonsoft.Json.Formatting.Indented);
-                File.WriteAllText(_currentStoryboardPath, jsonOutput);
+                string jsonOutput = Newtonsoft.Json.JsonConvert.SerializeObject(Context.Storyboard, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(Context.StoryboardPath, jsonOutput);
 
-                // 🌟 核心修复：点击保存时，顺手把 .nep 账本也一并同步重写！
                 SaveProjectNepFile();
 
                 _isVisualDirty = false;
@@ -543,89 +478,65 @@ namespace Naziki_Editor.Views
             catch (Exception ex) { MessageBox.Show("写入磁盘爆炸啦 QAQ：\n" + ex.Message); }
         }
 
-        // 🌟 核心加装：自动链接触发器，彻底解放菜单事件，专注于业务逻辑！
         private void TriggerAutoLinkIfReady()
         {
-            if (_currentChart != null && _currentStoryboardRoot != null)
-                ChartStoryboardLink.TryTriggerAutoLink(_currentChart, _currentStoryboardRoot, _currentEngine, EventList.NoteCtrlListBox, EventList.UpdateEmptyHintVisibility);
+            if (Context.HasChart && Context.HasStoryboard)
+                ChartStoryboardLink.TryTriggerAutoLink(Context.Chart, Context.Storyboard, Context.TimeEngine, EventList.NoteCtrlListBox, EventList.UpdateEmptyHintVisibility);
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => this.WindowState = (this.WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
         private void BtnClose_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) Application.Current.Shutdown(); }
 
-
-        // ==========================================
-        // 🚀 核心枢纽：呼唤属性编辑器并处理全局存档
-        // ==========================================
         public void OpenPropertyEditor(StoryboardObject targetObj)
         {
-
             if (targetObj == null) return;
 
-            // 1. 召唤弹窗，并设置 Owner 让它在主窗口正中间弹出
-            // 注意中间多传了一个 _currentStoryboardRoot 进去！
-            // 加上具体的命名空间和新类名
+            // ✨ 注意：我们现在使用的是 Context.Storyboard 和 Context.Chart，而不是以前的野变量！
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, _currentStoryboardRoot, _currentChart)
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, Context.Storyboard, Context.Chart)
                 {
                     Owner = this
                 };
-            editor.ShowDialog();
 
-            // 2. 阻塞等待用户操作
             if (editor.ShowDialog() == true)
             {
-                // 3. 用户点击了“保存魔法”！提取改好的克隆体
                 StoryboardObject modifiedObj = (StoryboardObject)editor.Tag;
-
-                // ✨ 黑科技：把修改后的数据化为流，直接“灌”回原本的对象内存中！原地升级！
                 string modifiedJson = JsonConvert.SerializeObject(modifiedObj);
                 JsonConvert.PopulateObject(modifiedJson, targetObj);
 
-                // 4. 呼叫全局时光机，记录这次原子的打包操作！
-                Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
-
-                // 5. 刷新战舰上的所有雷达面板
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
         }
 
-        // ==========================================
-        // 🚀 专供素材列表使用：先编辑，保存了才入库！
-        // ==========================================
         public void CreateNewEventFromAsset(StoryboardObject newObj)
         {
-            if (newObj == null || _currentStoryboardRoot == null) return;
+            if (newObj == null || !Context.HasStoryboard) return;
 
-            // 1. 带着全局字典弹窗！
+            // ✨ 注意：同上，依然使用解包后的数据调用弹窗
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, _currentStoryboardRoot, _currentChart)
+                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, Context.Storyboard, Context.Chart)
                  {
                      Owner = this,
                      Title = "属性编辑器 - [✨ 导入新素材并设置]"
                  };
 
-            // 2. 如果玩家点击了保存 (且通过了不重名的防线)
             if (editor.ShowDialog() == true)
             {
                 StoryboardObject modifiedObj = (StoryboardObject)editor.Tag;
 
-                // 3. 根据类型，正式将其加入到大宇宙中！
-                if (modifiedObj is Sprite s) _currentStoryboardRoot.sprites.Add(s);
-                else if (modifiedObj is Text t) _currentStoryboardRoot.texts.Add(t);
-                else if (modifiedObj is Video v) _currentStoryboardRoot.videos.Add(v);
-                else if (modifiedObj is Line l) _currentStoryboardRoot.lines.Add(l);
-                // 如果是控制器等也可以在这里继续 else if...
+                if (modifiedObj is Sprite s) Context.Storyboard.sprites.Add(s);
+                else if (modifiedObj is Text t) Context.Storyboard.texts.Add(t);
+                else if (modifiedObj is Video v) Context.Storyboard.videos.Add(v);
+                else if (modifiedObj is Line l) Context.Storyboard.lines.Add(l);
 
-                // 4. 存入时光机并刷新所有面板
-                Core.UndoRedoManager.Global.RecordSnapshot(_currentStoryboardRoot);
-                EventList.LoadStoryboardUI(_currentStoryboardRoot);
+                Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
+                EventList.LoadStoryboardUI(Context.Storyboard);
                 CanvasArea.RefreshJsonView();
             }
-            // 如果点击了取消，对象直接烟消云散，列表里干干净净！
         }
     }
 }
