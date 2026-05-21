@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Naziki_Editor.Models;
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views
 {
@@ -16,8 +17,15 @@ namespace Naziki_Editor.Views
         public event Action OnApplyPropertiesRequested;
         // 新增：数据被修改（属性值发生变化）时触发
         public event Action OnDataModified;
-
+        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
         private object _currentObject;
+        // 🌟 新增：项目数据上下文 (如果需要的话，后续可以扩展成更复杂的状态管理系统！)
+        public ProjectDataContext Context { get; private set; }
+        // 🌟 新增：加载项目数据上下文的公开方法，供主窗口调用
+        public void LoadContext(ProjectDataContext context)
+        {
+            Context = context;
+        }
 
         public PropertyPanelControl()
         {

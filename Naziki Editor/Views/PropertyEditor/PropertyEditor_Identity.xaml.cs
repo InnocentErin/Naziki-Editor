@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Naziki_Editor.Models;
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
@@ -12,6 +13,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private StoryboardRoot _root;
         private string _originalId; 
         private C2Chart _chart;
+        private ProjectDataContext _context; // ✨ 统一接收数据包
 
         public PropertyEditor_Identity()
         {
@@ -23,19 +25,17 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 📥 接口 1：主窗口呼叫这里，把数据塞进来
         // ==========================================
-        public void LoadData(StoryboardObject editingObj, StoryboardRoot root, C2Chart chart)
+        public void LoadData(StoryboardObject editingObj, ProjectDataContext context)
         {
             _editingObject = editingObj;
-            _root = root;
-            _chart = chart;
+            _context = context;
             _originalId = editingObj.Id ?? "";
 
-            // 渲染 UI
             TxtObjectId.Text = _editingObject.Id;
             TxtParentId.Text = _editingObject.ParentId;
 
-            // ✨ 解锁判定：如果有谱面，并且里面有音符，就点亮按钮并去掉灰色提示！
-            if (_chart != null && _chart.note_list != null && _chart.note_list.Count > 0)
+            // ✨ 解锁判定：从包裹里查谱面！
+            if (_context != null && _context.HasChart && _context.Chart.note_list != null && _context.Chart.note_list.Count > 0)
             {
                 BtnBindNote.IsEnabled = true;
                 BtnBindNote.ToolTip = "点击选择要绑定的音符ID";
@@ -53,18 +53,18 @@ namespace Naziki_Editor.Views.PropertyEditor
                 MenuEventList.Items.Clear();
                 var allIds = new List<string>();
 
-                // 雷达扫描大宇宙里的所有生命体
-                if (_root != null)
+                // ✨ 从包裹里查故事板！
+                if (_context != null && _context.HasStoryboard)
                 {
-                    if (_root.sprites != null) allIds.AddRange(_root.sprites.Select(x => x.Id));
-                    if (_root.texts != null) allIds.AddRange(_root.texts.Select(x => x.Id));
-                    if (_root.lines != null) allIds.AddRange(_root.lines.Select(x => x.Id));
-                    if (_root.videos != null) allIds.AddRange(_root.videos.Select(x => x.Id));
-                    if (_root.controllers != null) allIds.AddRange(_root.controllers.Select(x => x.Id));
-                    if (_root.note_controllers != null) allIds.AddRange(_root.note_controllers.Select(x => x.Id));
+                    var root = _context.Storyboard;
+                    if (root.sprites != null) allIds.AddRange(root.sprites.Select(x => x.Id));
+                    if (root.texts != null) allIds.AddRange(root.texts.Select(x => x.Id));
+                    if (root.lines != null) allIds.AddRange(root.lines.Select(x => x.Id));
+                    if (root.videos != null) allIds.AddRange(root.videos.Select(x => x.Id));
+                    if (root.controllers != null) allIds.AddRange(root.controllers.Select(x => x.Id));
+                    if (root.note_controllers != null) allIds.AddRange(root.note_controllers.Select(x => x.Id));
                 }
 
-                // 防呆：不能认自己当爸爸！
                 if (_editingObject != null && allIds.Contains(_editingObject.Id))
                 {
                     allIds.Remove(_editingObject.Id);
@@ -79,7 +79,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     foreach (var id in allIds)
                     {
                         var item = new MenuItem { Header = $"目标: {id}" };
-                        item.Click += (senderItem, args) => { TxtParentId.Text = id; }; // 点击自动填入
+                        item.Click += (senderItem, args) => { TxtParentId.Text = id; };
                         MenuEventList.Items.Add(item);
                     }
                 }
@@ -157,16 +157,19 @@ namespace Naziki_Editor.Views.PropertyEditor
             return true; // 放行！
         }
 
+        // ==========================================
         // 查字典工具
+        // ==========================================
         private bool IsIdConflict(string id)
         {
-            if (_root == null) return false;
-            if (_root.sprites?.Any(x => x.Id == id) == true) return true;
-            if (_root.texts?.Any(x => x.Id == id) == true) return true;
-            if (_root.lines?.Any(x => x.Id == id) == true) return true;
-            if (_root.videos?.Any(x => x.Id == id) == true) return true;
-            if (_root.controllers?.Any(x => x.Id == id) == true) return true;
-            if (_root.note_controllers?.Any(x => x.Id == id) == true) return true;
+            if (_context == null || !_context.HasStoryboard) return false;
+            var root = _context.Storyboard;
+            if (root.sprites?.Any(x => x.Id == id) == true) return true;
+            if (root.texts?.Any(x => x.Id == id) == true) return true;
+            if (root.lines?.Any(x => x.Id == id) == true) return true;
+            if (root.videos?.Any(x => x.Id == id) == true) return true;
+            if (root.controllers?.Any(x => x.Id == id) == true) return true;
+            if (root.note_controllers?.Any(x => x.Id == id) == true) return true;
             return false;
         }
     }

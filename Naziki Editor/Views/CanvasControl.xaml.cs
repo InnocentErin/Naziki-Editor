@@ -6,13 +6,12 @@ using ICSharpCode.AvalonEdit.Highlighting;
 using Newtonsoft.Json;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core;
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views
 {
     public partial class CanvasControl : UserControl
     {
-        // 📡 跨房连线 1：向主窗口索要当前最新数据
-        public Func<StoryboardRoot> RequestCurrentStoryboardRoot;
         // 📡 跨房连线 2：修改成功后，通知主窗口全局刷新！
         public Action<StoryboardRoot> OnApplyJsonSuccess;
         // 📡 跨房连线 3：核心安检闸门！操作前询问大本营是否有双向冲突，若返回 false 则立刻中止
@@ -20,12 +19,23 @@ namespace Naziki_Editor.Views
 
         // 🌟 状态锁与标记：用来区分是“系统刷新”还是“用户手动打字”
         private bool _isRefreshing = false;
+        // 🌟 冲突保护标记：当用户修改了 JSON 但还没应用时，标记为 true，提醒系统不要自动刷新覆盖用户的改动！
         public bool HasUnappliedChanges { get; set; } = false;
 
         // 雷达缓存：记录主窗口当前选中的对象
         private object _lastSelectedObject;
-
+        // 🌟 新增：全局预览模式开关，默认为关闭
         private bool _isGlobalPreviewMode = false;
+        // 🌟 新增：项目数据上下文 (如果需要的话，后续可以扩展成更复杂的状态管理系统！)
+        public ProjectDataContext Context { get; private set; }
+        // 🌟 新增：加载项目数据上下文的公开方法，供主窗口调用
+        public void LoadContext(ProjectDataContext context)
+        {
+            Context = context;
+        }
+
+
+
         // 在类最上方定义全局开关，并新增按钮事件
         private void BtnPreviewGlobal_Click(object sender, RoutedEventArgs e)
         {
@@ -77,7 +87,7 @@ namespace Naziki_Editor.Views
         public void RefreshJsonView()
         {
             if (JsonEditor == null) return;
-            var currentModel = RequestCurrentStoryboardRoot?.Invoke();
+            var currentModel = Context?.Storyboard;
             if (currentModel == null) return;
 
             try
@@ -141,7 +151,7 @@ namespace Naziki_Editor.Views
         {
             try
             {
-                var root = RequestCurrentStoryboardRoot?.Invoke();
+                var root = Context?.Storyboard;
 
                 if (_isGlobalPreviewMode)
                 {

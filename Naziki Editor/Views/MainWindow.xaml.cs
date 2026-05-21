@@ -95,7 +95,7 @@ namespace Naziki_Editor.Views
                     StoryboardRoot root = StoryboardParser.Load(projectData.StoryboardExportPath);
                     Context.Storyboard = root;
 
-                    EventList.LoadStoryboardUI(Context.Storyboard);
+                    EventList.LoadStoryboardUI();
                     CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
@@ -110,7 +110,7 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
 
@@ -136,9 +136,6 @@ namespace Naziki_Editor.Views
                 {
                     Context.Chart = chart;
                     Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
-
-                    NoteList._currentChart = Context.Chart;
-                    NoteList._currentEngine = Context.TimeEngine;
                     NoteList.BuildFullNoteTree();
                     if (Context.Chart.note_list.Count > 0)
                         NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
@@ -151,6 +148,14 @@ namespace Naziki_Editor.Views
         public MainWindow()
         {
             InitializeComponent();
+
+
+            // 🔌 ✨ 终极通电！主窗口一启动，就把数据包分发给所有小弟！
+            EventList.LoadContext(Context);
+            NoteList.LoadContext(Context);
+            CanvasArea.LoadContext(Context);
+            PropertyPanel.LoadContext(Context);
+
 
             EventList.OnAssetScanned += (bundle) => AssetList.RefreshAssetListUI(bundle);
 
@@ -272,14 +277,13 @@ namespace Naziki_Editor.Views
                 }
             });
 
-            CanvasArea.RequestCurrentStoryboardRoot = () => Context.Storyboard;
             CanvasArea.OnBeforeActionCheckConflict = () => ResolveDataConflictIfNeeded();
 
             CanvasArea.OnApplyJsonSuccess += (newRoot) =>
             {
                 _undoRedoManager.RecordSnapshot(Context.Storyboard);
                 Context.Storyboard = newRoot;
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 _isVisualDirty = false;
             };
 
@@ -333,7 +337,7 @@ namespace Naziki_Editor.Views
             if (success)
             {
                 Context.Storyboard = prevState;
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
@@ -350,7 +354,7 @@ namespace Naziki_Editor.Views
             if (success)
             {
                 Context.Storyboard = nextState;
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
@@ -407,8 +411,6 @@ namespace Naziki_Editor.Views
 
                     Context.Chart = chart;
                     Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
-                    NoteList._currentChart = Context.Chart;
-                    NoteList._currentEngine = Context.TimeEngine;
                     NoteList.BuildFullNoteTree();
 
                     if (Context.Chart.note_list.Count > 0)
@@ -440,7 +442,7 @@ namespace Naziki_Editor.Views
             else if (obj is Controller ctrl) Context.Storyboard.controllers.Add(ctrl);
 
             _isVisualDirty = true;
-            EventList.LoadStoryboardUI(Context.Storyboard);
+            EventList.LoadStoryboardUI();
             if (!CanvasArea.HasUnappliedChanges)
             {
                 CanvasArea.RefreshJsonView();
@@ -494,7 +496,7 @@ namespace Naziki_Editor.Views
 
             // ✨ 注意：我们现在使用的是 Context.Storyboard 和 Context.Chart，而不是以前的野变量！
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, Context.Storyboard, Context.Chart)
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, Context)
                 {
                     Owner = this
                 };
@@ -506,7 +508,7 @@ namespace Naziki_Editor.Views
                 JsonConvert.PopulateObject(modifiedJson, targetObj);
 
                 Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
@@ -518,7 +520,7 @@ namespace Naziki_Editor.Views
 
             // ✨ 注意：同上，依然使用解包后的数据调用弹窗
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
-                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, Context.Storyboard, Context.Chart)
+                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, Context)
                  {
                      Owner = this,
                      Title = "属性编辑器 - [✨ 导入新素材并设置]"
@@ -534,7 +536,7 @@ namespace Naziki_Editor.Views
                 else if (modifiedObj is Line l) Context.Storyboard.lines.Add(l);
 
                 Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
-                EventList.LoadStoryboardUI(Context.Storyboard);
+                EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
             }
         }

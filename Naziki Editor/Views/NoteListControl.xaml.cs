@@ -9,19 +9,27 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media; // 🌟 解决 Brushes 报错
 using System.Windows.Shapes; // 🌟 解决 Rectangle 报错
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views
 {
     public partial class NoteListControl : UserControl
     {
+        // 🌟 重要事件：当用户点击“导出事件”按钮时，把打包好的 TreeViewItem（包含选中音符信息）丢出去，让主窗口接收并放到“音符抽屉”里！
         public event Action<TreeViewItem> OnNoteGroupExported;
-        private C2Chart _chartData;
-        private ChartTimeEngine _timeEngine;
-        public C2Chart _currentChart { get; set; }
-        public ChartTimeEngine _currentEngine { get; set; }
+        // 🌟 重要缓存：当前谱面里被选中的音符集合（通过勾选框维护），用来批量导出事件时打包数据！
         public HashSet<C2Note> _selectedNotes = new HashSet<C2Note>();
+        // 🌟 重要缓存：谱面里最后一个音符的时间（秒），用来限制搜索区间的最大值，避免用户输入过大导致引擎闪退！
         public double _maxChartTime = 0;
+        // 🔌 全局万能数据包接口
+        public ProjectDataContext Context { get; private set; }
+        // 
+        public void LoadContext(ProjectDataContext context)
+        {
+            Context = context;
+        }
 
+        // 🌟 构造函数：初始化组件（加载 XAML）并做好准备工作
         public NoteListControl()
         {
             InitializeComponent();
@@ -32,35 +40,35 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void BuildFullNoteTree()
         {
-            if (_currentChart == null) return;
+            if (Context.Chart == null) return;
             NoteTreeView.Items.Clear();
 
             // 呼叫数学引擎：找出谁是儿子
-            bool[] isChild = ChartLogic.FindChildren(_currentChart);
+            bool[] isChild = ChartLogic.FindChildren(Context.Chart);
 
             // 全量挂载所有的“族长”和对应的“子孙链条”
-            for (int i = 0; i < _currentChart.note_list.Count; i++)
+            for (int i = 0; i < Context.Chart.note_list.Count; i++)
             {
                 if (!isChild[i])
                 {
                     // 创建族长节点
-                    var rootItem = CreateNoteTreeItem(_currentChart.note_list, i, _currentEngine);
+                    var rootItem = CreateNoteTreeItem(Context.Chart.note_list, i, Context.TimeEngine);
                     rootItem.Tag = i; // 🌟 极其重要：把音符在数据列表里的身份证（索引）挂在 Tag 上作缓存！
 
-                    C2Note rootNote = _currentChart.note_list[i];
+                    C2Note rootNote = Context.Chart.note_list[i];
                     if (rootNote.type == 3 || rootNote.type == 6)
                     {
                         int nextIndex = rootNote.next_id;
                         HashSet<int> visited = new HashSet<int>();
 
-                        while (nextIndex >= 0 && nextIndex < _currentChart.note_list.Count && !visited.Contains(nextIndex))
+                        while (nextIndex >= 0 && nextIndex < Context.Chart.note_list.Count && !visited.Contains(nextIndex))
                         {
                             visited.Add(nextIndex);
-                            var childItem = CreateNoteTreeItem(_currentChart.note_list, nextIndex, _currentEngine);
+                            var childItem = CreateNoteTreeItem(Context.Chart.note_list, nextIndex, Context.TimeEngine);
                             childItem.Tag = nextIndex; // 子节点也挂上身份证
                             rootItem.Items.Add(childItem);
 
-                            nextIndex = _currentChart.note_list[nextIndex].next_id;
+                            nextIndex = Context.Chart.note_list[nextIndex].next_id;
                         }
                     }
                     NoteTreeView.Items.Add(rootItem);
@@ -151,7 +159,7 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void RefreshNoteList()
         {
-            if (_currentChart == null) return;
+            if (Context.Chart == null) return;
 
             // 1. 刷新列表时清空购物车，并将下方全选框重置
             _selectedNotes.Clear();
@@ -182,7 +190,7 @@ namespace Naziki_Editor.Views
                     }
 
                     // 🔮 呼叫纯数学引擎：判定这一大家子（长条链条）是否有任何一个音符落入选区
-                    if (ChartLogic.IsChainVisible(_currentChart, _currentEngine, noteIndex, searchMin, searchMax, searchType, filters))
+                    if (ChartLogic.IsChainVisible(Context.Chart, Context.TimeEngine, noteIndex, searchMin, searchMax, searchType, filters))
                     {
                         rootItem.Visibility = Visibility.Visible; // 显形！
                     }
@@ -257,7 +265,7 @@ namespace Naziki_Editor.Views
 
             foreach (var note in _selectedNotes.OrderBy(n => n.tick))
             {
-                double time = _currentEngine.TickToSeconds(note.tick);
+                double time = Context.TimeEngine.TickToSeconds(note.tick);
                 string noteInfo = $"ID: {note.id} | 时间: {time:0.000}s | X: {note.x}";
                 targetFolder.Items.Add(new TreeViewItem() { Header = noteInfo });
             }

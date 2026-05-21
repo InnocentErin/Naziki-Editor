@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views
 {
@@ -27,6 +28,15 @@ namespace Naziki_Editor.Views
         private void BtnAddText_Click(object sender, RoutedEventArgs e) => OnAddTextRequested?.Invoke();
         private void BtnAddLine_Click(object sender, RoutedEventArgs e) => OnAddLineRequested?.Invoke();
         private void BtnAddScene_Click(object sender, RoutedEventArgs e) => OnAddSceneRequested?.Invoke();
+
+        // 🌟 新增：项目数据上下文 (如果需要的话，后续可以扩展成更复杂的状态管理系统！)
+        public ProjectDataContext Context { get; private set; }
+
+        // 🌟 新增：加载项目数据上下文的公开方法，供主窗口调用
+        public void LoadContext(ProjectDataContext context)
+        {
+            Context = context;
+        }
 
 
         public EventListControl()
@@ -51,7 +61,7 @@ namespace Naziki_Editor.Views
                 {
                     // 🔮 呼叫解析引擎！
                     StoryboardRoot root = StoryboardParser.Load(openFileDialog.FileName);
-                    LoadStoryboardUI(root); // UI 专心负责画树叶
+                    LoadStoryboardUI(); // UI 专心负责画树叶
                     OnStoryboardLoaded?.Invoke(openFileDialog.FileName, root);// 抛出事件给主窗口，告诉它故事板加载好了！
 
 
@@ -79,8 +89,13 @@ namespace Naziki_Editor.Views
         // 🎨 UI 专职：扁平化列表渲染 (解除文件夹封装)
         // ==========================================
         // 🎨 UI 专职：扁平化列表渲染 (一键大一统！)
-        public void LoadStoryboardUI(StoryboardRoot root)
+        public void LoadStoryboardUI()
         {
+            // 防呆：如果没有通电或者没有故事板，直接退出
+            if (Context == null || !Context.HasStoryboard) return;
+
+            var root = Context.Storyboard; // 提取图纸
+
             ClearAllDrawers();
 
             if (root.sprites?.Count > 0) foreach (var obj in root.sprites)
