@@ -31,6 +31,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private void RefreshUI()
         {
             bool hasInitialState = false;
+            _firstStateReference = null;
 
             // 检查克隆体肚子里有没有第 0 帧
             if (_editingObject is Sprite s && s.States?.Count > 0) _firstStateReference = s.States[0];
