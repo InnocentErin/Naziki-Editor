@@ -127,56 +127,54 @@ namespace Naziki_Editor.Views
             {
                 Models.StoryboardObject newEvent = null;
                 // 生成一个暂时的身份证，等进了编辑器玩家还会改
-                string tempId = selectedAsset.AssetType.ToLower() + "_" + DateTime.Now.Ticks;
+                string tempId = selectedAsset.AssetType.ToLower() + "_" + System.DateTime.Now.Ticks;
 
                 // 根据素材类型创建对应的事件对象，并把路径属性刻在初始状态里，方便编辑器一打开就能看到效果
-                if (selectedAsset.AssetType == "Image")
+                if (!selectedAsset.FileName.EndsWith(".nem"))
                 {
-                    newEvent = new Models.Sprite
+                    if (selectedAsset.AssetType == "Image")
                     {
-                        Id = tempId,
-                        // ✨ 路径属性刻在初始状态 (States[0]) 里
-                        States = new System.Collections.Generic.List<Models.SpriteState>
-                {
-                    new Models.SpriteState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() }
-                }
-                    };
-                }
-                else if (selectedAsset.AssetType == "Video")
-                {
-                    newEvent = new Models.Video
+                        newEvent = new Models.Sprite
+                        {
+                            Id = tempId,
+                            // ✨ 路径属性刻在初始状态 (States[0]) 里
+                            States = new System.Collections.Generic.List<Models.SpriteState>
+                            { new Models.SpriteState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() } }
+                        };
+                    }
+                    else if (selectedAsset.AssetType == "Video")
                     {
-                        Id = tempId,
-                        States = new System.Collections.Generic.List<Models.VideoState>
-                {
-                    new Models.VideoState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() }
+                        newEvent = new Models.Video
+                        {
+                            Id = tempId,
+                            States = new System.Collections.Generic.List<Models.VideoState>
+                            { new Models.VideoState { Time = 0f, Path = selectedAsset.FileName, Color = new Models.CytoidColor() } }
+                        };
+                    }
                 }
-                    };
-                }
+
+
 
 
                 else if (selectedAsset.AssetType == "Text" || selectedAsset.AssetType == "Line" || selectedAsset.AssetType == "Template")
                 {
                     try
                     {
-                        // 1. 读取纯正的 JSON 文本
-                        string jsonContent = System.IO.File.ReadAllText(selectedAsset.FilePath);
-
-                        // 2. 将其视为一个微型宇宙进行反序列化
-                        var miniRoot = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.StoryboardRoot>(jsonContent);
-
-                        // 3. 智能捕获：看看哪个维度里有生命体，就把它抓出来！
-                        if (miniRoot.sprites?.Count > 0) newEvent = miniRoot.sprites[0];
-                        else if (miniRoot.texts?.Count > 0) newEvent = miniRoot.texts[0];
-                        else if (miniRoot.lines?.Count > 0) newEvent = miniRoot.lines[0];
-                        else if (miniRoot.videos?.Count > 0) newEvent = miniRoot.videos[0];
-                        else if (miniRoot.controllers?.Count > 0) newEvent = miniRoot.controllers[0];
-                        else if (miniRoot.note_controllers?.Count > 0) newEvent = miniRoot.note_controllers[0];
+                        if (selectedAsset.Tag is Models.StoryboardRoot miniRoot)
+                        {
+                            // 智能捕获生命体
+                            if (miniRoot.sprites?.Count > 0) newEvent = miniRoot.sprites[0];
+                            else if (miniRoot.texts?.Count > 0) newEvent = miniRoot.texts[0];
+                            else if (miniRoot.lines?.Count > 0) newEvent = miniRoot.lines[0];
+                            else if (miniRoot.videos?.Count > 0) newEvent = miniRoot.videos[0];
+                            else if (miniRoot.controllers?.Count > 0) newEvent = miniRoot.controllers[0];
+                            else if (miniRoot.note_controllers?.Count > 0) newEvent = miniRoot.note_controllers[0];
+                        }
 
                         // 4. 重置身份：为了防止和别人撞名字，给它发一张新的临时身份证
                         if (newEvent != null)
                         {
-                            newEvent.Id = newEvent.Id + "_nem_" + DateTime.Now.Ticks;
+                            newEvent.Id = newEvent.Id + "_nem_" + System.DateTime.Now.Ticks;
                         }
                     }
                     catch (System.Exception ex)

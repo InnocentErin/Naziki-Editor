@@ -223,7 +223,15 @@ namespace Naziki_Editor.Views
             PropertyPanel.OnSaveAsMaterialRequested += (obj) =>
             {
                 if (string.IsNullOrEmpty(_currentProjectFilePath) || _currentProjectData == null) return;
-                string matType = (obj is Text) ? "Text" : (obj is Line) ? "Line" : "";
+
+                // 智能判定对象类型
+                string matType = "";
+                if (obj is Sprite) matType = "Image";
+                else if (obj is Text) matType = "Text";
+                else if (obj is Line) matType = "Line";
+                else if (obj is Video) matType = "Video";
+                else if (obj is Controller || obj is NoteController) matType = "Scene";
+
                 if (string.IsNullOrEmpty(matType)) return;
 
                 try
@@ -233,14 +241,26 @@ namespace Naziki_Editor.Views
                     if (!Directory.Exists(materialsDir)) Directory.CreateDirectory(materialsDir);
 
                     string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    string fileName = $"{matType}_{timeStamp}.nem";
-                    string displayName = $"{matType} 预设 {DateTime.Now:HH:mm}";
+                    string fileName = $"{matType}_Preset_{timeStamp}.nem";
 
-                    string payload = Newtonsoft.Json.JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.Indented);
-                    NemDocument capsule = new NemDocument { MaterialType = matType, MaterialName = displayName, PayloadJson = payload };
+                    // ✨ 核心重构：抛弃 NemDocument，直接创造一个微型的纯净宇宙！
+                    StoryboardRoot miniRoot = new StoryboardRoot();
 
-                    File.WriteAllText(Path.Combine(materialsDir, fileName), Newtonsoft.Json.JsonConvert.SerializeObject(capsule, Newtonsoft.Json.Formatting.Indented));
-                    MessageBox.Show($"素材制造成功！(≧∇≦)ﾉ\n已安全存入沙盒：\n{fileName}", "资产封装完成");
+                    // 把选中的对象放进宇宙对应的空间里 (确保 List 不为 null)
+                    if (obj is Sprite s) miniRoot.sprites = new List<Sprite> { s };
+                    else if (obj is Text t) miniRoot.texts = new List<Text> { t };
+                    else if (obj is Line l) miniRoot.lines = new List<Line> { l };
+                    else if (obj is Video v) miniRoot.videos = new List<Video> { v };
+                    else if (obj is Controller c) miniRoot.controllers = new List<Controller> { c };
+                    else if (obj is NoteController nc) miniRoot.note_controllers = new List<NoteController> { nc };
+
+                    // ✨ 将微型宇宙直接序列化为最纯正的 JSON 文本！
+                    string pureJson = Newtonsoft.Json.JsonConvert.SerializeObject(miniRoot, Newtonsoft.Json.Formatting.Indented);
+
+                    File.WriteAllText(Path.Combine(materialsDir, fileName), pureJson);
+                    MessageBox.Show($"素材制造成功！(≧∇≦)ﾉ\n已安全存入沙盒：\n{fileName}", "纯净资产封装完成");
+
+                    // 重新扫描呼叫雷达！
                     RefreshAllAssets();
                 }
                 catch (Exception ex) { MessageBox.Show($"胶囊压制失败 QAQ：{ex.Message}"); }

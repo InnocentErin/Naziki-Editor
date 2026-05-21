@@ -66,22 +66,33 @@ namespace Naziki_Editor.Core
                     try
                     {
                         string json = File.ReadAllText(nemFile);
-                        var doc = JsonConvert.DeserializeObject<NemDocument>(json);
-                        if (doc != null)
+
+                        // ✨ 抛弃 NemDocument 外壳，直接按指挥官设定的“微型宇宙”进行解析！
+                        var miniRoot = JsonConvert.DeserializeObject<StoryboardRoot>(json);
+
+                        if (miniRoot != null)
                         {
+                            // 🧠 智能推断：看看第一层节点里哪个数组有东西，它就是什么类型！
+                            string assetType = "Template"; // 默认兜底
+                            if (miniRoot.texts != null && miniRoot.texts.Count > 0) assetType = "Text";
+                            else if (miniRoot.lines != null && miniRoot.lines.Count > 0) assetType = "Line";
+                            else if (miniRoot.controllers != null && miniRoot.controllers.Count > 0) assetType = "Scene";
+                            else if (miniRoot.note_controllers != null && miniRoot.note_controllers.Count > 0) assetType = "Scene";
+
+                            string fileName = Path.GetFileName(nemFile);
                             var model = new AssetItemModel
                             {
                                 FilePath = nemFile,
-                                FileName = Path.GetFileName(nemFile),
-                                AssetType = doc.MaterialType,
-                                DisplayName = string.IsNullOrEmpty(doc.MaterialName) ? Path.GetFileName(nemFile) : doc.MaterialName,
-                                Tag = doc // 把胶囊本身也带上，方便以后直接“召唤”到画布上
+                                FileName = fileName,
+                                AssetType = assetType,
+                                DisplayName = metaMap.ContainsKey(fileName) ? metaMap[fileName] : fileName,
+                                Tag = miniRoot // ✨ 提前把解析好的微型宇宙存起来，双击时不用再读一次硬盘啦！
                             };
 
                             // 分发到对应的抽屉里
-                            if (doc.MaterialType == "Text") bundle.TextAssets.Add(model);
-                            else if (doc.MaterialType == "Line") bundle.LineAssets.Add(model);
-                            else if (doc.MaterialType == "Template") bundle.TemplateAssets.Add(model);
+                            if (assetType == "Text") bundle.TextAssets.Add(model);
+                            else if (assetType == "Line") bundle.LineAssets.Add(model);
+                            else bundle.TemplateAssets.Add(model);
                         }
                     }
                     catch

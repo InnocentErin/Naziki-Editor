@@ -19,6 +19,9 @@ namespace Naziki_Editor.Views
         private StoryboardRoot _root;
         private string _originalId;
 
+        // 🌟 预留：如果需要在编辑器里动态展示可用的轨道蓝图列表，可以在这里存一份当前的快照，随时刷新它
+        private List<Core.TrackBlueprint> _currentAvailableBlueprints;
+
         public PropertyEditor(StoryboardObject targetObject, StoryboardRoot root)
         {
             InitializeComponent();
@@ -93,7 +96,10 @@ namespace Naziki_Editor.Views
                     }
                     e.Handled = true;
                 }
+
             }
+
+
         }
 
         // ==========================================
@@ -110,6 +116,9 @@ namespace Naziki_Editor.Views
                 PanelController.Visibility = Visibility.Collapsed;
                 PanelNoteController.Visibility = Visibility.Collapsed;
                 Title = $"属性编辑器 - [场景演员: {_editingObject.GetType().Name}]";
+
+                // ✨ 载入场景对象的蓝图辞典！
+                _currentAvailableBlueprints = Core.TrackBlueprintManager.RenderObjectBlueprints;
             }
             else if (_editingObject is Controller)
             {
@@ -117,6 +126,9 @@ namespace Naziki_Editor.Views
                 PanelRenderObject.Visibility = Visibility.Collapsed;
                 PanelNoteController.Visibility = Visibility.Collapsed;
                 Title = "属性编辑器 - [全局控制器]";
+
+                // ✨ 载入场景控制器的蓝图辞典！
+                _currentAvailableBlueprints = Core.TrackBlueprintManager.ControllerBlueprints;
             }
             else if (_editingObject is NoteController)
             {
@@ -124,6 +136,9 @@ namespace Naziki_Editor.Views
                 PanelRenderObject.Visibility = Visibility.Collapsed;
                 PanelController.Visibility = Visibility.Collapsed;
                 Title = "属性编辑器 - [音符控制器]";
+
+                // ✨ 载入音符控制器的蓝图辞典！
+                _currentAvailableBlueprints = Core.TrackBlueprintManager.NoteControllerBlueprints;
             }
         }
 
@@ -187,5 +202,111 @@ namespace Naziki_Editor.Views
         {
             this.DialogResult = false;
         }
+
+
+
+        // ==========================================
+        // 🔮 智能反射引擎：打通 JSON 蛇形名与 C# 驼峰名
+        // ==========================================
+        private System.Reflection.MemberInfo FindMemberIgnoreCase(object target, string jsonName)
+        {
+            string cleanName = jsonName.Replace("_", "").ToLower(); // 例如 ui_opacity 变成 uiopacity
+
+            // 找字段 (Field)
+            foreach (var field in target.GetType().GetFields())
+                if (field.Name.ToLower() == cleanName) return field;
+
+            // 找属性 (Property)
+            foreach (var prop in target.GetType().GetProperties())
+                if (prop.Name.ToLower() == cleanName) return prop;
+
+            return null;
+        }
+
+        private object GetPropertyValue(object target, string jsonName)
+        {
+            var member = FindMemberIgnoreCase(target, jsonName);
+            if (member is System.Reflection.FieldInfo f) return f.GetValue(target);
+            if (member is System.Reflection.PropertyInfo p) return p.GetValue(target);
+            return null;
+        }
+
+        private void SetPropertyValue(object target, string jsonName, object value)
+        {
+            var member = FindMemberIgnoreCase(target, jsonName);
+            try
+            {
+                if (member is System.Reflection.FieldInfo f)
+                {
+                    // 处理 Cytoid 特有的 UnitFloat
+                    if (f.FieldType.Name == "UnitFloat" && value is float floatVal)
+                    {
+                        var unitFloat = Activator.CreateInstance(f.FieldType);
+                        f.FieldType.GetField("Value").SetValue(unitFloat, floatVal);
+                        f.SetValue(target, unitFloat);
+                    }
+                    // 处理普通的 bool?, float? 等
+                    else
+                    {
+                        object safeValue = value == null ? null : Convert.ChangeType(value, Nullable.GetUnderlyingType(f.FieldType) ?? f.FieldType);
+                        f.SetValue(target, safeValue);
+                    }
+                }
+            }
+            catch (Exception ex) { System.Windows.MessageBox.Show($"设置属性 {jsonName} 失败: {ex.Message}"); }
+        }
+
+
+
+
+        // ==========================================
+        // 🖨️ UI 魔法打印机：根据 State 动态生成轨道
+        // ==========================================
+        private void RefreshDynamicTracks(object currentState)
+        {
+            if (currentState == null || _currentAvailableBlueprints == null) return;
+
+            ActiveTracksContainer.Children.Clear();
+
+            // 制作下拉菜单的字典，用来给属性分组
+            var menuGroups = new Dictionary<string, MenuItem>();
+            ContextMenu addTrackMenu = new ContextMenu();
+
+            foreach (var bp in _currentAvailableBlueprints)
+            {
+                object currentValue = GetPropertyValue(currentState, bp.JsonName);
+
+                // 🌟 核心判断：如果值不是 null，说明轨道已激活，打印 UI！
+                if (currentValue != null)
+                {
+                    UIElement trackUI = CreateTrackControl(bp, currentState, currentValue);
+                    ActiveTracksContainer.Children.Add(trackUI);
+                }
+                // 🌟 如果值是 null，说明没激活，放进➕号菜单里让用户选！
+                else
+                {
+                    if (!menuGroups.ContainsKey(bp.GroupName))
+                    {
+                        var groupItem = new MenuItem { Header = bp.GroupName, FontWeight = FontWeights.Bold };
+                        menuGroups[bp.GroupName] = groupItem;
+                        addTrackMenu.Items.Add(groupItem);
+                    }
+
+                    var addItem = new MenuItem { Header = bp.DisplayName };
+                    addItem.Click += (s, e) =>
+                    {
+                        // 玩家点击激活：注入默认值，刷新 UI，存入时光机！
+                        SetPropertyValue(currentState, bp.JsonName, bp.DefaultValue);
+                        RefreshDynamicTracks(currentState);
+                        _localTimeMachine.RecordSnapshot(_editingObject);
+                    };
+                    menuGroups[bp.GroupName].Items.Add(addItem);
+                }
+            }
+
+            // 把做好的菜单绑定到按钮上
+            BtnActivateTrack.ContextMenu = addTrackMenu;
+        }
+
     }
 }
