@@ -601,11 +601,12 @@ namespace Naziki_Editor.Views
             if (newObj == null || _currentStoryboardRoot == null) return;
 
             // 1. 带着全局字典弹窗！
-            PropertyEditor editor = new PropertyEditor(newObj, _currentStoryboardRoot)
-            {
-                Owner = this,
-                Title = "属性编辑器 - [✨ 导入新素材并设置]" // 给个酷炫的标题
-            };
+            Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(newObj, _currentStoryboardRoot)
+                {
+                    Owner = this,
+                    Title = "属性编辑器 - [✨ 导入新素材并设置]"
+                };
 
             // 2. 如果玩家点击了保存 (且通过了不重名的防线)
             if (editor.ShowDialog() == true)

@@ -1,10 +1,19 @@
 ﻿<Window x:Class="Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:Naziki_Editor.Views.PropertyEditor"
-        Title="属性编辑器" Height="760" Width="1000"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        Background="{DynamicResource MainBgColor}" Foreground="{DynamicResource MainTextColor}">
+        xmlns:local="clr-namespace:Naziki_Editor.Views.PropertyEditor" 
+        Title="属性编辑器" 
+        Height="760" Width="1000"
+        
+        MinWidth="950" 
+        MinHeight="680"
+        MaxWidth="1600" 
+        MaxHeight="1050"
+        
+        WindowStartupLocation="CenterOwner" 
+        ShowInTaskbar="False"
+        Background="{DynamicResource MainBgColor}" 
+        Foreground="{DynamicResource MainTextColor}">
 
     <Grid Margin="15">
         <Grid.RowDefinitions>

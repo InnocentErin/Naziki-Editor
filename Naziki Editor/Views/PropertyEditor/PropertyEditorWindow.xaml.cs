@@ -3,7 +3,7 @@ using System.Windows;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
-    public partial class PropertyEditor : Window
+    public partial class PropertyEditorWindow : Window
     {
         private StoryboardObject _editingObject;
         private StoryboardRoot _root;
