@@ -377,25 +377,143 @@ namespace Naziki_Editor.Models
     [Serializable]
     public class ControllerState : ObjectState
     {
-        public bool? Arcade { get; set; }
-        public float? ArcadeContrast { get; set; }
-        public float? ArcadeIntensity { get; set; }
-        // ... (为节省篇幅，省略部分 Controller 高级特效，您需要时可根据官方代码全量补齐)
+        // 🔹 1. 游戏 UI 与透明度类
         public float? StoryboardOpacity { get; set; }
-        public float? BackgroundDim { get; set; }
         public float? UiOpacity { get; set; }
+        public float? ScanlineOpacity { get; set; }
+        public float? BackgroundDim { get; set; }
+        public float? NoteOpacityMultiplier { get; set; }
+        public string ScanlineColor { get; set; }
+        public string NoteRingColor { get; set; }
+        public List<string> NoteFillColors { get; set; } // 覆盖不同种类note颜色数组
+        public bool? OverrideScanlinePos { get; set; }
+        public float? ScanlinePos { get; set; }
+
+        // 🔹 2. 相机系统类
+        public bool? Perspective { get; set; }
+        public float? Size { get; set; }
+        public float? Fov { get; set; }
+        public UnitFloat X { get; set; }
+        public UnitFloat Y { get; set; }
+        public float? Z { get; set; }
+        public float? RotX { get; set; }
+        public float? RotY { get; set; }
+        public float? RotZ { get; set; }
+
+        // 🔹 3. 屏幕特效滤镜类 (Filters)
+        // 色度 (Chromatical)
+        public bool? Chromatical { get; set; }
+        public float? ChromaticalFade { get; set; }
+        public float? ChromaticalIntensity { get; set; }
+        public float? ChromaticalSpeed { get; set; }
+
+        // 泛光 (Bloom)
+        public bool? Bloom { get; set; }
+        public float? BloomIntensity { get; set; }
+
+        // 模糊 (RadialBlur)
+        public bool? RadialBlur { get; set; }
+        public float? RadialBlurIntensity { get; set; }
+
+        // 色调调节 (ColorAdjustment)
+        public bool? ColorAdjustment { get; set; }
+        public float? Brightness { get; set; }
+        public float? Saturation { get; set; }
+        public float? Contrast { get; set; }
+
+        // 屏幕色滤镜 (ColorFilter)
+        public bool? ColorFilter { get; set; }
+        public string ColorFilterColor { get; set; }
+
+        // 灰度 (GrayScale)
+        public bool? GrayScale { get; set; }
+        public float? GrayScaleIntensity { get; set; }
+
+        // 噪点 (Noise)
+        public bool? Noise { get; set; }
+        public float? NoiseIntensity { get; set; }
+
+        // 棕色老照片 (Sepia)
+        public bool? Sepia { get; set; }
+        public float? SepiaIntensity { get; set; }
+
+        // 梦幻 (Dream)
+        public bool? Dream { get; set; }
+        public float? DreamIntensity { get; set; }
+
+        // 鱼眼 (Fisheye)
+        public bool? Fisheye { get; set; }
+        public float? FisheyeIntensity { get; set; }
+
+        // 冲击波 (Shockwave)
+        public bool? Shockwave { get; set; }
+        public float? ShockwaveSpeed { get; set; }
+
+        // 漫画聚焦线 (Focus)
+        public bool? Focus { get; set; }
+        public float? FocusSize { get; set; }
+        public string FocusColor { get; set; }
+        public float? FocusSpeed { get; set; }
+        public float? FocusIntensity { get; set; }
+
+        // 故障艺术 (Glitch)
+        public bool? Glitch { get; set; }
+        public float? GlitchIntensity { get; set; }
+
+        // 街机风格 (Arcade)
+        public bool? Arcade { get; set; }
+        public float? ArcadeIntensity { get; set; }
+        public float? ArcadeInterferenceSize { get; set; }
+        public float? ArcadeInterferenceSpeed { get; set; }
+        public float? ArcadeContrast { get; set; }
+
+        // 磁带翻转 (Tape)
+        public bool? Tape { get; set; }
     }
+
 
     [Serializable]
     public class NoteControllerState : ObjectState
     {
-        public int? Note { get; set; }
+        // 🎵 注意：因为在官方底层中，外层有一行专门的 noteTarget，所以在关键帧指令状态里，我们只保留可动增量参数
+
+        // X轴覆盖与偏移
         public bool? OverrideX { get; set; }
         public UnitFloat X { get; set; }
         public float? XMultiplier { get; set; }
-        public float? XOffset { get; set; }
+        public float? Dx { get; set; }
+        public float? XOffset { get; set; }  // 官方新版本 x_offset，正是前台需要的它！
+
+        // Y轴覆盖与偏移
+        public bool? OverrideY { get; set; }
+        public UnitFloat Y { get; set; }
+        public float? YMultiplier { get; set; }
+        public float? Dy { get; set; }
+        public float? YOffset { get; set; }  // 官方新版本 y_offset
+
+        // Z轴覆盖
+        public bool? OverrideZ { get; set; }
+        public float? Z { get; set; }
+
+        // 3D相机旋转覆盖
+        public bool? OverrideRotX { get; set; }
+        public float? RotX { get; set; }
+        public bool? OverrideRotY { get; set; }
+        public float? RotY { get; set; }
+        public bool? OverrideRotZ { get; set; }
+        public float? RotZ { get; set; }
+
+        // 换色与不透明度/大小倍率
+        public bool? OverrideRingColor { get; set; }
+        public string RingColor { get; set; }
+        public bool? OverrideFillColor { get; set; }
+        public string FillColor { get; set; }
         public float? OpacityMultiplier { get; set; }
         public float? SizeMultiplier { get; set; }
+
+        // Hold（长条音符）专属控制
+        public int? HoldDirection { get; set; } // 1向上，-1向下
+        public int? Style { get; set; }         // 1默认样式，2隐藏射线连线下落式
     }
 
     // ==========================================

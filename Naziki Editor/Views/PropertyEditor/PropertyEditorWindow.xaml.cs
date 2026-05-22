@@ -38,7 +38,9 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             // ✨ 致命修改 2：接通专线！只要列表选了帧，就强塞给模块四！
             // (注意：这里目前会报错说模块四没有 LoadState 方法，别急，那是咱们下一步要写的东西！)
-            ModFrameList.OnFrameSelected += (state, title) => ModFrameDetails.LoadState(state, title);
+            // ✨ 完美修复：让左边的接收端和右边的调用端都带上完整的 4 个参数！
+            ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
+                ModFrameDetails.LoadState(state, title, rootState, isRoot);
 
 
             BtnCancel.Click += (s, e) => { this.DialogResult = false; };
