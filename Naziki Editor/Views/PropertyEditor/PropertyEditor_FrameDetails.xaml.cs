@@ -7,6 +7,44 @@ using System.Windows.Data;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
+
+
+    // ✨ 新增：专门解决 Time 数组被显示成 "System.Collections..." 的救星转换器！
+    public class TimeBindingConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is System.Collections.IList list)
+            {
+                var strList = new System.Collections.Generic.List<string>();
+                foreach (var item in list) strList.Add(item.ToString());
+                return string.Join(", ", strList); // 完美将数组拼接成逗号分隔的字符串
+            }
+            return value?.ToString() ?? "";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            string s = value?.ToString() ?? "";
+            if (s.Contains(","))
+            {
+                var parts = s.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var list = new System.Collections.Generic.List<object>();
+                foreach (var p in parts)
+                {
+                    string t = p.Trim();
+                    if (float.TryParse(t, out float f)) list.Add(f); else list.Add(t);
+                }
+                return list;
+            }
+            if (float.TryParse(s, out float fSingle)) return fSingle;
+            return s;
+        }
+    }
+
+
+
+
     public partial class PropertyEditor_FrameDetails : UserControl
     {
         private object _currentState;
@@ -24,23 +62,18 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot)
         {
-            _currentState = stateReference;
-            _rootState = rootState;
-            _isRoot = isRoot;
-
+            _currentState = stateReference; _rootState = rootState; _isRoot = isRoot;
             if (_currentState == null) { PanelDetails.Visibility = Visibility.Collapsed; TxtEmptyState.Visibility = Visibility.Visible; return; }
 
             PanelDetails.Visibility = Visibility.Visible;
             TxtEmptyState.Visibility = Visibility.Collapsed;
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
 
-            // 👑 智能显隐面板
-            PanelSceneCards.Visibility = (_rootState is Controller) ? Visibility.Collapsed : Visibility.Visible;
-            PanelControllerCards.Visibility = (_rootState is Controller) ? Visibility.Visible : Visibility.Collapsed;
+            // 🌟 修正 5：同样加上 State！
+            PanelSceneCards.Visibility = (_rootState is ControllerState) ? Visibility.Collapsed : Visibility.Visible;
+            PanelControllerCards.Visibility = (_rootState is ControllerState) ? Visibility.Visible : Visibility.Collapsed;
 
-            BindStaticProperty(TxtTime, "Time");
-            BindStaticProperty(TxtEasing, "Easing");
-
+            BindStaticProperty(TxtTime, "Time"); BindStaticProperty(TxtEasing, "Easing");
             PanelStateTimeOptions.Visibility = _isRoot ? Visibility.Collapsed : Visibility.Visible;
             if (!_isRoot) { BindStaticProperty(TxtAddTime, "AddTime"); BindStaticProperty(TxtRelativeTime, "RelativeTime"); }
 
@@ -54,11 +87,13 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (prop != null)
             {
                 Binding b = new Binding(propName) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
+                // 🌟 修正 6：为 Time 挂载我们刚刚写的专属翻译官，杜绝乱码！
+                if (propName == "Time" || propName == "AddTime" || propName == "RelativeTime") b.Converter = new TimeBindingConverter();
                 txt.SetBinding(TextBox.TextProperty, b);
             }
         }
 
-        
+
 
         // 核心：为每个已激活属性创建一行输入控件，包含标签、输入框和删除按钮
         private UIElement CreateDynamicRow(PropertyInfo prop, object value)
@@ -153,7 +188,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         // 🧬 DNA 鉴定器：判断哪些属性是不可变的静态属性或已固定的属性
         // ==========================================
         private bool IsStaticDnaProperty(string propName) =>
-            propName == "Path" || propName == "TextContent" || propName == "Pos" || propName == "Template" || propName == "Layer" || propName == "Font" || propName == "Align" || propName == "Note";
+            propName == "Path" || propName == "Text" || propName == "Pos" || propName == "Template" || propName == "Layer" || propName == "Font" || propName == "Align" || propName == "Note";
 
 
 
@@ -165,26 +200,16 @@ namespace Naziki_Editor.Views.PropertyEditor
         private int GetPropertyCategory(string name, object rootState)
         {
             string n = name.ToLower();
-
-            if (rootState is Controller)
+            if (rootState is ControllerState) // 👈 加上了 State！
             {
-                // 控制器专属 3大类
-                if (n.Contains("chromatical") || n.Contains("bloom") || n.Contains("blur") ||
-                    n.Contains("adjustment") || n.Contains("brightness") || n.Contains("saturation") ||
-                    n.Contains("contrast") || n.Contains("noise") || n.Contains("sepia") ||
-                    n.Contains("dream") || n.Contains("fisheye") || n.Contains("shockwave") ||
-                    n.Contains("focus") || n.Contains("glitch") || n.Contains("arcade") || n == "tape" || n.Contains("filter"))
-                    return 5; // 滤镜特效类
-                if (n == "perspective" || n == "size" || n == "fov" || n == "x" || n == "y" || n == "z" || n.Contains("rot"))
-                    return 4; // 相机类
-                return 3; // UI 类
+                if (n.Contains("chromatical") || n.Contains("bloom") || n.Contains("blur") || n.Contains("adjustment") || n.Contains("brightness") || n.Contains("saturation") || n.Contains("contrast") || n.Contains("noise") || n.Contains("sepia") || n.Contains("dream") || n.Contains("fisheye") || n.Contains("shockwave") || n.Contains("focus") || n.Contains("glitch") || n.Contains("arcade") || n == "tape" || n.Contains("filter")) return 5;
+                if (n == "perspective" || n == "size" || n == "fov" || n == "x" || n == "y" || n == "z" || n.Contains("rot")) return 4;
+                return 3;
             }
             else
             {
-                // 场景对象（包含 NoteController）专属 2大类
-                if (n.Contains("color") || n.Contains("opacity") || n == "width" || n == "style" || n.Contains("direction"))
-                    return 2; // 外观颜色类
-                return 1; // 空间变换类 (X, Y, Rot, Scale, XMultiplier, Dx 等)
+                if (n.Contains("color") || n.Contains("opacity") || n == "width" || n == "style" || n.Contains("direction")) return 2;
+                return 1;
             }
         }
 
