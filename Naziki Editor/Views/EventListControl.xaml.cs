@@ -219,6 +219,70 @@ namespace Naziki_Editor.Views
                 }
             }
         }
+        // ==========================================
+        // 🗑️ 核心功能：删除选中的事件 (支持多选批量删除！)
+        // ==========================================
+        private void BtnDeleteEvent_Click(object sender, RoutedEventArgs e)
+        {
+            // 防呆拦截：没有通电或者没有数据
+            if (Context == null || !Context.HasStoryboard) return;
+
+            ListBox activeList = GetCurrentActiveListBox();
+            if (activeList == null || activeList.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("呆胶布？你还没有在列表中选择要删除的事件哦！", "小艾的提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 危险操作！必须经过指挥官同意！
+            var result = MessageBox.Show($"确认要将这 {activeList.SelectedItems.Count} 个事件从故事板中彻底抹除吗？\n此操作目前不可撤销哦！",
+                                         "危险警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes) return;
+
+            var root = Context.Storyboard;
+            bool hasDeleted = false;
+
+            // 提取所有选中的项目 (使用 Linq 转为 List 防止遍历时修改集合报错)
+            var selectedItems = activeList.SelectedItems.Cast<ListBoxItem>().ToList();
+
+            foreach (var item in selectedItems)
+            {
+                // 获取原始标签对象，不要强行转化为 StoryboardObject
+                var tag = item.Tag;
+
+                if (item.Tag is StoryboardObject objToDelete)
+                {
+                    // 根据类型，精准切断它们在底层 DNA 库中的连接！
+                    if (objToDelete is Sprite s) { root.sprites?.Remove(s); hasDeleted = true; }
+                    else if (objToDelete is Text t) { root.texts?.Remove(t); hasDeleted = true; }
+                    else if (objToDelete is Line l) { root.lines?.Remove(l); hasDeleted = true; }
+                    else if (objToDelete is Video v) { root.videos?.Remove(v); hasDeleted = true; }
+                    else if (objToDelete is Controller c) { root.controllers?.Remove(c); hasDeleted = true; }
+                    else if (objToDelete is NoteController nc) { root.note_controllers?.Remove(nc); hasDeleted = true; }
+                }
+                else if (tag is StoryboardTemplate st)
+                {
+                    // 👑 独立处理模板对象：通过 Value 反查 Key
+                    var targetEntry = root.templates?.FirstOrDefault(x => x.Value == st);
+                    if (targetEntry != null && targetEntry.Value.Key != null)
+                    {
+                        root.templates.Remove(targetEntry.Value.Key);
+                        hasDeleted = true;
+                    }
+                }
+               
+            }
+
+            if (hasDeleted)
+            {
+                // 1. 刷新左侧树叶列表，更新空空如也提示
+                LoadStoryboardUI();
+
+                // 2. 发射空信号，让右侧的属性面板和预览画布取消选中高亮状态！
+                OnEventNodeSelected?.Invoke(null);
+            }
+        }
 
     }
+
 }

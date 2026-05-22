@@ -9,82 +9,92 @@
              BorderBrush="{DynamicResource BorderColor}"
              Foreground="{DynamicResource MainTextColor}">
 
-    <Border Background="{DynamicResource MainBgColor}"  BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
-        
+    <Border Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="55"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <TabControl x:Name="EventTabControl" Grid.ColumnSpan="2" TabStripPlacement="Left" 
-                        Background="Transparent" BorderThickness="0"
-                        ItemContainerStyle="{DynamicResource VerticalTabItemStyle}"
-                        SelectionChanged="EventTabControl_SelectionChanged">
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="55"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                <TabControl.Template>
-                    <ControlTemplate TargetType="TabControl">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="55"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                <TabControl x:Name="EventTabControl" Grid.ColumnSpan="2" TabStripPlacement="Left" 
+                            Background="Transparent" BorderThickness="0"
+                            ItemContainerStyle="{DynamicResource VerticalTabItemStyle}"
+                            SelectionChanged="EventTabControl_SelectionChanged">
 
-                            <Border Grid.Column="0" Background="{DynamicResource SideBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
-                                <TabPanel IsItemsHost="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                            </Border>
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="TabControl">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="55"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Column="1" Background="Transparent">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <UniformGrid Grid.Row="0" Columns="3" Margin="5,5,5,2">
-                                    <Button Content="➕ 文字" x:Name="BtnAddText" Click="BtnAddText_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-                                    <Button Content="➕ 线条" x:Name="BtnAddLine" Click="BtnAddLine_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-                                    <Button Content="➕ 场景" x:Name="BtnAddScene" Click="BtnAddScene_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-                                </UniformGrid>
-
-                                <Border Grid.Row="1" Background="Transparent">
-                                    <ContentPresenter ContentSource="SelectedContent"/>
+                                <Border Grid.Column="0" Background="{DynamicResource SideBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
+                                    <TabPanel IsItemsHost="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 </Border>
+
+                                <Grid Grid.Column="1" Background="Transparent">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <UniformGrid Grid.Row="0" Columns="3" Margin="5,5,5,2">
+                                        <Button Content="➕ 文字" x:Name="BtnAddText" Click="BtnAddText_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                        <Button Content="➕ 线条" x:Name="BtnAddLine" Click="BtnAddLine_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                        <Button Content="➕ 场景" x:Name="BtnAddScene" Click="BtnAddScene_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                    </UniformGrid>
+
+                                    <Border Grid.Row="1" Background="Transparent">
+                                        <ContentPresenter ContentSource="SelectedContent"/>
+                                    </Border>
+                                </Grid>
                             </Grid>
-                        </Grid>
-                    </ControlTemplate>
-                </TabControl.Template>
+                        </ControlTemplate>
+                    </TabControl.Template>
 
-                <TabItem Header="图片">
-                    <ListBox x:Name="SpriteListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="文字">
-                    <ListBox x:Name="TextListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="线条">
-                    <ListBox x:Name="LinesListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="视频">
-                    <ListBox x:Name="VideoListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="场景">
-                    <ListBox x:Name="SceneListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="音符">
-                    <ListBox x:Name="NoteCtrlListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-                <TabItem Header="模板">
-                    <ListBox x:Name="EventTemplateListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
-                </TabItem>
-            </TabControl>
+                    <TabItem Header="图片">
+                        <ListBox x:Name="SpriteListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="文字">
+                        <ListBox x:Name="TextListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="线条">
+                        <ListBox x:Name="LinesListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="视频">
+                        <ListBox x:Name="VideoListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="场景">
+                        <ListBox x:Name="SceneListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="音符">
+                        <ListBox x:Name="NoteCtrlListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                    <TabItem Header="模板">
+                        <ListBox x:Name="EventTemplateListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                    </TabItem>
+                </TabControl>
 
-            <StackPanel x:Name="DynamicEmptyHint" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
-                <TextBlock Text="这里空空如也" Background="{DynamicResource MainBgColor}" HorizontalAlignment="Center"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                    <TextBlock Text="快来添加“" Background="{DynamicResource MainBgColor}" FontSize="10"/>
-                    <TextBlock Text="{Binding SelectedItem.Header, ElementName=EventTabControl}" Background="{DynamicResource MainBgColor}" FontSize="10"/>
-                    <TextBlock Text="”事件吧！" Background="{DynamicResource MainBgColor}" FontSize="10"/>
+                <StackPanel x:Name="DynamicEmptyHint" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock Text="这里空空如也" Background="{DynamicResource MainBgColor}" HorizontalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+                        <TextBlock Text="快来添加“" Background="{DynamicResource MainBgColor}" FontSize="10"/>
+                        <TextBlock Text="{Binding SelectedItem.Header, ElementName=EventTabControl}" Background="{DynamicResource MainBgColor}" FontSize="10"/>
+                        <TextBlock Text="”事件吧！" Background="{DynamicResource MainBgColor}" FontSize="10"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
+
+            <Button Grid.Row="1" x:Name="BtnDeleteEvent" Content="🗑️ 删除选中的事件" Click="BtnDeleteEvent_Click" 
+                    Margin="10,5,10,10" Padding="5,8" Background="#FF5555" Foreground="White" 
+                    FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
         </Grid>
     </Border>
 </UserControl>
