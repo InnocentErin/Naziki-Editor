@@ -33,6 +33,8 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         private void RefreshList()
         {
+            // 断开大喇叭，防止 Items.Clear() 引发死循环！
+            ListFrames.SelectionChanged -= ListFrames_SelectionChanged;
             ListFrames.Items.Clear();
             _statesList = null;
 
@@ -66,6 +68,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             }
 
             BtnRemoveFrame.IsEnabled = (_statesList != null && _statesList.Count > 0);
+
+            // 🟢 重新接通大喇叭！
+            ListFrames.SelectionChanged += ListFrames_SelectionChanged;
         }
 
         private void ListFrames_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -74,7 +79,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 object selectedState = _statesList[ListFrames.SelectedIndex];
                 string frameTitle = ListFrames.SelectedItem.ToString(); // 📣 呼叫模块四！
+                object rootState = _statesList[0];// 永远抓取第 0 帧作为标尺
+                bool isRoot = (ListFrames.SelectedIndex == 0);
                 OnFrameSelected?.Invoke(selectedState, frameTitle); // 传递选中的帧数据和标题，让模块四去显示和编辑它！
+                
             }
             else
             {
