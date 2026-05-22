@@ -28,36 +28,24 @@ namespace Naziki_Editor.Views.PropertyEditor
             _rootState = rootState;
             _isRoot = isRoot;
 
-            if (_currentState == null)
-            {
-                PanelDetails.Visibility = Visibility.Collapsed;
-                TxtEmptyState.Visibility = Visibility.Visible;
-                return;
-            }
+            if (_currentState == null) { PanelDetails.Visibility = Visibility.Collapsed; TxtEmptyState.Visibility = Visibility.Visible; return; }
 
             PanelDetails.Visibility = Visibility.Visible;
             TxtEmptyState.Visibility = Visibility.Collapsed;
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
 
-            // 绑定基础只读/文本框
+            // 👑 智能显隐面板
+            PanelSceneCards.Visibility = (_rootState is Controller) ? Visibility.Collapsed : Visibility.Visible;
+            PanelControllerCards.Visibility = (_rootState is Controller) ? Visibility.Visible : Visibility.Collapsed;
+
             BindStaticProperty(TxtTime, "Time");
             BindStaticProperty(TxtEasing, "Easing");
-            // 联动控制相对时间面板显示
+
             PanelStateTimeOptions.Visibility = _isRoot ? Visibility.Collapsed : Visibility.Visible;
-
-
-            // 
-            if (!_isRoot)
-            {
-                BindStaticProperty(TxtAddTime, "AddTime");
-                BindStaticProperty(TxtRelativeTime, "RelativeTime");
-            }
-
-            BuildDynamicPanel();
+            if (!_isRoot) { BindStaticProperty(TxtAddTime, "AddTime"); BindStaticProperty(TxtRelativeTime, "RelativeTime"); }
 
             BuildDynamicPanel();
         }
-        
 
         // 核心：绑定 Time 和 Easing 这两个固定属性的输入框
         private void BindStaticProperty(TextBox txt, string propName)
@@ -164,11 +152,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 🧬 DNA 鉴定器：判断哪些属性是不可变的静态属性或已固定的属性
         // ==========================================
-        private bool IsStaticDnaProperty(string propName)
-        {
-            return propName == "Path" || propName == "TextContent" || propName == "Pos" ||
-                   propName == "Template" || propName == "Layer" || propName == "Font" || propName == "Align" || propName == "Note";
-        }
+        private bool IsStaticDnaProperty(string propName) =>
+            propName == "Path" || propName == "TextContent" || propName == "Pos" || propName == "Template" || propName == "Layer" || propName == "Font" || propName == "Align" || propName == "Note";
 
 
 
@@ -177,28 +162,30 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 🔮 辅助方法：属性名称智能分流分类器
         // ==========================================
-        private int GetPropertyCategory(string name)
+        private int GetPropertyCategory(string name, object rootState)
         {
             string n = name.ToLower();
-            // 特效滤镜核心关键字
-            if (n.Contains("chromatical") || n.Contains("bloom") || n.Contains("blur") ||
-                n.Contains("adjustment") || n.Contains("brightness") || n.Contains("saturation") ||
-                n.Contains("contrast") || n.Contains("noise") || n.Contains("sepia") ||
-                n.Contains("dream") || n.Contains("fisheye") || n.Contains("shockwave") ||
-                n.Contains("focus") || n.Contains("glitch") || n.Contains("arcade") || n == "tape" || n.Contains("filter"))
-            {
-                return 3; // 归类三：屏幕特效
-            }
 
-            // 相机控制与绝对空间位移轴关键字
-            if (n == "x" || n == "y" || n == "z" || n.Contains("rot") || n.Contains("scale") ||
-                n == "perspective" || n == "size" || n == "fov" || n.Contains("multiplier") ||
-                n == "dx" || n == "dy" || n.Contains("offset") || n.Contains("override"))
+            if (rootState is Controller)
             {
-                return 2; // 归类二：相机空间
+                // 控制器专属 3大类
+                if (n.Contains("chromatical") || n.Contains("bloom") || n.Contains("blur") ||
+                    n.Contains("adjustment") || n.Contains("brightness") || n.Contains("saturation") ||
+                    n.Contains("contrast") || n.Contains("noise") || n.Contains("sepia") ||
+                    n.Contains("dream") || n.Contains("fisheye") || n.Contains("shockwave") ||
+                    n.Contains("focus") || n.Contains("glitch") || n.Contains("arcade") || n == "tape" || n.Contains("filter"))
+                    return 5; // 滤镜特效类
+                if (n == "perspective" || n == "size" || n == "fov" || n == "x" || n == "y" || n == "z" || n.Contains("rot"))
+                    return 4; // 相机类
+                return 3; // UI 类
             }
-
-            return 1; // 归类一：游戏 UI 与事件本体 DNA 属性
+            else
+            {
+                // 场景对象（包含 NoteController）专属 2大类
+                if (n.Contains("color") || n.Contains("opacity") || n == "width" || n == "style" || n.Contains("direction"))
+                    return 2; // 外观颜色类
+                return 1; // 空间变换类 (X, Y, Rot, Scale, XMultiplier, Dx 等)
+            }
         }
 
         // ==========================================
@@ -206,58 +193,53 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         private void BuildDynamicPanel()
         {
-            // 彻底清场
-            PanelUiContainer.Children.Clear();
-            PanelCameraContainer.Children.Clear();
-            PanelEffectsContainer.Children.Clear();
-
-            CmbUiProps.Items.Clear();
-            CmbCameraProps.Items.Clear();
-            CmbEffectsProps.Items.Clear();
+            PanelSpatialContainer.Children.Clear(); CmbSpatialProps.Items.Clear();
+            PanelAppearanceContainer.Children.Clear(); CmbAppearanceProps.Items.Clear();
+            PanelUiContainer.Children.Clear(); CmbUiProps.Items.Clear();
+            PanelCameraContainer.Children.Clear(); CmbCameraProps.Items.Clear();
+            PanelEffectsContainer.Children.Clear(); CmbEffectsProps.Items.Clear();
 
             PropertyInfo[] props = _currentState.GetType().GetProperties();
 
             foreach (var prop in props)
             {
-                // 跳过已单独固定的时间轴轴心参数
                 if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "AddTime" || prop.Name == "RelativeTime") continue;
                 if (prop.Name == "Id" || prop.Name == "ParentId" || prop.Name == "TargetId" || prop.Name == "States") continue;
 
-                // 核心控制：DNA 静态属性只允许在 Root 中修改
-                bool isDna = IsStaticDnaProperty(prop.Name);
-                if (isDna && !_isRoot) continue;
+                if (IsStaticDnaProperty(prop.Name) && !_isRoot) continue;
 
                 object val = prop.GetValue(_currentState);
                 bool isActive = (val != null);
-                int cat = GetPropertyCategory(prop.Name);
+                int cat = GetPropertyCategory(prop.Name, _rootState);
 
                 if (isActive)
                 {
-                    // 属性已被用户开启激活，生成双向绑定输入控件并上架到对应卡片仓中
                     var row = CreateDynamicRow(prop, val);
-                    if (cat == 1) PanelUiContainer.Children.Add(row);
-                    else if (cat == 2) PanelCameraContainer.Children.Add(row);
-                    else if (cat == 3) PanelEffectsContainer.Children.Add(row);
+                    if (cat == 1) PanelSpatialContainer.Children.Add(row);
+                    else if (cat == 2) PanelAppearanceContainer.Children.Add(row);
+                    else if (cat == 3) PanelUiContainer.Children.Add(row);
+                    else if (cat == 4) PanelCameraContainer.Children.Add(row);
+                    else if (cat == 5) PanelEffectsContainer.Children.Add(row);
                 }
                 else
                 {
-                    // 🛑 落实铁律二：血统继承审查
-                    // 如果当前是子关键帧状态，它必须确保这个属性在 Root (祖宗) 里面不是 null，才有资格出现在下拉单里！
                     if (!_isRoot && prop.Name != "Destroy")
                     {
                         var rootProp = _rootState.GetType().GetProperty(prop.Name);
-                        if (rootProp == null || rootProp.GetValue(_rootState) == null) continue; // 祖宗没开，子孙封锁！
+                        if (rootProp == null || rootProp.GetValue(_rootState) == null) continue;
                     }
 
-                    // 还没有被激活，分流塞进对应的“待开启下拉菜单”
                     var item = new ComboBoxItem { Content = prop.Name, Tag = prop };
-                    if (cat == 1) CmbUiProps.Items.Add(item);
-                    else if (cat == 2) CmbCameraProps.Items.Add(item);
-                    else if (cat == 3) CmbEffectsProps.Items.Add(item);
+                    if (cat == 1) CmbSpatialProps.Items.Add(item);
+                    else if (cat == 2) CmbAppearanceProps.Items.Add(item);
+                    else if (cat == 3) CmbUiProps.Items.Add(item);
+                    else if (cat == 4) CmbCameraProps.Items.Add(item);
+                    else if (cat == 5) CmbEffectsProps.Items.Add(item);
                 }
             }
 
-            // 智能隐藏空菜单
+            if (CmbSpatialProps.Items.Count > 0) CmbSpatialProps.SelectedIndex = 0;
+            if (CmbAppearanceProps.Items.Count > 0) CmbAppearanceProps.SelectedIndex = 0;
             if (CmbUiProps.Items.Count > 0) CmbUiProps.SelectedIndex = 0;
             if (CmbCameraProps.Items.Count > 0) CmbCameraProps.SelectedIndex = 0;
             if (CmbEffectsProps.Items.Count > 0) CmbEffectsProps.SelectedIndex = 0;
@@ -266,6 +248,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 👆 三大卡片独立开启属性响应方法 (替代原本的单个点击方法)
         // ==========================================
+        private void BtnAddSpatial_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbSpatialProps);
+        private void BtnAddAppearance_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbAppearanceProps);
         private void BtnAddUiProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbUiProps);
         private void BtnAddCameraProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbCameraProps);
         private void BtnAddEffectsProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbEffectsProps);
@@ -274,16 +258,10 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             if (cmb.SelectedItem is ComboBoxItem item && item.Tag is PropertyInfo prop)
             {
-                Type pType = prop.PropertyType;
-                Type uType = Nullable.GetUnderlyingType(pType) ?? pType;
-
-                object defaultVal = null;
-                if (uType == typeof(string)) defaultVal = "";
-                else if (uType == typeof(UnitFloat)) defaultVal = new UnitFloat { Value = 0, Unit = ReferenceUnit.World };
-                else if (uType.IsValueType) defaultVal = Activator.CreateInstance(uType);
-
+                Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                object defaultVal = uType == typeof(string) ? "" : (uType == typeof(UnitFloat) ? new UnitFloat { Value = 0, Unit = ReferenceUnit.World } : Activator.CreateInstance(uType));
                 prop.SetValue(_currentState, defaultVal);
-                LoadState(_currentState, _currentTitle, _rootState, _isRoot); // 重绘刷新面板
+                LoadState(_currentState, TxtFrameTitle.Text.Replace("当前选中 ➡️ ", ""), _rootState, _isRoot);
             }
         }
 

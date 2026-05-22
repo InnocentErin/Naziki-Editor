@@ -1,34 +1,18 @@
 ﻿using System;
-using System.Collections;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using Naziki_Editor.Models;
-using Naziki_Editor.State;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
     public partial class PropertyEditor_FrameList : UserControl
     {
         private StoryboardObject _editingObject;
-        private ProjectDataContext _context;
-        private IList _statesList;
+        private System.Collections.IList _statesList;
         private Type _stateType;
 
-
-        private class FrameNodeTag
-        {
-            public bool IsRoot { get; set; }
-            public bool IsGroup { get; set; }
-            public object TargetObject { get; set; } // 挂载的数据实体
-            public System.Collections.IList ParentList { get; set; }
-            public int Index { get; set; }
-        }
-
-
-
-        // ✨ 终极枢纽：当用户选中一个帧时，触发这个事件，把具体的帧数据传出去！
+        // 专线大喇叭保持不变
         public event Action<object, string, object, bool> OnFrameSelected;
 
         public PropertyEditor_FrameList()
@@ -36,33 +20,30 @@ namespace Naziki_Editor.Views.PropertyEditor
             InitializeComponent();
         }
 
-        public void LoadData(StoryboardObject editingObj, ProjectDataContext context)
+        public void LoadData(StoryboardObject editingObj, Naziki_Editor.State.ProjectDataContext context)
         {
             _editingObject = editingObj;
-            _context = context;
+            //_context = context;
             RefreshList();
         }
 
+        // 🌟 核心刷新逻辑：先清空列表和状态缓存，再重新读取 Root 和 States 生成列表项，最后恢复事件监听和默认选中
         private void RefreshList()
         {
-            TreeFrames.Items.Clear();
+            ListFrames.SelectionChanged -= ListFrames_SelectionChanged;
+            ListFrames.Items.Clear();
             _statesList = null;
 
-            // 👑 自动确保 Root 的必备初始值绝对存在 (Time & Easing 防空桩)
+            // 👑 自动防呆确保 Root 的必备初始值
             var timeProp = _editingObject.GetType().GetProperty("Time");
             var easingProp = _editingObject.GetType().GetProperty("Easing");
             if (string.IsNullOrEmpty(timeProp?.GetValue(_editingObject)?.ToString())) timeProp?.SetValue(_editingObject, "0");
             if (string.IsNullOrEmpty(easingProp?.GetValue(_editingObject)?.ToString())) easingProp?.SetValue(_editingObject, "none");
 
-            // 1. 挂载唯一的【[0] 🚩 初始状态设定 (Root)】节点
-            TreeViewItem rootNode = new TreeViewItem
-            {
-                Header = "👑 [0] 初始状态设定 (Root)",
-                Tag = new FrameNodeTag { IsRoot = true, TargetObject = _editingObject }
-            };
-            TreeFrames.Items.Add(rootNode);
+            // 1. 挂载本体
+            ListFrames.Items.Add("👑 [0] 初始状态设定 (Root)");
 
-            // 2. 遍历加载子状态组与关键帧
+            // 2. 遍历纯净的 States 关键帧数组
             PropertyInfo statesProp = _editingObject.GetType().GetProperty("States");
             if (statesProp != null)
             {
@@ -73,108 +54,68 @@ namespace Naziki_Editor.Views.PropertyEditor
                 {
                     for (int i = 0; i < _statesList.Count; i++)
                     {
-                        object groupState = _statesList[i];
-
-                        // 创建状态组节点
-                        TreeViewItem groupNode = new TreeViewItem
-                        {
-                            Header = $"📦 状态组 {i + 1}",
-                            Tag = new FrameNodeTag { IsGroup = true, TargetObject = groupState, ParentList = _statesList, Index = i }
-                        };
-
-                        // 每一个状态组下面，自动默认生成它的“动作关键帧”
-                        string subTime = groupState.GetType().GetProperty("Time")?.GetValue(groupState)?.ToString() ?? "未定";
-                        TreeViewItem subFrameNode = new TreeViewItem
-                        {
-                            Header = $"  ⏱️ 关键帧 [Time: {subTime}]",
-                            Tag = new FrameNodeTag { IsRoot = false, IsGroup = false, TargetObject = groupState, ParentList = _statesList, Index = i }
-                        };
-                        groupNode.Items.Add(subFrameNode);
-
-                        TreeFrames.Items.Add(groupNode);
+                        object state = _statesList[i];
+                        string subTime = state.GetType().GetProperty("Time")?.GetValue(state)?.ToString() ?? "未定";
+                        ListFrames.Items.Add($"🎬 [{i + 1}] 补间关键帧 (Time: {subTime})");
                     }
                 }
             }
 
-            BtnRemove.IsEnabled = false; // 初始状态下不给删除
+            BtnRemoveFrame.IsEnabled = false;
+            ListFrames.SelectionChanged += ListFrames_SelectionChanged;
+
+            if (ListFrames.Items.Count > 0 && ListFrames.SelectedIndex == -1)
+                ListFrames.SelectedIndex = 0;
         }
-
-        // ==========================================
-        // 📣 树节点点选大喇叭：接通 4 参数完全体信道
-        // ==========================================
-        private void TreeFrames_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        // 🌟 选中事件核心逻辑：根据选中项的索引区分 Root 和普通帧，提取对应状态并通过专线大喇叭通知模块四更新详情面板
+        private void ListFrames_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (TreeFrames.SelectedItem is TreeViewItem selectedNode && selectedNode.Tag is FrameNodeTag tag)
+            if (ListFrames.SelectedIndex >= 0)
             {
-                object rootState = _editingObject; // 真正的老祖宗就是 _editingObject
+                string title = ListFrames.SelectedItem.ToString();
+                object rootState = _editingObject;
+                bool isRoot = ListFrames.SelectedIndex == 0;
+                BtnRemoveFrame.IsEnabled = !isRoot;
 
-                // 按钮防呆：Root 节点绝不允许被删除！
-                BtnRemove.IsEnabled = !tag.IsRoot;
-
-                // 呼叫右侧参数编辑器
-                OnFrameSelected?.Invoke(tag.TargetObject, selectedNode.Header.ToString().Trim(), rootState, tag.IsRoot);
+                if (isRoot)
+                    OnFrameSelected?.Invoke(_editingObject, title, rootState, true);
+                else if (_statesList != null)
+                    OnFrameSelected?.Invoke(_statesList[ListFrames.SelectedIndex - 1], title, rootState, false);
             }
             else
             {
                 OnFrameSelected?.Invoke(null, "", null, false);
-                BtnRemove.IsEnabled = false;
+                BtnRemoveFrame.IsEnabled = false;
             }
         }
-
-        // ✨ 动态创造一个新的 State 实例，附带 Cytoid 的出厂设置，然后添加到列表里！至于 State 的具体类型，我们通过反射从 States 属性的泛型参数里拿到！
-        // ==========================================
-        // ➕ 创建状态组按钮响应
-        // ==========================================
-        private void BtnAddGroup_Click(object sender, RoutedEventArgs e)
+        // 🌟 添加帧按钮核心逻辑：确保 States 列表存在，创建新帧并设置默认值，添加到列表并刷新界面，最后自动选中新帧以便编辑
+        private void BtnAddFrame_Click(object sender, RoutedEventArgs e)
         {
             PropertyInfo statesProp = _editingObject.GetType().GetProperty("States");
             if (statesProp == null) return;
 
             if (_statesList == null)
             {
-                Type listType = statesProp.PropertyType;
-                _statesList = Activator.CreateInstance(listType) as System.Collections.IList;
+                _statesList = Activator.CreateInstance(statesProp.PropertyType) as System.Collections.IList;
                 statesProp.SetValue(_editingObject, _statesList);
             }
 
-            // 创建新的状态组实体
-            object newStateGroup = Activator.CreateInstance(_stateType);
-            newStateGroup.GetType().GetProperty("Time")?.SetValue(newStateGroup, "0");
-            newStateGroup.GetType().GetProperty("Easing")?.SetValue(newStateGroup, "linear");
+            object newState = Activator.CreateInstance(_stateType);
+            newState.GetType().GetProperty("Time")?.SetValue(newState, "0");
+            newState.GetType().GetProperty("Easing")?.SetValue(newState, "linear");
 
-            _statesList.Add(newStateGroup);
+            _statesList.Add(newState);
             RefreshList();
-
-            // 自动展开并选中新状态组的第一个关键帧
-            if (TreeFrames.Items.Count > 0)
-            {
-                var lastGroup = TreeFrames.Items[TreeFrames.Items.Count - 1] as TreeViewItem;
-                if (lastGroup != null && lastGroup.Items.Count > 0)
-                {
-                    var subFrame = lastGroup.Items[0] as TreeViewItem;
-                    if (subFrame != null) subFrame.IsSelected = true;
-                }
-            }
+            ListFrames.SelectedIndex = _statesList.Count; // 自动选中新帧
         }
-
-        // ==========================================
-        // 🗑️ 删除选中帧/状态组响应 (落实问题 2)
-        // ==========================================
-        private void BtnRemove_Click(object sender, RoutedEventArgs e)
+        // 🌟 删除帧按钮核心逻辑：仅允许删除非 Root 帧，移除选中帧并刷新界面，最后自动选中 Root 以防止选中空白
+        private void BtnRemoveFrame_Click(object sender, RoutedEventArgs e)
         {
-            if (TreeFrames.SelectedItem is TreeViewItem selectedNode && selectedNode.Tag is FrameNodeTag tag)
+            if (ListFrames.SelectedIndex > 0 && _statesList != null)
             {
-                if (tag.IsRoot) return; // 铁律防御：初始状态不可删
-
-                if (tag.ParentList != null && tag.Index >= 0 && tag.Index < tag.ParentList.Count)
-                {
-                    tag.ParentList.RemoveAt(tag.Index);
-                    RefreshList();
-
-                    // 默认滚回 Root 节点
-                    if (TreeFrames.Items.Count > 0 && TreeFrames.Items[0] is TreeViewItem rootNode)
-                        rootNode.IsSelected = true;
-                }
+                _statesList.RemoveAt(ListFrames.SelectedIndex - 1);
+                RefreshList();
+                ListFrames.SelectedIndex = 0; // 滚回Root
             }
         }
     }

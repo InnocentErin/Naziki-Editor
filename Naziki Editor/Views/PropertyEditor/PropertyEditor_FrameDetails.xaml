@@ -20,13 +20,12 @@
                         </Grid>
                         <Grid Margin="0,0,0,8" x:Name="RowEasing">
                             <Grid.ColumnDefinitions>
-                                <Grid.ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="140"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="过渡缓动 (Easing):" VerticalAlignment="Center" FontWeight="Bold"/>
                             <TextBox x:Name="TxtEasing" Grid.Column="1" Padding="5"/>
                         </Grid>
-
                         <StackPanel x:Name="PanelStateTimeOptions" Visibility="Collapsed">
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -48,57 +47,89 @@
                     </StackPanel>
                 </Border>
 
-                <Expander x:Name="ExpUi" Header="📱 游戏 UI 与表现控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
-                    <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
-                        <StackPanel>
-                            <StackPanel x:Name="PanelUiContainer" />
-                            <Grid Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ComboBox x:Name="CmbUiProps" FontWeight="Normal"/>
-                                <Button x:Name="BtnAddUiProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddUiProp_Click"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Expander>
+                <StackPanel x:Name="PanelSceneCards" Visibility="Collapsed">
+                    <Expander Header="📍 空间坐标与尺寸控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
+                            <StackPanel>
+                                <StackPanel x:Name="PanelSpatialContainer" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbSpatialProps" FontWeight="Normal"/>
+                                    <Button x:Name="BtnAddSpatial" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddSpatial_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                    <Expander Header="🎨 外观颜色与表现控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
+                            <StackPanel>
+                                <StackPanel x:Name="PanelAppearanceContainer" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbAppearanceProps" FontWeight="Normal"/>
+                                    <Button x:Name="BtnAddAppearance" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddAppearance_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                </StackPanel>
 
-                <Expander x:Name="ExpCamera" Header="🎥 相机与视口空间系统" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
-                    <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
-                        <StackPanel>
-                            <StackPanel x:Name="PanelCameraContainer" />
-                            <Grid Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ComboBox x:Name="CmbCameraProps" FontWeight="Normal"/>
-                                <Button x:Name="BtnAddCameraProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddCameraProp_Click"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Expander>
-
-                <Expander x:Name="ExpEffects" Header="✨ 屏幕画面特效滤镜 (Filters)" IsExpanded="False" Margin="0,0,0,10" FontWeight="Bold">
-                    <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
-                        <StackPanel>
-                            <StackPanel x:Name="PanelEffectsContainer" />
-                            <Grid Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ComboBox x:Name="CmbEffectsProps" FontWeight="Normal"/>
-                                <Button x:Name="BtnAddEffectsProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddEffectsProp_Click"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Expander>
+                <StackPanel x:Name="PanelControllerCards" Visibility="Collapsed">
+                    <Expander Header="📱 全局游戏 UI 控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
+                            <StackPanel>
+                                <StackPanel x:Name="PanelUiContainer" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbUiProps" FontWeight="Normal"/>
+                                    <Button x:Name="BtnAddUiProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddUiProp_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                    <Expander Header="🎥 核心相机系统" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
+                            <StackPanel>
+                                <StackPanel x:Name="PanelCameraContainer" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbCameraProps" FontWeight="Normal"/>
+                                    <Button x:Name="BtnAddCameraProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddCameraProp_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                    <Expander Header="✨ 屏幕画面滤镜 (Filters)" IsExpanded="False" Margin="0,0,0,10" FontWeight="Bold">
+                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
+                            <StackPanel>
+                                <StackPanel x:Name="PanelEffectsContainer" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbEffectsProps" FontWeight="Normal"/>
+                                    <Button x:Name="BtnAddEffectsProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddEffectsProp_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                </StackPanel>
 
             </StackPanel>
         </ScrollViewer>
-
-        <TextBlock x:Name="TxtEmptyState" Text="👈 请先在左侧轨道选择一个状态层进行编辑" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TipsColor}"/>
+        <TextBlock x:Name="TxtEmptyState" Text="👈 请先在左侧轨道选择一个状态层" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TipsColor}"/>
     </Grid>
 </UserControl>
