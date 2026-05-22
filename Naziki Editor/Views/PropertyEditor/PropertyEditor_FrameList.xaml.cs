@@ -43,7 +43,6 @@ namespace Naziki_Editor.Views.PropertyEditor
                 _statesList = statesProp.GetValue(_editingObject) as System.Collections.IList;
                 _stateType = statesProp.PropertyType.GetGenericArguments()[0];
 
-                // 👑 自动防呆：如果连第 0 帧 (Root) 都没有，强制生成一个作为出厂设置！
                 if (_statesList == null || _statesList.Count == 0)
                 {
                     if (_statesList == null)
@@ -57,19 +56,21 @@ namespace Naziki_Editor.Views.PropertyEditor
                     _statesList.Add(rootState);
                 }
 
-                // 1. 挂载本体 (完美指向 _statesList[0])
                 ListFrames.Items.Add("👑 [0] 初始状态设定 (Root)");
 
-                // 2. 遍历后续纯净的补间关键帧 (一定要从 index 1 开始！)
                 for (int i = 1; i < _statesList.Count; i++)
                 {
                     object state = _statesList[i];
                     object timeObj = state.GetType().GetProperty("Time")?.GetValue(state);
                     string subTime = "未定";
 
-                    // 解决显示 System.Collections 的 Bug
-                    if (timeObj is System.Collections.IList tList) subTime = $"多点触发({tList.Count})";
-                    else if (timeObj != null) subTime = timeObj.ToString();
+                    // ✨ 核心修复：完美识别 JArray，告别 System.Collections 乱码！
+                    if (timeObj is Newtonsoft.Json.Linq.JArray jArray)
+                        subTime = $"多点触发 ({jArray.Count})";
+                    else if (timeObj is System.Collections.IList tList)
+                        subTime = $"多点触发 ({tList.Count})";
+                    else if (timeObj != null)
+                        subTime = timeObj.ToString();
 
                     ListFrames.Items.Add($"🎬 [{i}] 补间关键帧 (Time: {subTime})");
                 }
@@ -77,7 +78,6 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             BtnRemoveFrame.IsEnabled = false;
             ListFrames.SelectionChanged += ListFrames_SelectionChanged;
-
         }
 
 
@@ -108,14 +108,26 @@ namespace Naziki_Editor.Views.PropertyEditor
         private void BtnAddFrame_Click(object sender, RoutedEventArgs e)
         {
             if (_stateType == null) return;
+
             object newState = Activator.CreateInstance(_stateType);
             newState.GetType().GetProperty("Time")?.SetValue(newState, "0");
             newState.GetType().GetProperty("Easing")?.SetValue(newState, "linear");
 
+            // 防呆保险：确保列表实例一定存在
+            if (_statesList == null)
+            {
+                PropertyInfo statesProp = _editingObject.GetType().GetProperty("States");
+                _statesList = Activator.CreateInstance(statesProp.PropertyType) as System.Collections.IList;
+                statesProp.SetValue(_editingObject, _statesList);
+            }
+
             _statesList.Add(newState);
             RefreshList();
-            // 添加完毕后自动选中刚添加的最新帧
-            ListFrames.SelectedIndex = ListFrames.Items.Count - 1;
+
+            // ✨ 核心修复：异步派发选择事件，彻底切断 WPF 同步更新引发的堆栈死锁！
+            Dispatcher.BeginInvoke(new Action(() => {
+                ListFrames.SelectedIndex = ListFrames.Items.Count - 1;
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
 

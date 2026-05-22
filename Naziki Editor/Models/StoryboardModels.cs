@@ -302,7 +302,7 @@ namespace Naziki_Editor.Models
         [JsonConverter(typeof(TimeObjectConverter))]
         public object AddTime { get; set; }
         public bool? Destroy { get; set; }
-        public Easing? Easing { get; set; }
+        public object Easing { get; set; }
         public string Template { get; set; }
 
         // 🌟 核心修正：相对时间也可能有特殊格式，用 object！

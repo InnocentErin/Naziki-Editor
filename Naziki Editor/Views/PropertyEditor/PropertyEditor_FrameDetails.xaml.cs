@@ -188,8 +188,9 @@ namespace Naziki_Editor.Views.PropertyEditor
         // 🧬 DNA 鉴定器：判断哪些属性是不可变的静态属性或已固定的属性
         // ==========================================
         private bool IsStaticDnaProperty(string propName) =>
-            propName == "Path" || propName == "Text" || propName == "Pos" || propName == "Template" || propName == "Layer" || propName == "Font" || propName == "Align" || propName == "Note";
-
+            propName == "Path" || propName == "Text" || propName == "TextContent" ||
+            propName == "Pos" || propName == "Template" || propName == "Layer" ||
+            propName == "Font" || propName == "Align" || propName == "Note";
 
 
 
