@@ -30,7 +30,6 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         private void RefreshUI()
         {
-            bool hasInitialState = false;
             _firstStateReference = null;
 
             // 检查克隆体肚子里有没有第 0 帧
@@ -41,7 +40,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             else if (_editingObject is Controller c && c.States?.Count > 0) _firstStateReference = c.States[0];
             else if (_editingObject is NoteController nc && nc.States?.Count > 0) _firstStateReference = nc.States[0];
 
-            if (hasInitialState)
+            if (_firstStateReference != null)
             {
                 PanelUninitialized.Visibility = Visibility.Collapsed;
                 PanelProperties.Visibility = Visibility.Visible;

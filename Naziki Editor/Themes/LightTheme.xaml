@@ -6,6 +6,8 @@
     <SolidColorBrush x:Key="SideBgColor" Color="#F0F0F0"/>
     <SolidColorBrush x:Key="MenuBgColor" Color="#F5F5F5"/>
 
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FFFFFF"/>
+
     <SolidColorBrush x:Key="MainTextColor" Color="#000000"/>
     <SolidColorBrush x:Key="SecTextColor" Color="#666666"/>
     <SolidColorBrush x:Key="TipsColor" Color="Gray"/>
@@ -14,10 +16,8 @@
     <SolidColorBrush x:Key="SeparatorColor" Color="#E0E0E0"/>
     <SolidColorBrush x:Key="HighlightBorderColor" Color="#007ACC"/>
 
-
     <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#F5F5F5"/>
     <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#000000"/>
     <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
-
 
 </ResourceDictionary>

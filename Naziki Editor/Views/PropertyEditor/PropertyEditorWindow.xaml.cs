@@ -11,6 +11,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private StoryboardObject _editingObject;
         private string _originalId;
         private ProjectDataContext _context;
+        
 
 
         // 🌟 这个窗口的职责就是：克隆一份数据，给四个模块分发，等四个模块都说 OK 了再放行保存！如果有一个模块说不 OK 就立刻停下来不保存！
@@ -29,7 +30,16 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             // ✨ 激活第一模块！把克隆体和字典交给它！
             ModIdentity.LoadData(_editingObject, _context);
-            ModInitialState.LoadData(_editingObject, _context);
+
+            // ModInitialState.LoadData(_editingObject, _context);
+
+            // 给帧列表模块通电！
+            ModFrameList.LoadData(_editingObject, _context);
+
+            // ✨ 致命修改 2：接通专线！只要列表选了帧，就强塞给模块四！
+            // (注意：这里目前会报错说模块四没有 LoadState 方法，别急，那是咱们下一步要写的东西！)
+            ModFrameList.OnFrameSelected += (state, title) => ModFrameDetails.LoadState(state, title);
+
 
             BtnCancel.Click += (s, e) => { this.DialogResult = false; };
             BtnSave.Click += BtnSave_Click;
@@ -44,7 +54,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             // ✨ 查岗：让身份模块自己检查有没有错，如果返回 false，直接停止保存并留在这个窗口！
             if (!ModIdentity.ValidateAndSave()) return;
-            if (!ModInitialState.ValidateAndSave()) return;
+
+            // if (!ModInitialState.ValidateAndSave()) return;
 
             // 如果全都顺利通过，再放行
             this.Tag = _editingObject;

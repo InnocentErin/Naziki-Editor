@@ -32,10 +32,10 @@
             <local:PropertyEditor_Identity x:Name="ModIdentity" Margin="5"/>
         </GroupBox>
 
-        <GroupBox Grid.Row="2" Header="🎬 初始属性 (Root Properties)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
-            <local:PropertyEditor_InitialState x:Name="ModInitialState" Margin="5"/>
-        </GroupBox>
-
+        <!-- <GroupBox Grid.Row="2" Header="🎬 初始属性 (Root Properties)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
+           <local:PropertyEditor_InitialState x:Name="ModInitialState" Margin="5"/> 
+        </GroupBox> -->
+        
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250"/>

@@ -6,6 +6,8 @@
     <SolidColorBrush x:Key="SideBgColor" Color="#2D2D30"/>
     <SolidColorBrush x:Key="MenuBgColor" Color="#2D2D30"/>
 
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#1E1E1E"/>
+
     <SolidColorBrush x:Key="MainTextColor" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="SecTextColor" Color="#A0A0A0"/>
     <SolidColorBrush x:Key="TipsColor" Color="#555555"/>
