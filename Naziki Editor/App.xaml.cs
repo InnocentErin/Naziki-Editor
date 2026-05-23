@@ -10,7 +10,9 @@ namespace Naziki_Editor
 {
     public partial class App : Application
     {
-
+        // =========================================
+        // 🛡️ 监控哨兵机制：双进程守护，崩溃即报
+        // =========================================
         protected override void OnStartup(StartupEventArgs e)
         {
             // 🛡️ 逻辑：如果是作为监控哨兵启动 (收到 --watch 参数)

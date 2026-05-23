@@ -1,8 +1,8 @@
 ﻿using Naziki_Editor.Models;
-using System.Windows;
-using Naziki_Editor.Models;
-using System.Windows;
 using Naziki_Editor.State;
+using Newtonsoft.Json;
+using System.Windows;
+using Naziki_Editor.Core;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
@@ -11,7 +11,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         private StoryboardObject _editingObject;
         private string _originalId;
         private ProjectDataContext _context;
-        
+        private StoryboardObject _originalObject;
+
 
 
         // 🌟 这个窗口的职责就是：克隆一份数据，给四个模块分发，等四个模块都说 OK 了再放行保存！如果有一个模块说不 OK 就立刻停下来不保存！
@@ -52,16 +53,32 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ModFrameDetails.LoadData(null); // 初始为空，等列表点击时再传
 
 
-        private void BtnSave_Click(object sender, System.Windows.RoutedEventArgs e)
+        private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            // ✨ 查岗：让身份模块自己检查有没有错，如果返回 false，直接停止保存并留在这个窗口！
-            if (!ModIdentity.ValidateAndSave()) return;
+            // 🛑 呼叫核心安检基站进行拦截
+            var validationResult = Core.StoryboardValidator.ValidateStateConflicts(_editingObject);
 
-            // if (!ModInitialState.ValidateAndSave()) return;
+            if (!validationResult.IsValid)
+            {
+                // 收到安检网的拦截情报，由 UI 层负责弹窗警告用户！
+                MessageBox.Show(validationResult.ErrorMessage, "小艾的防呆纠察雷达", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return; // 阻止保存
+            }
 
-            // 如果全都顺利通过，再放行
-            this.Tag = _editingObject;
+            // 🟢 安检通过！执行安全覆盖
+            var settings = new JsonSerializerSettings
+            {
+                ObjectCreationHandling = ObjectCreationHandling.Replace
+            };
+
+            string updatedJson = JsonConvert.SerializeObject(_editingObject);
+            JsonConvert.PopulateObject(updatedJson, _originalObject, settings);
+
+            // 通知项目有未保存的修改
+            _context.MarkAsModified();
+
             this.DialogResult = true;
+            this.Close();
         }
     }
 }
