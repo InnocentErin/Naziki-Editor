@@ -15,28 +15,32 @@ namespace Naziki_Editor
         // =========================================
         protected override void OnStartup(StartupEventArgs e)
         {
-            // 🛡️ 逻辑：如果是作为监控哨兵启动 (收到 --watch 参数)
-            if (e.Args.Length >= 2 && e.Args[0] == "--watch")
+            // 🛑 【雷达修正核心】安全网升级：只要是带参数的哨兵（无论叫啥），通通拦截，绝对不许往下执行！
+            if (e.Args.Length > 0 && (e.Args[0] == "--watch" || e.Args[0] == "--crash-watcher"))
             {
-                int targetPid = int.Parse(e.Args[1]);
-                try
+                if (e.Args.Length >= 2)
                 {
-                    var p = System.Diagnostics.Process.GetProcessById(targetPid);
-                     p.WaitForExit(); // 哨兵进程在这里死等
-                    if (p.ExitCode != 0) // 如果是非正常退出 (如崩溃)
+                    int targetPid = int.Parse(e.Args[1]);
+                    try
                     {
-                        System.Windows.MessageBox.Show(
-                            "🚨 监测到 Naziki Editor 发生致命崩溃！\n" +
-                            "这是由 StackOverflow 或非法内存访问引发的。\n" +
-                            "请检查最近添加的关键帧或属性设置。",
-                            "Naziki 独立雷达哨兵", MessageBoxButton.OK, MessageBoxImage.Error);
+                        var p = System.Diagnostics.Process.GetProcessById(targetPid);
+                        p.WaitForExit(); // 哨兵进程在这里死等主程序
+                        if (p.ExitCode != 0) // 如果是非正常退出
+                        {
+                            System.Windows.MessageBox.Show(
+                                "🚨 监测到 Naziki Editor 发生致命崩溃！\n" +
+                                "这是由 StackOverflow 或非法内存访问引发的。\n" +
+                                "请检查最近添加的关键帧或属性设置。",
+                                "Naziki 独立雷达哨兵", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
                     }
+                    catch { }
                 }
-                catch { } // 主程序已彻底消失，哨兵自毁
-                Environment.Exit(0);
+                Environment.Exit(0); // 💥 致命修复：哨兵任务结束直接自毁，切断套娃！
+                return;
             }
 
-            // 🛡️ 逻辑：作为主程序启动，顺手拉起一个哨兵
+            // 🛡️ 主程序启动哨兵（全局只留这一个召唤法阵就足够啦！）
             try
             {
                 var current = System.Diagnostics.Process.GetCurrentProcess();
@@ -44,31 +48,20 @@ namespace Naziki_Editor
             }
             catch { }
 
-            base.OnStartup(e);
+            base.OnStartup(e); // 往下会触发 Application_Startup
         }
-
-
-
 
         // ==========================================
         // 📡 全局唯一大总闸：双控流时空拦截网
         // ==========================================
         private void Application_Startup(object sender, StartupEventArgs e)
         {
-            // 唤醒雷达分身
+            // 🗑️ 【已经把这里导致套娃的 --crash-watcher 召唤法阵删掉了！】
+
+            // 🌟 核心驱动 1：自适应动态换肤
             try
             {
-                string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-                int currentPid = System.Diagnostics.Process.GetCurrentProcess().Id;
-                System.Diagnostics.Process.Start(exePath, $"--crash-watcher {currentPid}");
-            }
-            catch { }
-
-
-            // 🌟 核心驱动 1：自适应动态换肤并修正 Themes/ 路径
-            try
-            {
-                bool isDarkMode = true; // 默认暗黑
+                bool isDarkMode = true;
                 using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
                 {
                     if (key?.GetValue("AppsUseLightTheme") != null)
@@ -79,12 +72,9 @@ namespace Naziki_Editor
 
                 string themePath = isDarkMode ? "Themes/DarkTheme.xaml" : "Themes/LightTheme.xaml";
                 var themeDict = new ResourceDictionary { Source = new Uri(themePath, UriKind.Relative) };
-
-                // 强制掉包替换 App.xaml 里的默认皮肤字典
                 Application.Current.Resources.MergedDictionaries[0] = themeDict;
             }
             catch { }
-
 
             // 🚀 核心驱动 2：【.nep 项目双击直通车机制】
             if (e.Args.Length > 0 && File.Exists(e.Args[0]))
@@ -102,17 +92,16 @@ namespace Naziki_Editor
                             MainWindow mainWindow = new MainWindow();
                             mainWindow.LoadProject(nepPath, project);
                             mainWindow.Show();
-                            return; // 直接进城，结束流程！
+                            return;
                         }
                     }
                     catch { }
                 }
             }
 
-            // 🕒 核心驱动 3：【普通启动流程】
+            // 🕒 核心驱动 3：【普通启动流程】（指挥官你之前删掉的窗口，小艾帮你加回来啦！）
             ProjectHubWindow hubWindow = new ProjectHubWindow();
             hubWindow.Show();
         }
-
     }
 }
