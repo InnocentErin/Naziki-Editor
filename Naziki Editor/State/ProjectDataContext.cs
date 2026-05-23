@@ -1,4 +1,5 @@
-﻿using Naziki_Editor.Models;
+﻿using System;
+using Naziki_Editor.Models;
 using Naziki_Editor.Core;
 
 namespace Naziki_Editor.State
@@ -8,6 +9,13 @@ namespace Naziki_Editor.State
     /// </summary>
     public class ProjectDataContext
     {
+
+
+        // ==========================================
+        // 🌟 新增：全局数据修改“广播站” (Event)
+        // ==========================================
+        public event Action OnDataModified;
+
         // ==========================================
         // 🌟 物理工程账本环境
         // ==========================================
@@ -32,5 +40,21 @@ namespace Naziki_Editor.State
         // ==========================================
         public bool HasStoryboard => Storyboard != null;
         public bool HasChart => Chart != null;
+
+
+
+
+
+
+
+        // ==========================================
+        // 🌟 新增：触发广播的方法 (MarkAsModified)
+        // ==========================================
+        public void MarkAsModified()
+        {
+            // 只要任何地方调用了这个方法，就会向全宇宙广播：“数据被修改啦！”
+            // 问号 ? 是安全检查，意思是“如果有人订阅了这个广播，才去呼叫他们”
+            OnDataModified?.Invoke();
+        }
     }
 }

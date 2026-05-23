@@ -156,7 +156,26 @@ namespace Naziki_Editor.Views
             CanvasArea.LoadContext(Context);
             PropertyPanel.LoadContext(Context);
 
+            // ==========================================
+            // 让主窗口订阅 Context 的数据修改广播！
+            // ==========================================
+            Context.OnDataModified += () =>
+            {
+                // 标记视觉画面变脏（需要保存）
+                _isVisualDirty = true;
 
+                // 如果 JSON 编辑器那边没有未应用的冲突代码，我们就自动刷新画面！
+                if (!CanvasArea.HasUnappliedChanges)
+                {
+                    CanvasArea.RefreshJsonView();
+                    _isVisualDirty = false;
+                }
+            };
+
+
+            // ==========================================
+            // 公开事件订阅：主窗口直接订阅小弟们的事件，来实现跨模块通信！(Event Subscription)
+            // ==========================================
             EventList.OnAssetScanned += (bundle) => AssetList.RefreshAssetListUI(bundle);
 
             NoteList.OnNoteGroupExported += (groupItem) =>
@@ -287,23 +306,15 @@ namespace Naziki_Editor.Views
                 _isVisualDirty = false;
             };
 
-            PropertyPanel.OnDataModified += () =>
-            {
-                _isVisualDirty = true;
-                if (!CanvasArea.HasUnappliedChanges)
-                {
-                    CanvasArea.RefreshJsonView();
-                    _isVisualDirty = false;
-                }
-            };
-
             EventList.OnEventNodeSelected += (obj) =>
             {
                 PropertyPanel.SetSelectedObject(obj);
                 CanvasArea.TrackSelectedObject(obj);
             };
         }
-
+        // ==========================================
+        // 🚨 全局快捷键监听：Ctrl+Z / Ctrl+Y 的撤销重做逻辑
+        // ==========================================
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -330,6 +341,7 @@ namespace Naziki_Editor.Views
         private void MenuUndo_Click(object sender, RoutedEventArgs e) => ExecuteGlobalUndo();
         private void MenuRedo_Click(object sender, RoutedEventArgs e) => ExecuteGlobalRedo();
 
+        // 🌟 核心功能：全局撤销重做执行器，直接操作 Context.Storyboard 来实现跨模块状态回退和前进！
         private void ExecuteGlobalUndo()
         {
             bool success;
@@ -343,7 +355,7 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                MessageBox.Show("呆胶布？已经没有更古老的修改痕迹可以撤回啦~", "时空尽头");
+                MessageBox.Show("已经没有更古老的修改痕迹可以撤回啦~", "时空尽头");
             }
         }
 
@@ -364,6 +376,9 @@ namespace Naziki_Editor.Views
             }
         }
 
+        // ==========================================
+        // 📢 关于窗口：展示一些关于信息，顺便卖个萌~
+        // ==========================================
         private void MenuAbout_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("🛸 Naziki Editor v1.0.0\n\n一款专为 Cytoid 故事板设计师打造的可视化编辑器。\nPowered by Erin & You！\n\n祝您顺利创作出神级故事板分镜~ (★ω★)ノ", "关于 Naziki Studio");
@@ -394,6 +409,9 @@ namespace Naziki_Editor.Views
             return true;
         }
 
+        // ==========================================
+        // 📂 顶部菜单栏：文件操作和数据导入
+        // ==========================================
         private void MenuOpenProject_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) EventList.ExecuteOpenProject(); }
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
         private void MenuImportChart_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) ExecuteImportChart(); }
@@ -430,7 +448,7 @@ namespace Naziki_Editor.Views
             }
             TriggerAutoLinkIfReady();
         }
-
+        // 🌟 核心功能：从事件列表接收创建新对象的请求，并注入到 Storyboard 中，同时处理好撤销重做和视觉刷新！
         private void CreateAndInjectObject(object obj)
         {
             if (!ResolveDataConflictIfNeeded()) return;
@@ -449,7 +467,7 @@ namespace Naziki_Editor.Views
                 _isVisualDirty = false;
             }
         }
-
+        // 🌟 核心功能：全局保存按钮，负责将当前 Storyboard 和工程配置文件物理写入磁盘，同时处理数据冲突和视觉状态！
         private void MenuSave_Click(object sender, RoutedEventArgs e)
         {
             if (!ResolveDataConflictIfNeeded()) return;
@@ -479,17 +497,17 @@ namespace Naziki_Editor.Views
             }
             catch (Exception ex) { MessageBox.Show("写入磁盘爆炸啦 QAQ：\n" + ex.Message); }
         }
-
+        // 🌟 核心功能：当故事板和谱面都准备好时，尝试触发自动关联功能，让用户一键对齐事件和音符！
         private void TriggerAutoLinkIfReady()
         {
             if (Context.HasChart && Context.HasStoryboard)
                 ChartStoryboardLink.TryTriggerAutoLink(Context.Chart, Context.Storyboard, Context.TimeEngine, EventList.NoteCtrlListBox, EventList.UpdateEmptyHintVisibility);
         }
-
+        // 🌟 核心功能：当用户尝试关闭窗口或打开新工程时，先检查是否存在未解决的数据冲突，如果有就弹窗让用户选择保留哪个版本，或者取消操作！
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => this.WindowState = (this.WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
         private void BtnClose_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) Application.Current.Shutdown(); }
-
+        // 🌟 核心功能：当事件列表请求打开属性编辑器时，主窗口负责创建并展示属性编辑器窗口，同时传递当前选中对象和全局数据包，让属性编辑器能够无缝访问和修改数据！
         public void OpenPropertyEditor(StoryboardObject targetObj)
         {
             if (targetObj == null) return;
@@ -513,7 +531,7 @@ namespace Naziki_Editor.Views
                 _isVisualDirty = false;
             }
         }
-
+        // 🌟 核心功能：当事件列表请求从素材创建新事件时，主窗口负责创建并展示属性编辑器窗口，同时传递新对象和全局数据包，让用户设置属性后直接注入故事板！
         public void CreateNewEventFromAsset(StoryboardObject newObj)
         {
             if (newObj == null || !Context.HasStoryboard) return;

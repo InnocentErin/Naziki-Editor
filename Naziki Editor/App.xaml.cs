@@ -22,7 +22,7 @@ namespace Naziki_Editor
                 try
                 {
                     var p = System.Diagnostics.Process.GetProcessById(targetPid);
-                    p.WaitForExit(); // 哨兵进程在这里死等
+                     p.WaitForExit(); // 哨兵进程在这里死等
                     if (p.ExitCode != 0) // 如果是非正常退出 (如崩溃)
                     {
                         System.Windows.MessageBox.Show(
