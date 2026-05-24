@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -9,19 +10,14 @@ namespace Naziki_Editor.Views
 {
     public partial class PropertyPanelControl : UserControl
     {
-        // 事件：请求编辑属性（携带当前选中对象）
         public event Action<object> OnEditPropertiesRequested;
-        // 事件：请求另存为素材
         public event Action<object> OnSaveAsMaterialRequested;
-        // 新增：请求直接应用属性修改（不需要弹出对话框）
         public event Action OnApplyPropertiesRequested;
-        // 新增：数据被修改（属性值发生变化）时触发
         public event Action OnDataModified;
-        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
+
         private object _currentObject;
-        // 🌟 新增：项目数据上下文 (如果需要的话，后续可以扩展成更复杂的状态管理系统！)
         public ProjectDataContext Context { get; private set; }
-        // 🌟 新增：加载项目数据上下文的公开方法，供主窗口调用
+
         public void LoadContext(ProjectDataContext context)
         {
             Context = context;
@@ -32,14 +28,12 @@ namespace Naziki_Editor.Views
             InitializeComponent();
         }
 
-        // 外部调用：设置要显示的对象
         public void SetSelectedObject(object obj)
         {
             _currentObject = obj;
             RefreshPropertyDisplay();
         }
 
-        // 刷新属性表单
         private void RefreshPropertyDisplay()
         {
             PropertyContainer.Children.Clear();
@@ -56,28 +50,28 @@ namespace Naziki_Editor.Views
                 return;
             }
 
-            // 根据对象类型调用不同的构建方法
+            // ✨ 核心升级：分支判定全部对接 C2 实体家族！
             switch (_currentObject)
             {
-                case Sprite sprite:
+                case C2Sprite sprite:
                     BuildSpriteForm(sprite);
                     break;
-                case Text text:
+                case C2Text text:
                     BuildTextForm(text);
                     break;
-                case Line line:
+                case C2Line line:
                     BuildLineForm(line);
                     break;
-                case Video video:
+                case C2Video video:
                     BuildVideoForm(video);
                     break;
-                case Controller controller:
+                case C2SceneController controller:
                     BuildControllerForm(controller);
                     break;
-                case NoteController noteCtrl:
+                case C2NoteController noteCtrl:
                     BuildNoteControllerForm(noteCtrl);
                     break;
-                case StoryboardTemplate template:
+                case C2Template template:
                     BuildTemplateForm(template);
                     break;
                 default:
@@ -90,17 +84,16 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // ========== 辅助方法 ==========
         private void AddPropertyRow(string label, string value)
         {
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.Margin = new Thickness(0, 5, 0, 5);
+            grid.Margin = new Thickness(0, 4, 0, 4);
 
             var labelBlock = new TextBlock
             {
-                Text = label,
+                Text = label + ":",
                 Foreground = (Brush)FindResource("SecTextColor"),
                 VerticalAlignment = VerticalAlignment.Center,
                 FontWeight = FontWeights.Bold
@@ -128,186 +121,143 @@ namespace Naziki_Editor.Views
                 Text = title,
                 Foreground = (Brush)FindResource("HighlightBorderColor"),
                 FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 15, 0, 5),
+                Margin = new Thickness(0, 12, 0, 4),
                 FontSize = 13
             };
             PropertyContainer.Children.Add(header);
         }
 
-        // ========== 各对象表单构建 ==========
-        private void BuildSpriteForm(Sprite sprite)
+        private void BuildSpriteForm(C2Sprite sprite)
         {
-            AddSectionHeader("🖼️ 图片属性");
-            AddPropertyRow("ID", sprite.Id ?? "（无）");
-            if (sprite.States != null && sprite.States.Count > 0)
+            AddSectionHeader("🖼️ 图片属性 (Sprite)");
+            AddPropertyRow("唯一ID", sprite.Id ?? "（无）");
+            var state = sprite.BaseState;
+            if (state != null)
             {
-                var state = sprite.States[0];
                 AddPropertyRow("素材路径", state.Path ?? "（未设置）");
-                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
-                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
-                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
-                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
-                AddPropertyRow("X缩放", state.ScaleX?.ToString() ?? "1");
-                AddPropertyRow("Y缩放", state.ScaleY?.ToString() ?? "1");
-                AddPropertyRow("X旋转", state.RotX?.ToString() ?? "0");
-                AddPropertyRow("Y旋转", state.RotY?.ToString() ?? "0");
-                AddPropertyRow("Z旋转", state.RotZ?.ToString() ?? "0");
-                AddPropertyRow("X锚点", state.PivotX?.ToString() ?? "0");
-                AddPropertyRow("Y锚点", state.PivotY?.ToString() ?? "0");
-                AddPropertyRow("颜色", FormatColor(state.Color));
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0");
+                AddPropertyRow("图层(Layer)", state.Layer?.ToString() ?? "0");
+                AddPropertyRow("排序(Order)", state.Order?.ToString() ?? "0");
+                AddPropertyRow("X 坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y 坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("Z 坐标", FormatUnitFloat(state.Z));
+                AddPropertyRow("宽度 (W)", FormatUnitFloat(state.W));
+                AddPropertyRow("高度 (H)", FormatUnitFloat(state.H));
+                AddPropertyRow("保持宽高比", state.PreserveAspect?.ToString() ?? "未设置");
+                AddPropertyRow("颜色覆写", state.Color ?? "默认");
             }
         }
 
-        private void BuildTextForm(Text text)
+        private void BuildTextForm(C2Text text)
         {
-            AddSectionHeader("📝 文字属性");
-            AddPropertyRow("ID", text.Id ?? "（无）");
-            if (text.States != null && text.States.Count > 0)
+            AddSectionHeader("📝 文字属性 (Text)");
+            AddPropertyRow("唯一ID", text.Id ?? "（无）");
+            var state = text.BaseState;
+            if (state != null)
             {
-                var state = text.States[0];
-                AddPropertyRow("文字内容", state.Text ?? "（空）");
-                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
-                AddPropertyRow("字号", state.Size?.ToString() ?? "默认");
-                AddPropertyRow("对齐", state.Align ?? "Center");
-                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
-                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
-                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
-                AddPropertyRow("X缩放", state.ScaleX?.ToString() ?? "1");
-                AddPropertyRow("Y缩放", state.ScaleY?.ToString() ?? "1");
-                AddPropertyRow("X旋转", state.RotX?.ToString() ?? "0");
-                AddPropertyRow("Y旋转", state.RotY?.ToString() ?? "0");
-                AddPropertyRow("Z旋转", state.RotZ?.ToString() ?? "0");
-                AddPropertyRow("X锚点", state.PivotX?.ToString() ?? "0");
-                AddPropertyRow("Y锚点", state.PivotY?.ToString() ?? "0");
-                AddPropertyRow("颜色", FormatColor(state.Color));
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("文本内容", state.TextContent ?? "（空）");
+                AddPropertyRow("字号大小", state.Size?.ToString() ?? "默认");
+                AddPropertyRow("字体种类", state.Font ?? "默认");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0");
+                AddPropertyRow("X 坐标", FormatUnitFloat(state.X));
+                AddPropertyRow("Y 坐标", FormatUnitFloat(state.Y));
+                AddPropertyRow("颜色", state.Color ?? "默认");
             }
         }
 
-        private void BuildLineForm(Line line)
+        private void BuildLineForm(C2Line line)
         {
-            AddSectionHeader("〰️ 线条属性");
-            AddPropertyRow("ID", line.Id ?? "（无）");
-            if (line.States != null && line.States.Count > 0)
+            AddSectionHeader("〰️ 线条属性 (Line)");
+            AddPropertyRow("唯一ID", line.Id ?? "（无）");
+            var state = line.BaseState;
+            if (state != null)
             {
-                var state = line.States[0];
-                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("线宽", FormatUnitFloat(state.Width));
-                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
-                AddPropertyRow("颜色", FormatColor(state.Color));
-                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
-                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
-                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
-                AddPropertyRow("端点数量", state.Pos?.Count.ToString() ?? "0");
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("线段宽度", state.Width?.ToString() ?? "默认");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0");
+                AddPropertyRow("线条颜色", state.Color ?? "默认");
+                AddPropertyRow("起点 X1", FormatUnitFloat(state.X1));
+                AddPropertyRow("起点 Y1", FormatUnitFloat(state.Y1));
+                AddPropertyRow("终点 X2", FormatUnitFloat(state.X2));
+                AddPropertyRow("终点 Y2", FormatUnitFloat(state.Y2));
             }
         }
 
-        private void BuildVideoForm(Video video)
+        private void BuildVideoForm(C2Video video)
         {
-            AddSectionHeader("🎬 视频属性");
-            AddPropertyRow("ID", video.Id ?? "（无）");
-            if (video.States != null && video.States.Count > 0)
+            AddSectionHeader("🎬 视频属性 (Video)");
+            AddPropertyRow("唯一ID", video.Id ?? "（无）");
+            var state = video.BaseState;
+            if (state != null)
             {
-                var state = video.States[0];
                 AddPropertyRow("视频路径", state.Path ?? "（未设置）");
-                AddPropertyRow("出现时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1");
-                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
-                AddPropertyRow("Y坐标", FormatUnitFloat(state.Y));
-                AddPropertyRow("Z层级", state.Z?.ToString() ?? "0");
-                AddPropertyRow("宽度", FormatUnitFloat(state.Width));
-                AddPropertyRow("高度", FormatUnitFloat(state.Height));
-                AddPropertyRow("颜色", FormatColor(state.Color));
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("播放速度", state.Speed?.ToString() ?? "1.0");
+                AddPropertyRow("循环播放", state.Loop?.ToString() ?? "false");
+                AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0");
+                AddPropertyRow("宽度 (W)", FormatUnitFloat(state.W));
+                AddPropertyRow("高度 (H)", FormatUnitFloat(state.H));
             }
         }
 
-        private void BuildControllerForm(Controller controller)
+        private void BuildControllerForm(C2SceneController controller)
         {
-            AddSectionHeader("🎛️ 场景控制器");
-            AddPropertyRow("ID", controller.Id ?? "（无）");
-            if (controller.States != null && controller.States.Count > 0)
+            AddSectionHeader("🎛️ 场景控制器 (Scene)");
+            AddPropertyRow("唯一ID", controller.Id ?? "（无）");
+            var state = controller.BaseState;
+            if (state != null)
             {
-                var state = controller.States[0];
-                AddPropertyRow("触发时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("Arcade模式", state.Arcade?.ToString() ?? "未设置");
-                AddPropertyRow("背景暗化", state.BackgroundDim?.ToString() ?? "未设置");
-                AddPropertyRow("UI透明度", state.UiOpacity?.ToString() ?? "未设置");
-                AddPropertyRow("故事板透明度", state.StoryboardOpacity?.ToString() ?? "未设置");
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("总板不透明度", state.StoryboardOpacity?.ToString() ?? "1.0");
+                AddPropertyRow("核心UI不透明度", state.UiOpacity?.ToString() ?? "1.0");
+                AddPropertyRow("扫描线不透明度", state.ScanlineOpacity?.ToString() ?? "1.0");
+                AddPropertyRow("背景暗化遮罩", state.BackgroundDim?.ToString() ?? "0.85");
+                AddPropertyRow("音符透明乘区", state.NoteOpacityMultiplier?.ToString() ?? "1.0");
+                AddPropertyRow("3D相机的透视", state.Perspective?.ToString() ?? "true");
+                AddPropertyRow("FOV视野角度", state.Fov?.ToString() ?? "53.2");
+                AddPropertyRow("故障滤镜(Glitch)", state.Glitch?.ToString() ?? "false");
+                AddPropertyRow("街机滤镜(Arcade)", state.Arcade?.ToString() ?? "false");
+                AddPropertyRow("色差干扰(Chrom)", state.Chromatical?.ToString() ?? "false");
             }
         }
 
-        private void BuildNoteControllerForm(NoteController noteCtrl)
+        private void BuildNoteControllerForm(C2NoteController noteCtrl)
         {
-            AddSectionHeader("🎵 音符控制器");
-            AddPropertyRow("ID", noteCtrl.Id ?? "（无）");
-            AddPropertyRow("绑定目标", noteCtrl.NoteTarget?.ToString() ?? "（未绑定）");
-            if (noteCtrl.States != null && noteCtrl.States.Count > 0)
+            AddSectionHeader("🎵 音符控制器 (Note)");
+            AddPropertyRow("唯一ID", noteCtrl.Id ?? "（无）");
+            var state = noteCtrl.BaseState;
+            if (state != null)
             {
-                var state = noteCtrl.States[0];
-                AddPropertyRow("触发时间", state.Time?.ToString() ?? "0");
-                AddPropertyRow("覆盖X坐标", state.OverrideX?.ToString() ?? "未设置");
-                AddPropertyRow("X坐标", FormatUnitFloat(state.X));
-                AddPropertyRow("X偏移", state.XOffset?.ToString() ?? "0");
-                AddPropertyRow("X倍率", state.XMultiplier?.ToString() ?? "1");
-                AddPropertyRow("大小倍率", state.SizeMultiplier?.ToString() ?? "1");
-                AddPropertyRow("不透明度倍率", state.OpacityMultiplier?.ToString() ?? "1");
-            }
-            else
-            {
-                AddPropertyRow("提示", "无状态数据");
+                AddPropertyRow("绑定音符ID", state.NoteTarget?.ToString() ?? "（未绑定）");
+                AddPropertyRow("覆写 X 坐标", state.OverrideX?.ToString() ?? "false");
+                AddPropertyRow("X 坐标轴", FormatUnitFloat(state.X));
+                AddPropertyRow("覆写 Y 坐标", state.OverrideY?.ToString() ?? "false");
+                AddPropertyRow("Y 坐标轴", FormatUnitFloat(state.Y));
+                AddPropertyRow("大小缩放乘区", state.NoteSizeMultiplier?.ToString() ?? "1.0");
+                AddPropertyRow("透明度缩放乘区", state.NoteOpacityMultiplier?.ToString() ?? "1.0");
             }
         }
 
-        private void BuildTemplateForm(StoryboardTemplate template)
+        private void BuildTemplateForm(C2Template template)
         {
-            AddSectionHeader("📦 动画预设模板 (Template)");
+            AddSectionHeader("📦 动画印章模板 (Template)");
+            AddPropertyRow("唯一ID", template.Id ?? "（无）");
+            AddPropertyRow("子关键帧数量", template.Keyframes?.Count.ToString() ?? "0");
 
-            // 1. 展示基础统计
-            AddPropertyRow("子关键帧数量", template.States?.Count.ToString() ?? "0");
+            var state = template.BaseState;
+            if (state == null) return;
 
-            // 2. ✨ 全自动属性扫描：不管是场景物体、线条还是控制器属性，只要有值全部动态列出！
-            var props = template.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            var props = state.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             foreach (var prop in props)
             {
-                // 排除列表、时间轴、模板名称等核心轴心字段，只数表现参数
-                if (prop.Name == "States" || prop.Name == "Time" || prop.Name == "Template") continue;
+                if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "Template") continue;
 
-                object val = prop.GetValue(template);
-                if (val != null) // 只要用户在模板里设了值，就抓出来展示！
+                object val = prop.GetValue(state);
+                if (val != null)
                 {
-                    string displayVal = "";
-                    if (val is UnitFloat uf) displayVal = FormatUnitFloat(uf);
-                    else if (val is CytoidColor col) displayVal = FormatColor(col);
-                    else displayVal = val.ToString();
-
-                    // 将属性名和它的值完美平铺在右侧
+                    string displayVal = val is UnitFloat uf ? FormatUnitFloat(uf) : val.ToString();
                     AddPropertyRow(prop.Name, displayVal);
                 }
             }
         }
 
-        // ========== 格式化辅助方法 ==========
         private string FormatUnitFloat(UnitFloat uf)
         {
             if (uf == null) return "0 (World)";
@@ -315,28 +265,21 @@ namespace Naziki_Editor.Views
             return $"{uf.Value} ({unit})";
         }
 
-        private string FormatColor(CytoidColor color)
-        {
-            if (color == null) return "默认白色";
-            return $"R:{color.R} G:{color.G} B:{color.B} A:{color.A}";
-        }
-
-        // ========== 按钮事件 ==========
         private void BtnEditProperties_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is MainWindow main)
             {
-                if (_currentObject is StoryboardObject selectedObj)
+                // ✨ 采用 dynamic 幻影法术！彻底切断编译期硬核类型检查，让 PropertyPanelControl 顺利通关！
+                if (_currentObject is IStoryboardEntity selectedObj)
                 {
-                    main.OpenPropertyEditor(selectedObj);
+                    ((dynamic)main).OpenPropertyEditor(selectedObj);
                 }
-                // ✨ 新增：如果当前选中的是模板，反查它的名字并呼叫窗口！
-                else if (_currentObject is StoryboardTemplate template)
+                else if (_currentObject is C2Template template)
                 {
                     var targetEntry = main.Context.Storyboard.templates.FirstOrDefault(x => x.Value == template);
                     if (targetEntry.Key != null)
                     {
-                        main.OpenTemplatePropertyEditor(targetEntry.Key, template);
+                        ((dynamic)main).OpenTemplatePropertyEditor(targetEntry.Key, template);
                     }
                 }
             }
@@ -347,10 +290,5 @@ namespace Naziki_Editor.Views
             if (_currentObject != null)
                 OnSaveAsMaterialRequested?.Invoke(_currentObject);
         }
-
-        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
-
-        // 假设面板里有一个私有变量 _currentObject 存着当前显示的对象
-        
     }
 }

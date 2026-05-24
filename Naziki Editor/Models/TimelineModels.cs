@@ -22,7 +22,7 @@ namespace Naziki_Editor.Models
     public class TimelineClipModel : INotifyPropertyChanged
     {
         // 绑定的原始大本营对象 (TextObject, SpriteObject 等)
-        public StoryboardObject AssociatedObject { get; set; }
+        public IStoryboardEntity AssociatedObject { get; set; }
 
         public string DisplayName { get; set; } // 方块上显示的文字，比如 "text_1"
         public int TrackIndex { get; set; }     // 当前躺在哪个图层轨道上？

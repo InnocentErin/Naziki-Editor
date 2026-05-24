@@ -1,46 +1,42 @@
 ﻿using Naziki_Editor.Models;
-using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Core
 {
     // ==========================================
-    // 🌟 全局事件名称解析中枢 (供 Timeline、List、Panel 共享调用)
+    // 🌟 全局事件名称解析中枢 (已完美适配 C2 实体体系)
     // ==========================================
     public static class EventNameResolver
     {
         public static string GetDisplayName(object obj)
         {
-            // 感谢 Parser 里的强行补齐逻辑，现在所有对象必定有 Id！
             switch (obj)
             {
-                case Sprite sprite:
-                    string sPath = sprite.States?.Count > 0 ? sprite.States[0].Path : "";
+                case C2Sprite sprite:
+                    string sPath = sprite.BaseState?.Path ?? "";
                     return string.IsNullOrEmpty(sPath) ? sprite.Id : $"{sprite.Id} [{sPath}]";
 
-                case Video video:
-                    string vPath = video.States?.Count > 0 ? video.States[0].Path : "";
+                case C2Video video:
+                    string vPath = video.BaseState?.Path ?? "";
                     return string.IsNullOrEmpty(vPath) ? video.Id : $"{video.Id} [{vPath}]";
 
-                case Text text:
-                    string rawText = text.States?.Count > 0 ? text.States[0].Text : "";
+                case C2Text text:
+                    string rawText = text.BaseState?.TextContent ?? "";
                     if (!string.IsNullOrEmpty(rawText))
                         return rawText.Length > 10 ? $"{text.Id} (\"{rawText.Substring(0, 10)}...\")" : $"{text.Id} (\"{rawText}\")";
                     return text.Id;
 
-                case Line line:
+                case C2Line line:
                     return line.Id;
 
-                case Controller ctrl:
+                case C2SceneController ctrl:
                     return ctrl.Id;
 
-                case NoteController noteCtrl:
-                    // 音符控制器比较特殊，把它的绑定目标也打印出来更直观
-                    if (noteCtrl.NoteTarget is JObject jobj)
-                    {
-                        var selector = jobj.ToObject<NoteCtrlEventSelect>();
-                        return $"{noteCtrl.Id} | {selector.DisplayName}";
-                    }
-                    return $"{noteCtrl.Id} | Target: {noteCtrl.NoteTarget}";
+                case C2NoteController noteCtrl:
+                    // 直接读取 BaseState 里的 NoteTarget
+                    return $"{noteCtrl.Id} | Target: {noteCtrl.BaseState?.NoteTarget}";
+
+                case C2Template template:
+                    return template.Id;
 
                 default:
                     return "未知异界物质";

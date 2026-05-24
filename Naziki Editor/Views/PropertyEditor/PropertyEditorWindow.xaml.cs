@@ -9,67 +9,41 @@ namespace Naziki_Editor.Views.PropertyEditor
 {
     public partial class PropertyEditorWindow : Window
     {
-        private StoryboardObject _editingObject;
+        // ✨ 核心升级：将原有的旧基类全部替换成我们全新的时空分离型接口与新模板实体！
+        private IStoryboardEntity _editingObject;
         private string _originalId;
         private ProjectDataContext _context;
 
-
         private bool _isTemplateMode = false;
         private string _templateName;
-        private StoryboardTemplate _editingTemplate;
+        private C2Template _editingTemplate;
 
-
-
-
-
-
-
-
-
-        // 🌟 这个窗口的职责就是：克隆一份数据，给四个模块分发，等四个模块都说 OK 了再放行保存！如果有一个模块说不 OK 就立刻停下来不保存！
-        public PropertyEditorWindow(StoryboardObject targetObject, ProjectDataContext context)
+        // 🌟 构造函数一：适配普通事件对象的属性编辑
+        public PropertyEditorWindow(IStoryboardEntity targetObject, ProjectDataContext context)
         {
             InitializeComponent();
 
             _context = context;
             _originalId = targetObject.Id ?? "";
 
-            // 1. 完美的克隆魔法
-            string jsonClone = Newtonsoft.Json.JsonConvert.SerializeObject(targetObject);
-            _editingObject = (StoryboardObject)Newtonsoft.Json.JsonConvert.DeserializeObject(jsonClone, targetObject.GetType());
+            // 1. 完美的克隆魔法（不带自定义转换器，纯净保留内存中的 BaseState 和 Keyframes）
+            string jsonClone = JsonConvert.SerializeObject(targetObject);
+            _editingObject = (IStoryboardEntity)JsonConvert.DeserializeObject(jsonClone, targetObject.GetType());
 
-            // 2. 将数据分发给四个子模块！(接口我们稍后去 UserControl 里写)
-
-            // ✨ 激活第一模块！把克隆体和字典交给它！
+            // 2. 将数据分发给各个子模块！
             ModIdentity.LoadData(_editingObject, _context);
-
-            // ModInitialState.LoadData(_editingObject, _context);
-
-            // 给帧列表模块通电！
             ModFrameList.LoadData(_editingObject, _context);
 
-            // ✨ 致命修改 2：接通专线！只要列表选了帧，就强塞给模块四！
-            // (注意：这里目前会报错说模块四没有 LoadState 方法，别急，那是咱们下一步要写的东西！)
-            // ✨ 完美修复：让左边的接收端和右边的调用端都带上完整的 4 个参数！
+            // ⚡ 强绑定专线：只要列表选了帧，就塞给详情编辑面板
             ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
                 ModFrameDetails.LoadState(state, title, rootState, isRoot);
-
 
             BtnCancel.Click += (s, e) => { this.DialogResult = false; };
             BtnSave.Click += BtnSave_Click;
         }
 
-        // ModInitialState.LoadData(_editingObject);
-        // ModFrameList.LoadData(_editingObject);
-        // ModFrameDetails.LoadData(null); // 初始为空，等列表点击时再传
-
-
-
-
-        // ==========================================
-        // ✨ 新增：模板专属的特化重载构造函数 (双轨制)
-        // ==========================================
-        public PropertyEditorWindow(string templateName, StoryboardTemplate targetTemplate, ProjectDataContext context)
+        // 🌟 构造函数二：模板专属的特化重载构造函数 (双轨制)
+        public PropertyEditorWindow(string templateName, C2Template targetTemplate, ProjectDataContext context)
         {
             InitializeComponent();
             _context = context;
@@ -77,19 +51,18 @@ namespace Naziki_Editor.Views.PropertyEditor
             _templateName = templateName;
 
             // 1. 完美的克隆魔法：确保用户点取消时绝对不污染原件
-            string jsonClone = Newtonsoft.Json.JsonConvert.SerializeObject(targetTemplate);
-            _editingTemplate = Newtonsoft.Json.JsonConvert.DeserializeObject<StoryboardTemplate>(jsonClone);
+            string jsonClone = JsonConvert.SerializeObject(targetTemplate);
+            _editingTemplate = JsonConvert.DeserializeObject<C2Template>(jsonClone);
 
-            // 2. 改造身份面板：模板不需要“跟随目标(Parent)”，把下面藏起来，只留名字编辑！
+            // 2. 改造身份面板：模板不需要“跟随目标(Parent)”，隐藏无用控件
             ModIdentity.TxtObjectId.Text = templateName;
-            ModIdentity.TxtParentId.Visibility = Visibility.Collapsed; // 隐藏无用控件
+            ModIdentity.TxtParentId.Visibility = Visibility.Collapsed;
             if (ModIdentity.TxtParentId.Parent is Grid parentGrid) parentGrid.Visibility = Visibility.Collapsed;
 
             // 3. 核心解封：把单帧详情面板喂给模板全局字典，开启上锁雷达
             ModFrameDetails.InitTemplates(_context.Storyboard.templates);
 
-            // 4. 时空对接：让关键帧列表模块以“模板特化模式”加载它的 states 数组！
-            // 完美绑定：只要列表里选了帧（或者选了虚拟根节点），就强塞给详情面板
+            // 4. 时空对接：让关键帧列表模块以“模板特化模式”加载
             ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
                 ModFrameDetails.LoadState(state, title, rootState, isRoot);
 
@@ -100,14 +73,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             BtnSave.Click += BtnSave_Click;
         }
 
-
-
-
-
-
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            // ✨ 新增：模板模式下的级联保存与更名拦截
+            // ✨ 模板模式下的级联保存与更名拦截
             if (_isTemplateMode)
             {
                 string newName = ModIdentity.TxtObjectId.Text.Trim();
@@ -132,8 +100,6 @@ namespace Naziki_Editor.Views.PropertyEditor
                 return;
             }
 
-
-
             // 🛑 呼叫核心安检基站进行拦截
             var validationResult = Core.StoryboardValidator.ValidateStateConflicts(_editingObject);
 
@@ -152,10 +118,5 @@ namespace Naziki_Editor.Views.PropertyEditor
             this.DialogResult = true;
             this.Close();
         }
-
-
-
-
-
     }
 }
