@@ -3,6 +3,8 @@ using Naziki_Editor.Models;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.IO; // ✨ 新增：文件操作
+using System.Collections.Specialized; // ✨ 新增：剪贴板文件集合
 
 namespace Naziki_Editor.Views
 {
@@ -15,6 +17,10 @@ namespace Naziki_Editor.Views
         {
             InitializeComponent();
         }
+
+
+
+
 
         // ==========================================
         // ⌨️ 输入框魔法 1：按下按键的处理
@@ -67,6 +73,129 @@ namespace Naziki_Editor.Views
                 CommitRename(item);
             }
         }
+
+
+        // ==========================================
+        // 📢 WPF 路由命令：接收与执行中枢
+        // ==========================================
+
+        // 🛡️ 权限安检：只有当列表里真的有东西被选中时，才允许执行复制和删除！
+        // 如果返回 false，UI 上的按钮甚至会自动变成灰色不可点击状态哦！
+        private void Command_CanExecuteWithSelection(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = GetSelectedAsset() != null;
+        }
+
+        // 🚀 执行复制
+        private void CommandCopy_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            ExecuteCopy(GetSelectedAsset());
+        }
+
+        // 🚀 执行粘贴
+        private void CommandPaste_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            ExecutePaste();
+        }
+
+        // 🚀 执行删除
+        private void CommandDelete_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            ExecuteDelete(GetSelectedAsset());
+        }
+
+
+        // ==========================================
+        // 🛠️ 底层执行法术 (和我们之前讨论的核心逻辑一样)
+        // ==========================================
+
+        // 抓取当前选中的素材
+        private AssetItemModel GetSelectedAsset()
+        {
+            if (MediaListBox.IsKeyboardFocusWithin) return MediaListBox.SelectedItem as AssetItemModel;
+            if (TextListBox.IsKeyboardFocusWithin) return TextListBox.SelectedItem as AssetItemModel;
+            if (LineListBox.IsKeyboardFocusWithin) return LineListBox.SelectedItem as AssetItemModel;
+            if (TemplateListBox.IsKeyboardFocusWithin) return TemplateListBox.SelectedItem as AssetItemModel;
+
+            return (MediaListBox.SelectedItem ?? TextListBox.SelectedItem ?? LineListBox.SelectedItem ?? TemplateListBox.SelectedItem) as AssetItemModel;
+        }
+
+        // 写入剪贴板
+        private void ExecuteCopy(AssetItemModel item)
+        {
+            if (item != null && File.Exists(item.FilePath))
+            {
+                var files = new StringCollection { item.FilePath };
+                Clipboard.SetFileDropList(files);
+            }
+        }
+
+        // 从剪贴板粘贴
+        private void ExecutePaste()
+        {
+            if (ParentMainWindow == null || string.IsNullOrEmpty(ParentMainWindow.CurrentProjectFilePath)) return;
+
+            if (Clipboard.ContainsFileDropList())
+            {
+                var files = Clipboard.GetFileDropList();
+                string projectDir = Path.GetDirectoryName(ParentMainWindow.CurrentProjectFilePath);
+                string targetDir = Path.Combine(projectDir, ParentMainWindow.CurrentProjectData.MaterialFolderPath);
+
+                if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
+
+                bool hasChanged = false;
+                foreach (string sourceFile in files)
+                {
+                    if (File.Exists(sourceFile))
+                    {
+                        string fileName = Path.GetFileName(sourceFile);
+                        string destFile = Path.Combine(targetDir, fileName);
+
+                        int counter = 1;
+                        while (File.Exists(destFile))
+                        {
+                            string nameOnly = Path.GetFileNameWithoutExtension(fileName);
+                            string ext = Path.GetExtension(fileName);
+                            destFile = Path.Combine(targetDir, $"{nameOnly}_副本{counter}{ext}");
+                            counter++;
+                        }
+
+                        try
+                        {
+                            File.Copy(sourceFile, destFile);
+                            hasChanged = true;
+                        }
+                        catch { }
+                    }
+                }
+
+                if (hasChanged) ParentMainWindow.RefreshAllAssets();
+            }
+        }
+
+        // 物理删除
+        private void ExecuteDelete(AssetItemModel item)
+        {
+            if (item != null)
+            {
+                var result = MessageBox.Show($"确定要将素材【{item.DisplayName}】彻底删除吗？\n这是物理级销毁，不可撤销哦！", "小艾的危险警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        if (File.Exists(item.FilePath)) File.Delete(item.FilePath);
+                        ParentMainWindow.RefreshAllAssets();
+                    }
+                    catch (System.Exception ex)
+                    {
+                        MessageBox.Show($"呜哇！删除被阻挡了 QAQ：\n{ex.Message}", "删除失败");
+                    }
+                }
+            }
+        }
+
+
+
 
         // ==========================================
         // 🔄 接收扫描大礼包，瞬间画出所有磁贴！
@@ -197,5 +326,9 @@ namespace Naziki_Editor.Views
                 }
             }
         }
+
+
+
+
     }
 }

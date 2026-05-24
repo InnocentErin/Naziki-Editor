@@ -281,13 +281,30 @@ namespace Naziki_Editor.Views
 
         private void BuildTemplateForm(StoryboardTemplate template)
         {
-            AddSectionHeader("📦 模板组");
-            AddPropertyRow("图片数量", template.sprites?.Count.ToString() ?? "0");
-            AddPropertyRow("文字数量", template.texts?.Count.ToString() ?? "0");
-            AddPropertyRow("线条数量", template.lines?.Count.ToString() ?? "0");
-            AddPropertyRow("视频数量", template.videos?.Count.ToString() ?? "0");
-            AddPropertyRow("场景控制数量", template.controllers?.Count.ToString() ?? "0");
-            AddPropertyRow("音符控制数量", template.note_controllers?.Count.ToString() ?? "0");
+            AddSectionHeader("📦 动画预设模板 (Template)");
+
+            // 1. 展示基础统计
+            AddPropertyRow("子关键帧数量", template.States?.Count.ToString() ?? "0");
+
+            // 2. ✨ 全自动属性扫描：不管是场景物体、线条还是控制器属性，只要有值全部动态列出！
+            var props = template.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            foreach (var prop in props)
+            {
+                // 排除列表、时间轴、模板名称等核心轴心字段，只数表现参数
+                if (prop.Name == "States" || prop.Name == "Time" || prop.Name == "Template") continue;
+
+                object val = prop.GetValue(template);
+                if (val != null) // 只要用户在模板里设了值，就抓出来展示！
+                {
+                    string displayVal = "";
+                    if (val is UnitFloat uf) displayVal = FormatUnitFloat(uf);
+                    else if (val is CytoidColor col) displayVal = FormatColor(col);
+                    else displayVal = val.ToString();
+
+                    // 将属性名和它的值完美平铺在右侧
+                    AddPropertyRow(prop.Name, displayVal);
+                }
+            }
         }
 
         // ========== 格式化辅助方法 ==========
@@ -307,12 +324,20 @@ namespace Naziki_Editor.Views
         // ========== 按钮事件 ==========
         private void BtnEditProperties_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentObject is StoryboardObject selectedObj)
+            if (Window.GetWindow(this) is MainWindow main)
             {
-                // ✨ 雷达修正：同样按族谱向上查找 MainWindow！
-                if (Window.GetWindow(this) is MainWindow main)
+                if (_currentObject is StoryboardObject selectedObj)
                 {
                     main.OpenPropertyEditor(selectedObj);
+                }
+                // ✨ 新增：如果当前选中的是模板，反查它的名字并呼叫窗口！
+                else if (_currentObject is StoryboardTemplate template)
+                {
+                    var targetEntry = main.Context.Storyboard.templates.FirstOrDefault(x => x.Value == template);
+                    if (targetEntry.Key != null)
+                    {
+                        main.OpenTemplatePropertyEditor(targetEntry.Key, template);
+                    }
                 }
             }
         }

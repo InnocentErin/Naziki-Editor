@@ -508,11 +508,11 @@ namespace Naziki_Editor.Views
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => this.WindowState = (this.WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
         private void BtnClose_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) Application.Current.Shutdown(); }
         // 🌟 核心功能：当事件列表请求打开属性编辑器时，主窗口负责创建并展示属性编辑器窗口，同时传递当前选中对象和全局数据包，让属性编辑器能够无缝访问和修改数据！
+        // 🌟 核心功能：当事件列表请求打开属性编辑器时...
         public void OpenPropertyEditor(StoryboardObject targetObj)
         {
             if (targetObj == null) return;
 
-            // ✨ 注意：我们现在使用的是 Context.Storyboard 和 Context.Chart，而不是以前的野变量！
             Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow editor =
                 new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(targetObj, Context)
                 {
@@ -522,14 +522,68 @@ namespace Naziki_Editor.Views
             if (editor.ShowDialog() == true)
             {
                 StoryboardObject modifiedObj = (StoryboardObject)editor.Tag;
-                string modifiedJson = JsonConvert.SerializeObject(modifiedObj);
-                JsonConvert.PopulateObject(modifiedJson, targetObj);
+
+                // ==========================================
+                // ✨ 终极修复：面向对象之偷天换日！
+                // 直接在故事板大本营里把旧实体换成新实体，彻底告别 JSON 覆盖产生的帧偏移 Bug！
+                // ==========================================
+                ReplaceStoryboardObject(Context.Storyboard, targetObj, modifiedObj);
 
                 Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
+                EventList.LoadStoryboardUI(); // 刷新左侧列表，让它们重新绑定新的实体
+
+                // 确保画板追踪的是修改后的新实体，防止后续编辑报错！
+                CanvasArea.TrackSelectedObject(modifiedObj);
+
+                CanvasArea.RefreshJsonView();
+                _isVisualDirty = false;
+            }
+        }
+
+        // ==========================================
+        // ✨ 新增：专为模板开启的属性编辑器大门
+        // ==========================================
+        public void OpenTemplatePropertyEditor(string templateName, StoryboardTemplate targetTemplate)
+        {
+            if (targetTemplate == null) return;
+
+            // 呼叫带有 3 个参数的模板特化构造函数！
+            var editor = new PropertyEditor.PropertyEditorWindow(templateName, targetTemplate, Context)
+            {
+                Owner = this
+            };
+
+            if (editor.ShowDialog() == true)
+            {
+                // 录制时空快照，以便撤销
+                Core.UndoRedoManager.Global.RecordSnapshot(Context.Storyboard);
+
+                // 刷新左侧 UI 列表（比如改名了需要重新排版）
                 EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
             }
+        }
+
+
+
+
+
+
+        // ==========================================
+        // 🛠️ 小艾的专属换人小助手 (Helper Method)
+        // ==========================================
+        private void ReplaceStoryboardObject(StoryboardRoot root, StoryboardObject oldObj, StoryboardObject newObj)
+        {
+            if (root == null) return;
+
+            // 挨个家族寻找旧对象，找到就直接把新对象塞进去！(? 和 ?? 是防空指针的护盾哦)
+            if (oldObj is Sprite s && newObj is Sprite ns) { int i = root.sprites?.IndexOf(s) ?? -1; if (i >= 0) root.sprites[i] = ns; }
+            else if (oldObj is Text t && newObj is Text nt) { int i = root.texts?.IndexOf(t) ?? -1; if (i >= 0) root.texts[i] = nt; }
+            else if (oldObj is Line l && newObj is Line nl) { int i = root.lines?.IndexOf(l) ?? -1; if (i >= 0) root.lines[i] = nl; }
+            else if (oldObj is Video v && newObj is Video nv) { int i = root.videos?.IndexOf(v) ?? -1; if (i >= 0) root.videos[i] = nv; }
+            else if (oldObj is Controller c && newObj is Controller nc) { int i = root.controllers?.IndexOf(c) ?? -1; if (i >= 0) root.controllers[i] = nc; }
+            else if (oldObj is NoteController nc1 && newObj is NoteController nc2) { int i = root.note_controllers?.IndexOf(nc1) ?? -1; if (i >= 0) root.note_controllers[i] = nc2; }
         }
         // 🌟 核心功能：当事件列表请求从素材创建新事件时，主窗口负责创建并展示属性编辑器窗口，同时传递新对象和全局数据包，让用户设置属性后直接注入故事板！
         public void CreateNewEventFromAsset(StoryboardObject newObj)

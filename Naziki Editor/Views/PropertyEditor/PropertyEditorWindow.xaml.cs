@@ -1,8 +1,9 @@
-﻿using Naziki_Editor.Models;
+﻿using Naziki_Editor.Core;
+using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
 using System.Windows;
-using Naziki_Editor.Core;
+using System.Windows.Controls;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
@@ -11,7 +12,17 @@ namespace Naziki_Editor.Views.PropertyEditor
         private StoryboardObject _editingObject;
         private string _originalId;
         private ProjectDataContext _context;
-        private StoryboardObject _originalObject;
+
+
+        private bool _isTemplateMode = false;
+        private string _templateName;
+        private StoryboardTemplate _editingTemplate;
+
+
+
+
+
+
 
 
 
@@ -53,26 +64,87 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ModFrameDetails.LoadData(null); // 初始为空，等列表点击时再传
 
 
+
+
+        // ==========================================
+        // ✨ 新增：模板专属的特化重载构造函数 (双轨制)
+        // ==========================================
+        public PropertyEditorWindow(string templateName, StoryboardTemplate targetTemplate, ProjectDataContext context)
+        {
+            InitializeComponent();
+            _context = context;
+            _isTemplateMode = true;
+            _templateName = templateName;
+
+            // 1. 完美的克隆魔法：确保用户点取消时绝对不污染原件
+            string jsonClone = Newtonsoft.Json.JsonConvert.SerializeObject(targetTemplate);
+            _editingTemplate = Newtonsoft.Json.JsonConvert.DeserializeObject<StoryboardTemplate>(jsonClone);
+
+            // 2. 改造身份面板：模板不需要“跟随目标(Parent)”，把下面藏起来，只留名字编辑！
+            ModIdentity.TxtObjectId.Text = templateName;
+            ModIdentity.TxtParentId.Visibility = Visibility.Collapsed; // 隐藏无用控件
+            if (ModIdentity.TxtParentId.Parent is Grid parentGrid) parentGrid.Visibility = Visibility.Collapsed;
+
+            // 3. 核心解封：把单帧详情面板喂给模板全局字典，开启上锁雷达
+            ModFrameDetails.InitTemplates(_context.Storyboard.templates);
+
+            // 4. 时空对接：让关键帧列表模块以“模板特化模式”加载它的 states 数组！
+            // 完美绑定：只要列表里选了帧（或者选了虚拟根节点），就强塞给详情面板
+            ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
+                ModFrameDetails.LoadState(state, title, rootState, isRoot);
+
+            // 🚀 激活列表：专门传入模板和状态数组
+            ModFrameList.LoadTemplateData(_editingTemplate, _context);
+
+            BtnCancel.Click += (s, e) => { this.DialogResult = false; };
+            BtnSave.Click += BtnSave_Click;
+        }
+
+
+
+
+
+
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            // ✨ 新增：模板模式下的级联保存与更名拦截
+            if (_isTemplateMode)
+            {
+                string newName = ModIdentity.TxtObjectId.Text.Trim();
+                if (string.IsNullOrEmpty(newName))
+                {
+                    MessageBox.Show("指挥官，模板名称绝对不能为空哦！", "保存被拦截");
+                    return;
+                }
+
+                // 如果改名了，呼叫大管家级联更新全宇宙的引用！
+                if (newName != _templateName)
+                {
+                    Core.TemplateManager.RenameTemplateGlobally(_context.Storyboard, _templateName, newName);
+                }
+
+                // 把修改后的完全体克隆实体塞回大本营字典
+                _context.Storyboard.templates[newName] = _editingTemplate;
+
+                _context.MarkAsModified(); // 触发未保存标记
+                this.DialogResult = true;
+                this.Close();
+                return;
+            }
+
+
+
             // 🛑 呼叫核心安检基站进行拦截
             var validationResult = Core.StoryboardValidator.ValidateStateConflicts(_editingObject);
 
             if (!validationResult.IsValid)
             {
-                // 收到安检网的拦截情报，由 UI 层负责弹窗警告用户！
                 MessageBox.Show(validationResult.ErrorMessage, "小艾的防呆纠察雷达", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return; // 阻止保存
             }
 
-            // 🟢 安检通过！执行安全覆盖
-            var settings = new JsonSerializerSettings
-            {
-                ObjectCreationHandling = ObjectCreationHandling.Replace
-            };
-
-            string updatedJson = JsonConvert.SerializeObject(_editingObject);
-            JsonConvert.PopulateObject(updatedJson, _originalObject, settings);
+            // 🟢 安检通过！把克隆好并修改过的最终数据装进 Tag 胶囊里！
+            this.Tag = _editingObject;
 
             // 通知项目有未保存的修改
             _context.MarkAsModified();
@@ -80,5 +152,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             this.DialogResult = true;
             this.Close();
         }
+
+
+
+
+
     }
 }

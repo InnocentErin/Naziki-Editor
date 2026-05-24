@@ -208,6 +208,26 @@ namespace Naziki_Editor.Views
 
         private void EventTree_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            // ==========================================
+            // ✨ 核心修复：降维打击！直接从 UI 的 Content 里拿名字！
+            // ==========================================
+            if (sender == EventTemplateListBox)
+            {
+                if (EventTemplateListBox.SelectedItem is ListBoxItem templateItem && templateItem.Tag is StoryboardTemplate template)
+                {
+                    // 👑 直接读取 ListBoxItem 上的文字作为 Key
+                    string templateKey = templateItem.Content?.ToString();
+                    if (templateKey == "未命名模板") templateKey = "";
+
+                    if (Window.GetWindow(this) is MainWindow main && templateKey != null)
+                    {
+                        main.OpenTemplatePropertyEditor(templateKey, template);
+                    }
+                    e.Handled = true;
+                    return;
+                }
+            }
+
             // ✨ 魔法：不管是哪个分类的 ListBox 被双击了，sender 就是它！先剥开 ListBoxItem 的外壳，再去拿 Tag 肚子里的数据！
             if (sender is ListBox listBox && listBox.SelectedItem is ListBoxItem item && item.Tag is Models.StoryboardObject selectedObj)
             {
@@ -262,15 +282,17 @@ namespace Naziki_Editor.Views
                 }
                 else if (tag is StoryboardTemplate st)
                 {
-                    // 👑 独立处理模板对象：通过 Value 反查 Key
-                    var targetEntry = root.templates?.FirstOrDefault(x => x.Value == st);
-                    if (targetEntry != null && targetEntry.Value.Key != null)
+                    // 👑 独立处理模板对象：同样降维打击，直接拿 Content 当 Key 删！
+                    string templateKey = item.Content?.ToString();
+                    if (templateKey == "未命名模板") templateKey = "";
+
+                    if (templateKey != null && root.templates.ContainsKey(templateKey))
                     {
-                        root.templates.Remove(targetEntry.Value.Key);
+                        root.templates.Remove(templateKey);
                         hasDeleted = true;
                     }
                 }
-               
+
             }
 
             if (hasDeleted)

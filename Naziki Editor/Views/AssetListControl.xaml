@@ -5,6 +5,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignHeight="300" d:DesignWidth="300">
 
+    <UserControl.CommandBindings>
+        <CommandBinding Command="ApplicationCommands.Copy" Executed="CommandCopy_Executed" CanExecute="Command_CanExecuteWithSelection" />
+        <CommandBinding Command="ApplicationCommands.Paste" Executed="CommandPaste_Executed" />
+        <CommandBinding Command="ApplicationCommands.Delete" Executed="CommandDelete_Executed" CanExecute="Command_CanExecuteWithSelection" />
+    </UserControl.CommandBindings>
+
+
     <UserControl.Resources>
         <DataTemplate x:Key="AssetTileTemplate">
             <Border x:Name="TileBorder" Width="85" Height="100" Margin="5" Padding="5" 
@@ -12,8 +19,14 @@
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="✏️ 重命名素材" Click="MenuRename_Click"/>
+                        <Separator/>
+                        <MenuItem Header="📄 复制 (Ctrl+C)" Command="ApplicationCommands.Copy"/>
+                        <MenuItem Header="📋 粘贴 (Ctrl+V)" Command="ApplicationCommands.Paste"/>
+                        <Separator/>
+                        <MenuItem Header="🗑️ 删除 (Delete)" Command="ApplicationCommands.Delete" Foreground="IndianRed"/>
                     </ContextMenu>
                 </Border.ContextMenu>
+
 
                 <Grid>
                     <Grid.RowDefinitions>
@@ -72,6 +85,8 @@
         </DataTemplate>
 
         <ContextMenu x:Key="ListBoxGlobalMenu">
+            <MenuItem Header="📋 粘贴 (Ctrl+V)" Command="ApplicationCommands.Paste"/>
+            <Separator/>
             <MenuItem Header="🔄 刷新素材库 (Scan Assets)" Click="MenuRefresh_Click"/>
         </ContextMenu>
     </UserControl.Resources>

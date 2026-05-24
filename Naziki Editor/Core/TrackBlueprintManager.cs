@@ -32,101 +32,168 @@ namespace Naziki_Editor.Core
     public static class TrackBlueprintManager
     {
         // ==========================================
-        // 🟢 场景对象 (Sprite, Text, Line, Video) 通用蓝图
+        // 🖼️ 图片对象 (Sprite) 蓝图
         // ==========================================
-        public static readonly List<TrackBlueprint> RenderObjectBlueprints = new List<TrackBlueprint>
+        public static readonly List<TrackBlueprint> SpriteBlueprints = new List<TrackBlueprint>
         {
-            new TrackBlueprint { GroupName = "基础变换", JsonName = "x", DisplayName = "水平坐标 (X)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "基础变换", JsonName = "y", DisplayName = "垂直坐标 (Y)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "基础变换", JsonName = "z", DisplayName = "深度层级 (Z)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "旋转与翻转", JsonName = "rot", DisplayName = "旋转角度 (Rot)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "旋转与翻转", JsonName = "rot_x", DisplayName = "X轴翻转 (Rot X)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "旋转与翻转", JsonName = "rot_y", DisplayName = "Y轴翻转 (Rot Y)", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "尺寸与缩放", JsonName = "scale", DisplayName = "整体缩放 (Scale)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "尺寸与缩放", JsonName = "scale_x", DisplayName = "宽度缩放 (Scale X)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "尺寸与缩放", JsonName = "scale_y", DisplayName = "高度缩放 (Scale Y)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "色彩与外观", JsonName = "opacity", DisplayName = "透明度 (Opacity)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "色彩与外观", JsonName = "color", DisplayName = "颜色叠加 (Color)", DataType = TrackDataType.Color, DefaultValue = null }
+            // 📐 空间坐标与尺寸控制
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "x", DisplayName = "X 坐标 (X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "y", DisplayName = "Y 坐标 (Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "z", DisplayName = "Z 层级 (Z)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "width", DisplayName = "宽度 (Width)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "height", DisplayName = "高度 (Height)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale", DisplayName = "整体缩放 (Scale)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_x", DisplayName = "X 轴缩放 (Scale X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_y", DisplayName = "Y 轴缩放 (Scale Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_x", DisplayName = "X 轴锚点 (Pivot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_y", DisplayName = "Y 轴锚点 (Pivot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_x", DisplayName = "X 轴旋转 (Rot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_y", DisplayName = "Y 轴旋转 (Rot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_z", DisplayName = "Z 轴旋转 (Rot Z)", DataType = TrackDataType.Float },
+            
+            // 🌌 层级与环境表现
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "layer", DisplayName = "渲染图层 (Layer)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "order", DisplayName = "图层内顺序 (Order)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "opacity", DisplayName = "不透明度 (Opacity)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "fill_width", DisplayName = "宽度适配屏幕 (Fill Width)", DataType = TrackDataType.Boolean },
+
+            // 🎨 外观颜色与内容
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "color", DisplayName = "颜色 (Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "path", DisplayName = "图片路径 (Path)", DataType = TrackDataType.String }
         };
 
         // ==========================================
-        // 🔵 场景控制器 (Controller) 包罗万象蓝图
+        // 📝 文字对象 (Text) 蓝图
+        // ==========================================
+        public static readonly List<TrackBlueprint> TextBlueprints = new List<TrackBlueprint>
+        {
+            // 📐 空间坐标与尺寸控制
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "x", DisplayName = "X 坐标 (X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "y", DisplayName = "Y 坐标 (Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "z", DisplayName = "Z 层级 (Z)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "width", DisplayName = "文本框宽度 (Width)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "height", DisplayName = "文本框高度 (Height)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale", DisplayName = "整体缩放 (Scale)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_x", DisplayName = "X 轴缩放 (Scale X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_y", DisplayName = "Y 轴缩放 (Scale Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_x", DisplayName = "X 轴锚点 (Pivot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_y", DisplayName = "Y 轴锚点 (Pivot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_x", DisplayName = "X 轴旋转 (Rot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_y", DisplayName = "Y 轴旋转 (Rot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_z", DisplayName = "Z 轴旋转 (Rot Z)", DataType = TrackDataType.Float },
+            
+            // 🌌 层级与环境表现
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "layer", DisplayName = "渲染图层 (Layer)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "order", DisplayName = "图层内顺序 (Order)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "opacity", DisplayName = "不透明度 (Opacity)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "fill_width", DisplayName = "宽度适配屏幕 (Fill Width)", DataType = TrackDataType.Boolean },
+
+            // 🎨 外观颜色与文字属性
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "text", DisplayName = "文字内容 (Text)", DataType = TrackDataType.String },
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "color", DisplayName = "颜色 (Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "size", DisplayName = "字号大小 (Size)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "align", DisplayName = "对齐方式 (Align)", DataType = TrackDataType.String },
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "font", DisplayName = "字体文件 (Font)", DataType = TrackDataType.String },
+            new TrackBlueprint { GroupName = "外观颜色与文字属性", JsonName = "letter_spacing", DisplayName = "字间距 (Letter Spacing)", DataType = TrackDataType.Float }
+        };
+
+        // ==========================================
+        // 🎬 视频对象 (Video) 蓝图
+        // ==========================================
+        public static readonly List<TrackBlueprint> VideoBlueprints = new List<TrackBlueprint>
+        {
+            // 📐 空间坐标与尺寸控制
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "x", DisplayName = "X 坐标 (X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "y", DisplayName = "Y 坐标 (Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "z", DisplayName = "Z 层级 (Z)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "width", DisplayName = "宽度 (Width)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "height", DisplayName = "高度 (Height)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale", DisplayName = "整体缩放 (Scale)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_x", DisplayName = "X 轴缩放 (Scale X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_y", DisplayName = "Y 轴缩放 (Scale Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_x", DisplayName = "X 轴锚点 (Pivot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_y", DisplayName = "Y 轴锚点 (Pivot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_x", DisplayName = "X 轴旋转 (Rot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_y", DisplayName = "Y 轴旋转 (Rot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_z", DisplayName = "Z 轴旋转 (Rot Z)", DataType = TrackDataType.Float },
+            
+            // 🌌 层级与环境表现
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "layer", DisplayName = "渲染图层 (Layer)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "order", DisplayName = "图层内顺序 (Order)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "opacity", DisplayName = "不透明度 (Opacity)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "fill_width", DisplayName = "宽度适配屏幕 (Fill Width)", DataType = TrackDataType.Boolean },
+
+            // 🎨 外观颜色与内容
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "color", DisplayName = "颜色 (Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "path", DisplayName = "视频路径 (Path)", DataType = TrackDataType.String },
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "preserve_aspect_ratio", DisplayName = "保持宽高比 (Keep Ratio)", DataType = TrackDataType.Boolean }
+        };
+
+        // ==========================================
+        // 〰️ 线条对象 (Line) 蓝图
+        // ==========================================
+        public static readonly List<TrackBlueprint> LineBlueprints = new List<TrackBlueprint>
+        {
+            // 📐 空间坐标与尺寸控制
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "x", DisplayName = "X 坐标 (X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "y", DisplayName = "Y 坐标 (Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "z", DisplayName = "Z 层级 (Z)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "width", DisplayName = "线段粗细 (Width)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "height", DisplayName = "高度 (Height)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale", DisplayName = "整体缩放 (Scale)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_x", DisplayName = "X 轴缩放 (Scale X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "scale_y", DisplayName = "Y 轴缩放 (Scale Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_x", DisplayName = "X 轴锚点 (Pivot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "pivot_y", DisplayName = "Y 轴锚点 (Pivot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_x", DisplayName = "X 轴旋转 (Rot X)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_y", DisplayName = "Y 轴旋转 (Rot Y)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "空间坐标与尺寸控制", JsonName = "rot_z", DisplayName = "Z 轴旋转 (Rot Z)", DataType = TrackDataType.Float },
+            
+            // 🌌 层级与环境表现
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "layer", DisplayName = "渲染图层 (Layer)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "order", DisplayName = "图层内顺序 (Order)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "opacity", DisplayName = "不透明度 (Opacity)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "层级与环境表现", JsonName = "fill_width", DisplayName = "宽度适配屏幕 (Fill Width)", DataType = TrackDataType.Boolean },
+
+            // 🎨 外观颜色与内容
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "color", DisplayName = "颜色 (Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "外观颜色与内容", JsonName = "path", DisplayName = "线条材质路径 (Path)", DataType = TrackDataType.String }
+        };
+
+        // ==========================================
+        // 🎛️ 场景控制器 (Controller) 蓝图
         // ==========================================
         public static readonly List<TrackBlueprint> ControllerBlueprints = new List<TrackBlueprint>
         {
-            // --- 界面与基础控制 ---
-            new TrackBlueprint { GroupName = "界面与音符", JsonName = "ui_opacity", DisplayName = "UI 不透明度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "界面与音符", JsonName = "background_dim", DisplayName = "背景遮罩暗度", DataType = TrackDataType.Float, DefaultValue = 0.85f },
-            new TrackBlueprint { GroupName = "界面与音符", JsonName = "note_opacity_multiplier", DisplayName = "音符透明度倍率", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "界面与音符", JsonName = "note_ring_color", DisplayName = "音符外圈颜色", DataType = TrackDataType.Color, DefaultValue = null },
-            new TrackBlueprint { GroupName = "界面与音符", JsonName = "note_fill_colors", DisplayName = "音符覆盖颜色组", DataType = TrackDataType.NoteColorArray, DefaultValue = null },
+            // 🎥 镜头控制
+            new TrackBlueprint { GroupName = "镜头与透视控制", JsonName = "x", DisplayName = "相机 X 坐标", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "镜头与透视控制", JsonName = "y", DisplayName = "相机 Y 坐标", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "镜头与透视控制", JsonName = "z", DisplayName = "相机 Z 坐标", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "镜头与透视控制", JsonName = "fov", DisplayName = "正交视野大小 (Fov)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "镜头与透视控制", JsonName = "perspective", DisplayName = "开启 3D 透视 (Perspective)", DataType = TrackDataType.Boolean },
             
-            // --- 扫描线 ---
-            new TrackBlueprint { GroupName = "扫描线", JsonName = "scanline_opacity", DisplayName = "扫描线不透明度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "扫描线", JsonName = "scanline_color", DisplayName = "扫描线颜色", DataType = TrackDataType.Color, DefaultValue = null },
-            new TrackBlueprint { GroupName = "扫描线", JsonName = "override_scanline_pos", DisplayName = "覆盖扫描线坐标开关", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "扫描线", JsonName = "scanline_pos", DisplayName = "扫描线 Y 坐标", DataType = TrackDataType.Float, DefaultValue = 0f },
+            // 🌌 场景全局控制
+            new TrackBlueprint { GroupName = "场景全局控制", JsonName = "background_dim", DisplayName = "背景暗化 (BG Dim)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "场景全局控制", JsonName = "ui_opacity", DisplayName = "游戏UI透明度 (UI Opacity)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "场景全局控制", JsonName = "storyboard_opacity", DisplayName = "故事板总透明度 (SB Opacity)", DataType = TrackDataType.Float },
             
-            // --- 相机系统 ---
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "perspective", DisplayName = "开启透视相机(3D)", DataType = TrackDataType.Boolean, DefaultValue = true },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "x", DisplayName = "相机 X 坐标", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "y", DisplayName = "相机 Y 坐标", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "z", DisplayName = "相机 Z 坐标", DataType = TrackDataType.Float, DefaultValue = -10f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "rot_x", DisplayName = "相机旋转 X", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "rot_y", DisplayName = "相机旋转 Y", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "rot_z", DisplayName = "相机旋转 Z", DataType = TrackDataType.Float, DefaultValue = 0f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "size", DisplayName = "正交视图大小 (2D)", DataType = TrackDataType.Float, DefaultValue = 5f },
-            new TrackBlueprint { GroupName = "相机系统", JsonName = "fov", DisplayName = "透视视野大小 (3D)", DataType = TrackDataType.Float, DefaultValue = 53.2f },
+            // ✨ 画面滤镜与特效
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "bloom", DisplayName = "开启泛光滤镜 (Bloom)", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "bloom_color", DisplayName = "泛光颜色", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "bloom_intensity", DisplayName = "泛光强度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "bloom_threshold", DisplayName = "泛光阈值", DataType = TrackDataType.Float },
 
-            // --- 滤镜大礼包 (按文档顺序整理) ---
-            new TrackBlueprint { GroupName = "滤镜：色度异常 (Chromatical)", JsonName = "chromatical", DisplayName = "开启滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：色度异常 (Chromatical)", JsonName = "chromatical_fade", DisplayName = "透明度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：色度异常 (Chromatical)", JsonName = "chromatical_intensity", DisplayName = "强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：色度异常 (Chromatical)", JsonName = "chromatical_speed", DisplayName = "速度", DataType = TrackDataType.Float, DefaultValue = 1f },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "vignette", DisplayName = "开启暗角滤镜 (Vignette)", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "vignette_color", DisplayName = "暗角颜色", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "vignette_start", DisplayName = "暗角起始范围", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "vignette_end", DisplayName = "暗角结束范围", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "vignette_intensity", DisplayName = "暗角强度", DataType = TrackDataType.Float },
 
-            new TrackBlueprint { GroupName = "滤镜：泛光 (Bloom)", JsonName = "bloom", DisplayName = "开启滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：泛光 (Bloom)", JsonName = "bloom_intensity", DisplayName = "泛光强度", DataType = TrackDataType.Float, DefaultValue = 2f },
-
-            new TrackBlueprint { GroupName = "滤镜：径向模糊 (Radial Blur)", JsonName = "radial_blur", DisplayName = "开启滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：径向模糊 (Radial Blur)", JsonName = "radial_blur_intensity", DisplayName = "模糊强度", DataType = TrackDataType.Float, DefaultValue = 0.025f },
-
-            new TrackBlueprint { GroupName = "滤镜：色彩调整 (Color Adj)", JsonName = "color_adjustment", DisplayName = "开启滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：色彩调整 (Color Adj)", JsonName = "brightness", DisplayName = "亮度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：色彩调整 (Color Adj)", JsonName = "saturation", DisplayName = "饱和度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：色彩调整 (Color Adj)", JsonName = "contrast", DisplayName = "对比度", DataType = TrackDataType.Float, DefaultValue = 1f },
-
-            // 其他散装滤镜
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "color_filter", DisplayName = "开启屏幕纯色滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "color_filter_color", DisplayName = "屏幕滤镜颜色", DataType = TrackDataType.Color, DefaultValue = null },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "gray_scale", DisplayName = "开启灰度滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "gray_scale_intensity", DisplayName = "灰度强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "noise", DisplayName = "开启噪点滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "noise_intensity", DisplayName = "噪点强度", DataType = TrackDataType.Float, DefaultValue = 0.235f },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "sepia", DisplayName = "开启复古滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "sepia_intensity", DisplayName = "复古强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "dream", DisplayName = "开启梦幻滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "dream_intensity", DisplayName = "梦幻强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "fisheye", DisplayName = "开启鱼眼滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "fisheye_intensity", DisplayName = "鱼眼强度", DataType = TrackDataType.Float, DefaultValue = 0.5f },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "shockwave", DisplayName = "开启冲击波滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "其他滤镜", JsonName = "shockwave_speed", DisplayName = "冲击波速度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            
-            // Focus 滤镜
-            new TrackBlueprint { GroupName = "滤镜：漫画焦点 (Focus)", JsonName = "focus", DisplayName = "开启滤镜", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：漫画焦点 (Focus)", JsonName = "focus_size", DisplayName = "焦点大小", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：漫画焦点 (Focus)", JsonName = "focus_color", DisplayName = "焦点线颜色", DataType = TrackDataType.Color, DefaultValue = null },
-            new TrackBlueprint { GroupName = "滤镜：漫画焦点 (Focus)", JsonName = "focus_speed", DisplayName = "速度", DataType = TrackDataType.Float, DefaultValue = 5f },
-            new TrackBlueprint { GroupName = "滤镜：漫画焦点 (Focus)", JsonName = "focus_intensity", DisplayName = "强度", DataType = TrackDataType.Float, DefaultValue = 0.25f },
-
-            // Arcade & Glitch & Tape
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "glitch", DisplayName = "开启故障抖动 (Glitch)", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "glitch_intensity", DisplayName = "抖动强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "arcade", DisplayName = "开启街机显像管 (Arcade)", DataType = TrackDataType.Boolean, DefaultValue = false },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "arcade_intensity", DisplayName = "街机效果强度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "arcade_interference_size", DisplayName = "干扰条大小", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "arcade_interference_speed", DisplayName = "干扰条速度", DataType = TrackDataType.Float, DefaultValue = 0.5f },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "arcade_contrast", DisplayName = "街机对比度", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "滤镜：故障与复古电视", JsonName = "tape", DisplayName = "开启录像带翻滚 (Tape)", DataType = TrackDataType.Boolean, DefaultValue = false }
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "arcade", DisplayName = "开启街机模式 (Arcade)", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "arcade_contrast", DisplayName = "街机对比度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "arcade_interference_size", DisplayName = "干扰条大小", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "arcade_interference_speed", DisplayName = "干扰条速度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "画面滤镜与特效", JsonName = "tape", DisplayName = "开启录像带翻滚 (Tape)", DataType = TrackDataType.Boolean }
         };
 
         // ==========================================
@@ -134,9 +201,22 @@ namespace Naziki_Editor.Core
         // ==========================================
         public static readonly List<TrackBlueprint> NoteControllerBlueprints = new List<TrackBlueprint>
         {
-            new TrackBlueprint { GroupName = "音符控制", JsonName = "y_multiplier", DisplayName = "掉落速度乘区 (Y Multiplier)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "音符控制", JsonName = "opacity_multiplier", DisplayName = "透明度乘区 (Opacity Mult)", DataType = TrackDataType.Float, DefaultValue = 1f },
-            new TrackBlueprint { GroupName = "音符控制", JsonName = "size_multiplier", DisplayName = "大小乘区 (Size Mult)", DataType = TrackDataType.Float, DefaultValue = 1f }
+            // 📐 音符位移与乘区
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "override_x", DisplayName = "覆盖原始X坐标 (Override X)", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "override_y", DisplayName = "覆盖原始Y坐标 (Override Y)", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "x_offset", DisplayName = "X轴偏移 (X Offset)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "y_offset", DisplayName = "Y轴偏移 (Y Offset)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "z_offset", DisplayName = "Z轴偏移 (Z Offset)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "x_multiplier", DisplayName = "X轴拉伸乘区 (X Mult)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "y_multiplier", DisplayName = "Y轴速度乘区 (Y Mult)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "z_multiplier", DisplayName = "Z轴拉伸乘区 (Z Mult)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "size_multiplier", DisplayName = "音符大小乘区 (Size Mult)", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "音符位移与乘区", JsonName = "opacity_multiplier", DisplayName = "透明度乘区 (Opacity Mult)", DataType = TrackDataType.Float },
+            
+            // 🎨 音符颜色与特效
+            new TrackBlueprint { GroupName = "音符颜色与特效", JsonName = "note_color", DisplayName = "音符主颜色 (Note Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "音符颜色与特效", JsonName = "fallback_color", DisplayName = "拖拽轨迹颜色 (Fallback Color)", DataType = TrackDataType.Color },
+            new TrackBlueprint { GroupName = "音符颜色与特效", JsonName = "note_fill_colors", DisplayName = "12等分内部颜色组", DataType = TrackDataType.NoteColorArray }
         };
     }
 }

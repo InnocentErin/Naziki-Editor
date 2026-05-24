@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
@@ -18,9 +19,14 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 var strList = new System.Collections.Generic.List<string>();
                 foreach (var item in list) strList.Add(item.ToString());
-                return string.Join(", ", strList); // 完美将数组拼接成逗号分隔的字符串
+                return string.Join(", ", strList);
             }
-            return value?.ToString() ?? "";
+
+            // ✨ 核心拦截：如果是 C# 的极限占位符，直接显示为空，不吓唬用户！
+            string strVal = value?.ToString() ?? "";
+            if (strVal.Contains("3.402823")) return "";
+
+            return strVal;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
@@ -44,6 +50,8 @@ namespace Naziki_Editor.Views.PropertyEditor
 
 
 
+    
+
 
     public partial class PropertyEditor_FrameDetails : UserControl
     {
@@ -51,25 +59,48 @@ namespace Naziki_Editor.Views.PropertyEditor
         private string _currentTitle;
         private object _rootState;
         private bool _isRoot;
+        // ✨ 新增：幽灵斩杀追踪器！记录哪些属性是玩家手动点的，没点过的0全部视为幽灵！
+        private System.Collections.Generic.HashSet<string> _manuallyActivatedProps = new System.Collections.Generic.HashSet<string>();
+
+        // ✨ 新增：存放从大本营传过来的全局模板图纸！
+        private System.Collections.Generic.Dictionary<string, StoryboardTemplate> _globalTemplates;
+
+        public void InitTemplates(System.Collections.Generic.Dictionary<string, StoryboardTemplate> templates)
+        {
+            _globalTemplates = templates;
+        }
+
 
         public PropertyEditor_FrameDetails()
         {
             InitializeComponent();
         }
 
+
+
+
         // ==========================================
         // 📥 接口：接收选中的关键帧并渲染 UI
         // ==========================================
         public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot)
         {
-            _currentState = stateReference; _rootState = rootState; _isRoot = isRoot;
+            _currentState = stateReference; 
+            _rootState = rootState; 
+            _isRoot = isRoot;
+            _currentTitle = frameTitle; // ✨ 必须保存当前标题，以便重载时使用
+
+
             if (_currentState == null) { PanelDetails.Visibility = Visibility.Collapsed; TxtEmptyState.Visibility = Visibility.Visible; return; }
 
             PanelDetails.Visibility = Visibility.Visible;
             TxtEmptyState.Visibility = Visibility.Collapsed;
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
+            PopulateTemplateDropdown(); // ✨ 刷新模板下拉框
 
-            // 🌟 修正 5：同样加上 State！
+
+            // ✨ 核心修正：如果是模板，全量开放所有功能卡片（因为模板可以控制所有参数）！
+            bool isTemplate = _currentState is StoryboardTemplate || _rootState is StoryboardTemplate;
+            // 同样加上 State！
             PanelSceneCards.Visibility = (_rootState is ControllerState) ? Visibility.Collapsed : Visibility.Visible;
             PanelControllerCards.Visibility = (_rootState is ControllerState) ? Visibility.Visible : Visibility.Collapsed;
 
@@ -79,6 +110,10 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             BuildDynamicPanel();
         }
+
+
+        
+
 
         // 核心：绑定 Time 和 Easing 这两个固定属性的输入框
         private void BindStaticProperty(TextBox txt, string propName)
@@ -98,30 +133,47 @@ namespace Naziki_Editor.Views.PropertyEditor
         // 核心：为每个已激活属性创建一行输入控件，包含标签、输入框和删除按钮
         private UIElement CreateDynamicRow(PropertyInfo prop, object value)
         {
+
+            // ✨ 1. 先用透视法术查一下！
+            bool isLocked = IsLockedByTemplate(prop.Name, out object templateValue);
+
+
+
             Grid grid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            TextBlock lbl = new TextBlock { Text = prop.Name + ":", VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.Bold };
+            // ✨ 2. 如果上锁了，标题旁边加个小锁头！
+            TextBlock lbl = new TextBlock
+            {
+                Text = (isLocked ? "🔒 " : "") + prop.Name + ":",
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = FontWeights.Bold,
+                Foreground = isLocked ? Brushes.Gray : Brushes.White
+            };
             Grid.SetColumn(lbl, 0);
             grid.Children.Add(lbl);
 
             Button btnDel = new Button { Content = "🗑️", Padding = new Thickness(5, 0, 5, 0), Margin = new Thickness(5, 0, 0, 0), Foreground = System.Windows.Media.Brushes.Red };
+            // ✨ 3. 如果是模板锁定状态，绝对不允许用户删除它！把垃圾桶藏起来！
+            if (isLocked) btnDel.Visibility = Visibility.Collapsed;
+
             btnDel.Click += (s, e) => {
                 // 防呆拦截：如果用户的模型里没有定义为可空类型（比如是 float 而不是 float?），它将无法被删除！
                 if (prop.PropertyType.IsValueType && Nullable.GetUnderlyingType(prop.PropertyType) == null)
                 {
-                    MessageBox.Show($"指挥官，底层模型中的【{prop.Name}】不是可空类型 (Nullable)，无法被删除！\n请在您的 Models 代码中将其改为可空类型（如 float?）。", "底层限制");
+                    MessageBox.Show($"指挥官，底层模型中的【{prop.Name}】不是可空类型 (Nullable)，无法被删除！", "底层限制");
                     return;
                 }
                 prop.SetValue(_currentState, null);
-                LoadState(_currentState, _currentTitle, _rootState, _isRoot);// 刷新 UI
+                LoadState(_currentState, _currentTitle, _rootState, _isRoot);
             };
             Grid.SetColumn(btnDel, 2);
             grid.Children.Add(btnDel);
 
-            FrameworkElement inputCtrl = BuildBoundInputControl(prop, value);
+            // ✨ 4. 把上锁状态传给控件制造机
+            FrameworkElement inputCtrl = BuildBoundInputControl(prop, value, isLocked, templateValue);
             Grid.SetColumn(inputCtrl, 1);
             grid.Children.Add(inputCtrl);
 
@@ -129,10 +181,26 @@ namespace Naziki_Editor.Views.PropertyEditor
         }
 
         // 核心：基于类型生成不同的双向绑定输入控件
-        private FrameworkElement BuildBoundInputControl(PropertyInfo prop, object value)
+        private FrameworkElement BuildBoundInputControl(PropertyInfo prop, object value, bool isLocked, object templateValue)
         {
             Type pType = prop.PropertyType;
             Type uType = Nullable.GetUnderlyingType(pType) ?? pType;
+
+            // ✨ 如果被模板锁死了，我们就斩断 TwoWay 绑定，只显示一个灰色的假只读控件！
+            if (isLocked)
+            {
+                return new TextBox
+                {
+                    Text = templateValue.ToString(),
+                    Padding = new Thickness(5),
+                    IsEnabled = false,
+                    Foreground = System.Windows.Media.Brushes.Gray,
+                    ToolTip = "该属性已被模板接管。若需强制覆盖，请在当前状态解除模板印章。"
+                };
+            }
+
+
+
 
             // ✨ 魔法所在：全面采用 WPF 的数据绑定（TwoWay Binding），让 UI 与对象状态自动同步，无需手动读取输入框内容！
             if (uType == typeof(bool))
@@ -149,36 +217,24 @@ namespace Naziki_Editor.Views.PropertyEditor
                 Grid g = new Grid();
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
                 // 先创建一个下拉框选择单位
                 ComboBox cmb = new ComboBox { Margin = new Thickness(0, 0, 5, 0), SelectedValuePath = "Tag" };
-                // 填充单位选项
-                foreach (ReferenceUnit r in Enum.GetValues(typeof(ReferenceUnit)))
-                {
-                    cmb.Items.Add(new ComboBoxItem { Content = r.ToString(), Tag = r });
-                }
-                // 绑定当前单位值
-                Binding bUnit = new Binding(prop.Name + ".Unit") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
-                cmb.SetBinding(ComboBox.SelectedValueProperty, bUnit);
-                // 将下拉框放在第一列
-                Grid.SetColumn(cmb, 0);
-                g.Children.Add(cmb);
+                foreach (ReferenceUnit r in Enum.GetValues(typeof(ReferenceUnit))) cmb.Items.Add(new ComboBoxItem { Content = r.ToString(), Tag = r });
+                cmb.SetBinding(ComboBox.SelectedValueProperty, new Binding(prop.Name + ".Unit") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+                Grid.SetColumn(cmb, 0); g.Children.Add(cmb);
+
                 // 再创建一个文本框输入数值
                 TextBox txt = new TextBox { Padding = new Thickness(5) };
-                // 绑定当前数值
-                Binding bVal = new Binding(prop.Name + ".Value") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
-                txt.SetBinding(TextBox.TextProperty, bVal);
-                // 将文本框放在第二列
-                Grid.SetColumn(txt, 1);
-                g.Children.Add(txt);
-
+                txt.SetBinding(TextBox.TextProperty, new Binding(prop.Name + ".Value") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+                Grid.SetColumn(txt, 1); g.Children.Add(txt);
                 return g;
             }
             // 其他类型默认使用 TextBox 输入
             else
             {
                 TextBox txt = new TextBox { Padding = new Thickness(5) };
-                Binding b = new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
-                txt.SetBinding(TextBox.TextProperty, b);
+                txt.SetBinding(TextBox.TextProperty, new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
                 return txt;
             }
         }
@@ -196,22 +252,30 @@ namespace Naziki_Editor.Views.PropertyEditor
 
 
         // ==========================================
-        // 🔮 辅助方法：属性名称智能分流分类器
+        // 🔮 辅助方法：属性名称智能分流分类器 (Cytoid 官方全量归类版)
         // ==========================================
-        private int GetPropertyCategory(string name, object rootState)
+        private int GetPropertyCategory(string name)
         {
             string n = name.ToLower();
-            if (rootState is ControllerState) // 👈 加上了 State！
-            {
-                if (n.Contains("chromatical") || n.Contains("bloom") || n.Contains("blur") || n.Contains("adjustment") || n.Contains("brightness") || n.Contains("saturation") || n.Contains("contrast") || n.Contains("noise") || n.Contains("sepia") || n.Contains("dream") || n.Contains("fisheye") || n.Contains("shockwave") || n.Contains("focus") || n.Contains("glitch") || n.Contains("arcade") || n == "tape" || n.Contains("filter")) return 5;
-                if (n == "perspective" || n == "size" || n == "fov" || n == "x" || n == "y" || n == "z" || n.Contains("rot")) return 4;
-                return 3;
-            }
-            else
-            {
-                if (n.Contains("color") || n.Contains("opacity") || n == "width" || n == "style" || n.Contains("direction")) return 2;
+
+            // 📐 Cat 1: 空间坐标与尺寸控制 (Spatial)
+            if (n == "x" || n == "y" || n == "z" || n == "width" || n == "height" || n.Contains("scale") || n.Contains("pivot") || n.Contains("rot"))
                 return 1;
-            }
+
+            // 🎥 Cat 4: 镜头与透视控制 (Camera)
+            if (n == "fov" || n == "perspective")
+                return 4;
+
+            // ✨ Cat 5: 屏幕画面滤镜 (Effects)
+            if (n.Contains("bloom") || n.Contains("vignette") || n.Contains("arcade") || n == "tape")
+                return 5;
+
+            // 🌌 Cat 3: 场景环境与音符乘区控制 (UI/Scene)
+            if (n.Contains("dim") || n.Contains("opacity_multiplier") || n.Contains("multiplier") || n.Contains("offset") || n.Contains("override") || n == "videobgm" || n == "storyboardopacity" || n == "uiopacity")
+                return 3;
+
+            // 🎨 Cat 2: 外观颜色与表现控制 (Appearance - 剩下所有的都去外观)
+            return 2;
         }
 
         // ==========================================
@@ -226,6 +290,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelEffectsContainer.Children.Clear(); CmbEffectsProps.Items.Clear();
 
             PropertyInfo[] props = _currentState.GetType().GetProperties();
+            bool isTemplate = _currentState is StoryboardTemplate || _rootState is StoryboardTemplate;
 
             foreach (var prop in props)
             {
@@ -236,7 +301,14 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                 object val = prop.GetValue(_currentState);
                 bool isActive = (val != null);
-                int cat = GetPropertyCategory(prop.Name, _rootState);
+
+                // 👻 ✨ 幽灵斩杀阵！如果是模板里的 0 World，且没有被追踪器记录，直接屏蔽！
+                if (isActive && isTemplate && val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World)
+                {
+                    if (!_manuallyActivatedProps.Contains(prop.Name)) isActive = false;
+                }
+
+                int cat = GetPropertyCategory(prop.Name); // 👈 呼叫全新精准分类器
 
                 if (isActive)
                 {
@@ -249,7 +321,8 @@ namespace Naziki_Editor.Views.PropertyEditor
                 }
                 else
                 {
-                    if (!_isRoot && prop.Name != "Destroy")
+                    // 普通对象的子帧，如果 Root 没开就不进 ComboBox；但模板模式百无禁忌，全部塞进去让你选！
+                    if (!_isRoot && prop.Name != "Destroy" && !isTemplate)
                     {
                         var rootProp = _rootState.GetType().GetProperty(prop.Name);
                         if (rootProp == null || rootProp.GetValue(_rootState) == null) continue;
@@ -272,7 +345,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         }
 
         // ==========================================
-        // 👆 三大卡片独立开启属性响应方法 (替代原本的单个点击方法)
+        // 👆 三大卡片独立开启属性响应方法
         // ==========================================
         private void BtnAddSpatial_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbSpatialProps);
         private void BtnAddAppearance_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbAppearanceProps);
@@ -286,6 +359,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 object defaultVal = uType == typeof(string) ? "" : (uType == typeof(UnitFloat) ? new UnitFloat { Value = 0, Unit = ReferenceUnit.World } : Activator.CreateInstance(uType));
+
+                // ✨ 追踪器启动：打上玩家手动激活的印记，这样它即使是 0 也不会被当做幽灵屏蔽啦！
+                _manuallyActivatedProps.Add(prop.Name);
+
                 prop.SetValue(_currentState, defaultVal);
                 LoadState(_currentState, TxtFrameTitle.Text.Replace("当前选中 ➡️ ", ""), _rootState, _isRoot);
             }
@@ -295,7 +372,77 @@ namespace Naziki_Editor.Views.PropertyEditor
 
 
 
+        // ==========================================
+        // ✨ 模板下拉框逻辑
+        // ==========================================
+        private void PopulateTemplateDropdown()
+        {
+            CmbTemplate.SelectionChanged -= CmbTemplate_SelectionChanged; // 关掉监听防死循环
+            CmbTemplate.Items.Clear();
+            CmbTemplate.Items.Add(new ComboBoxItem { Content = "🚫 不使用模板", Tag = null });
 
+            string currentTemplate = _currentState.GetType().GetProperty("Template")?.GetValue(_currentState) as string;
+            int selectedIndex = 0;
+
+            if (_globalTemplates != null)
+            {
+                int index = 1;
+                foreach (var kvp in _globalTemplates)
+                {
+                    CmbTemplate.Items.Add(new ComboBoxItem { Content = $"✨ {kvp.Key}", Tag = kvp.Key });
+                    if (kvp.Key == currentTemplate) selectedIndex = index;
+                    index++;
+                }
+            }
+            CmbTemplate.SelectedIndex = selectedIndex;
+            CmbTemplate.SelectionChanged += CmbTemplate_SelectionChanged;
+        }
+
+        private void CmbTemplate_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CmbTemplate.SelectedItem is ComboBoxItem item)
+            {
+                string newTemplate = item.Tag as string;
+                var prop = _currentState.GetType().GetProperty("Template");
+                if (prop != null)
+                {
+                    prop.SetValue(_currentState, newTemplate);
+                    LoadState(_currentState, _currentTitle, _rootState, _isRoot); // 立刻重载UI以上锁！
+                }
+            }
+        }
+
+        // ==========================================
+        // 🔮 透视雷达：属性是否被模板接管（包含绝对豁免）
+        // ==========================================
+        private bool IsLockedByTemplate(string propName, out object templateValue)
+        {
+            templateValue = null;
+
+            // 🛡️ 绝对豁免特权：时空参数永远归属当前帧本体！
+            if (propName == "Time" || propName == "RelativeTime" || propName == "AddTime" || propName == "Template")
+                return false;
+
+            if (_currentState == null || _globalTemplates == null) return false;
+
+            string currentTemplateName = _currentState.GetType().GetProperty("Template")?.GetValue(_currentState) as string;
+            if (string.IsNullOrEmpty(currentTemplateName) || !_globalTemplates.ContainsKey(currentTemplateName))
+                return false;
+
+            var templateObj = _globalTemplates[currentTemplateName];
+            var targetProp = templateObj.GetType().GetProperty(propName);
+
+            if (targetProp != null)
+            {
+                object val = targetProp.GetValue(templateObj);
+                if (val != null)
+                {
+                    templateValue = val;
+                    return true;
+                }
+            }
+            return false;
+        }
 
 
 

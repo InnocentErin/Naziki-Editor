@@ -94,8 +94,11 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <CheckBox x:Name="SelectAllChk" Grid.Column="0" Content="当前全选" FontSize="11" VerticalAlignment="Center"/>
-                <Button x:Name="ImportEventBtn" Grid.Column="1" Content="🚀 一键导入事件" FontSize="11" HorizontalAlignment="Right" Padding="10,2" Background="LightGreen"/>
+                <CheckBox x:Name="SelectAllChk" Grid.Column="0" Content="当前全选" 
+                          FontSize="11" VerticalAlignment="Center" Click="SelectAllChk_Click"/>
+                <Button x:Name="ImportEventBtn" Grid.Column="1" Content="🚀 一键导入事件" 
+                        FontSize="11" HorizontalAlignment="Right" Padding="10,2" Background="LightGreen" 
+                        Click="ImportEventBtn_Click"/>
             </Grid>
         </Grid>
     </Border>

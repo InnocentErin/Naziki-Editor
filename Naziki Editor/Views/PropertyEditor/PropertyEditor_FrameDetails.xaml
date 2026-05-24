@@ -9,6 +9,13 @@
 
                 <Border Background="{DynamicResource MenuBgColor}" CornerRadius="5" Padding="10" Margin="0,0,0,15">
                     <StackPanel>
+                        <TextBlock Text="✨ 挂载模板印章 (Template)" FontWeight="Bold" Margin="0,0,0,5" Foreground="{DynamicResource SecTextColor}"/>
+                        <ComboBox x:Name="CmbTemplate" Padding="5" SelectionChanged="CmbTemplate_SelectionChanged"/>
+                    </StackPanel>
+                </Border>
+                
+                <Border Background="{DynamicResource MenuBgColor}" CornerRadius="5" Padding="10" Margin="0,0,0,15">
+                    <StackPanel>
                         <TextBlock Text="⏱️ 基础时间轴轴心参数" FontWeight="Bold" Margin="0,0,0,10" Foreground="{DynamicResource SecTextColor}"/>
                         <Grid Margin="0,0,0,8" x:Name="RowTime">
                             <Grid.ColumnDefinitions>

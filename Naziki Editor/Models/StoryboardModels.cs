@@ -21,7 +21,20 @@ namespace Naziki_Editor.Models
         public Dictionary<string, StoryboardTemplate> templates { get; set; } = new Dictionary<string, StoryboardTemplate>();
     }
 
-    public class StoryboardTemplate : StoryboardRoot { } // 模板内部其实就是个小故事板
+    // ==========================================
+    // 🌟 模板本质上是一个包含子帧和基础属性的超级状态印章！
+    // ==========================================
+    [Serializable]
+    public class StoryboardTemplate : StageObjectState // 继承自基础状态，自带 Time, Easing, Opacity 等所有状态属性
+    {
+        // 补充模板特有的混合根属性（这些属性既可以用来控制场景，也可以控制相机）
+        public bool? Perspective { get; set; }
+        public float? Fov { get; set; }
+
+        // 模板的子关键帧数组（完美映射 JSON 里的 "states" 数组）
+        [Newtonsoft.Json.JsonProperty("states")]
+        public System.Collections.Generic.List<StoryboardTemplate> States { get; set; } = new System.Collections.Generic.List<StoryboardTemplate>();
+    }
 
     // ==========================================
     // 🌟 二、 官方枚举字典 (Enums)
