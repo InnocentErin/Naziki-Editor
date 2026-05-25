@@ -40,5 +40,24 @@
             </Button>
         </Grid>
 
+        <Grid x:Name="RowTemplateType" Margin="0,0,0,10" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions> 
+            <TextBlock Text="模板门派分类:" VerticalAlignment="Center" FontWeight="Bold" Foreground="{DynamicResource HighlightBorderColor}"/>
+            <ComboBox x:Name="CmbTemplateType" Grid.Column="1" Padding="5" SelectionChanged="CmbTemplateType_SelectionChanged">
+                <ComboBoxItem Content="🌍 混沌通用 (Generic)" Tag="Generic"/>
+                <ComboBoxItem Content="📦 场景对象 (StageObject)" Tag="StageObject"/>
+                <ComboBoxItem Content="📝 文本专用 (Text)" Tag="Text"/>
+                <ComboBoxItem Content="🖼️ 精灵专用 (Sprite)" Tag="Sprite"/>
+                <ComboBoxItem Content="🎥 视频专用 (Video)" Tag="Video"/>
+                <ComboBoxItem Content="〰️ 线条专用 (Line)" Tag="Line"/>
+                <ComboBoxItem Content="🎛️ 场景控制/滤镜 (Controller)" Tag="Controller"/>
+                <ComboBoxItem Content="🎵 音符控制器 (NoteController)" Tag="NoteController"/>
+            </ComboBox>
+        </Grid>
+        
+        
     </StackPanel>
 </UserControl>

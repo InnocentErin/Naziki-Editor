@@ -97,12 +97,49 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             if (_stateType == null || _keyframesList == null) return;
 
-            // 魔法般自动生产对应卡槽的全新空白帧！
-            var newFrame = Activator.CreateInstance(_stateType);
-            _keyframesList.Add(newFrame);
+            object referenceState = null;
+            object newFrame = null;
 
+            // 1. 🧬 寻找“基因供体” (Reference State)
+            if (_keyframesList.Count > 0)
+            {
+                // 如果已经有关键帧了，就继承上一个关键帧的基因
+                referenceState = _keyframesList[_keyframesList.Count - 1];
+            }
+            else
+            {
+                // 如果这是第一个关键帧，就继承初始属性 (BaseState) 的基因
+                referenceState = _templateData != null ? (object)_templateData.BaseState : _editingObject.GetBaseState();
+            }
+
+            // 2. 🪄 施展克隆法术
+            if (referenceState != null)
+            {
+                // 利用咱们配置好的大管家进行完美深拷贝！
+                string jsonClone = Core.StoryboardSerializer.ToJson(referenceState);
+                newFrame = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonClone, _stateType, Core.StoryboardSerializer.GetSettings());
+
+                // 🚨 【小艾的终极防呆】：继承属性可以，但绝对不能继承“时间”！
+                // 如果时间和上一帧完全一样，就会触发咱们之前写的 StoryboardValidator 时空悖论报错！
+                if (newFrame is ObjectState os)
+                {
+                    os.Time = null;
+                    os.RelativeTime = null;
+                    os.AddTime = null;
+                    // （可选）如果你希望新帧的缓动曲线默认重置为 linear，也可以加一句 os.Easing = null;
+                }
+            }
+            else
+            {
+                // 万一遇到宇宙奇点（啥也没有），才使用女娲造人模式（白板）
+                newFrame = Activator.CreateInstance(_stateType);
+            }
+
+            // 3. 将新生命加入时间轨道
+            _keyframesList.Add(newFrame);
             RefreshList();
 
+            // 4. 自动选中这个刚刚诞生的新关键帧
             Dispatcher.BeginInvoke(new Action(() => {
                 ListFrames.SelectedIndex = ListFrames.Items.Count - 1;
             }), System.Windows.Threading.DispatcherPriority.Loaded);

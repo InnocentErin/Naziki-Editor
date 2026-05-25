@@ -10,6 +10,25 @@ using System.Linq;
 namespace Naziki_Editor.Core
 {
     // ==========================================
+    // 🔮 故事板解析器快捷命名空间代理（小艾帮你补办的通行证！）
+    // ==========================================
+    public static class StoryboardParser
+    {
+        /// <summary>
+        /// 全局高雅自增发证官：自动把无名氏 ID 规范化为 sprite001 等格式
+        /// </summary>
+        public static void StandardizeStoryboardIds(StoryboardRoot root)
+        {
+            // 转发给真正的转换器执行
+            StoryboardEntityConverter.StandardizeStoryboardIds(root);
+        }
+    }
+
+
+
+
+
+    // ==========================================
     // 🌟 全局 JSON 输出大管家 (供预览和保存使用)
     // ==========================================
     public static class StoryboardSerializer

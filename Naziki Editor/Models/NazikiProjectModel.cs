@@ -25,5 +25,10 @@ namespace Naziki_Editor.Models
         // 4. 时空记忆
         public double LastTimelinePosition { get; set; } = 0;
         public double CanvasZoomLevel { get; set; } = 1.0;
+
+
+        // 在 NazikiProjectModel 类的内部，追加这个属性：
+        // 5. 模板分类账本 (TemplateName -> TemplateType)
+        public System.Collections.Generic.Dictionary<string, TemplateType> TemplateTypes { get; set; } = new System.Collections.Generic.Dictionary<string, TemplateType>();
     }
 }

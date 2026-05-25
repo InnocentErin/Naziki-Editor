@@ -75,5 +75,129 @@ namespace Naziki_Editor.Core
                 }
             }
         }
+
+
+        // ==========================================\
+        // 🔮 智能法术 1：根据属性残留，推测模板的真实身份
+        // ==========================================\
+        public static TemplateType InferTemplateType(C2Template template)
+        {
+            var states = GetAllStatesFromTemplate(template);
+            bool hasText = false, hasPath = false, hasPos = false;
+            bool hasControllerProp = false, hasNoteCtrlProp = false;
+            bool hasSpatialProp = false;
+
+            foreach (var state in states)
+            {
+                // 利用反射嗅探非空属性
+                var props = state.GetType().GetProperties();
+                foreach (var prop in props)
+                {
+                    if (prop.GetValue(state) == null) continue;
+
+                    string n = prop.Name.ToLower();
+                    if (n == "text" || n == "textcontent" || n == "font_weight") hasText = true;
+                    else if (n == "path") hasPath = true;
+                    else if (n == "pos") hasPos = true;
+                    else if (n == "fov" || n == "ui_opacity" || n.Contains("bloom") || n.Contains("vignette")) hasControllerProp = true;
+                    else if (n.Contains("override_") || n == "hitbox_multiplier") hasNoteCtrlProp = true;
+                    else if (n == "x" || n == "y" || n == "scale") hasSpatialProp = true;
+                }
+            }
+
+            // 按照特征的稀有度进行身份宣判！
+            if (hasControllerProp) return TemplateType.Controller;
+            if (hasNoteCtrlProp) return TemplateType.NoteController;
+            if (hasText) return TemplateType.Text;
+            if (hasPos) return TemplateType.Line;
+            if (hasPath) return TemplateType.Sprite; // 视频和精灵特征太像，默认给精灵，指挥官可手动改
+            if (hasSpatialProp) return TemplateType.StageObject;
+
+            return TemplateType.Generic; // 实在认不出来，归入混沌！
+        }
+
+        // ==========================================\
+        // 🛡️ 智能法术 2：为 8 大门派建立专属的属性白名单！
+        // ==========================================\
+        public static HashSet<string> GetAllowedPropertiesForType(TemplateType type)
+        {
+            var baseProps = new[] { "Time", "Easing", "AddTime", "RelativeTime", "Destroy" };
+
+            // 通用的空间与外观（根据你的统计）
+            var spatialProps = new[] { "X", "Y", "Z", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height", "W", "H", "PivotX", "PivotY" };
+            var appearanceProps = new[] { "Opacity", "Layer", "Order", "Color", "PreserveAspect" };
+
+            var allowed = new HashSet<string>(baseProps);
+
+            switch (type)
+            {
+                case TemplateType.Generic:
+                    return null; // 混沌模式放行一切
+
+                case TemplateType.StageObject:
+                    allowed.UnionWith(spatialProps);
+                    allowed.UnionWith(appearanceProps);
+                    break;
+
+                case TemplateType.Text:
+                    allowed.UnionWith(spatialProps);
+                    allowed.UnionWith(appearanceProps);
+                    // 追加文字专属
+                    allowed.UnionWith(new[] { "TextContent", "Size", "Align", "LetterSpacing", "LineSpacing", "Font", "FontStyle" });
+                    break;
+
+                case TemplateType.Sprite:
+                    allowed.UnionWith(spatialProps);
+                    allowed.UnionWith(appearanceProps);
+                    allowed.UnionWith(new[] { "Path" }); // 精灵专属
+                    break;
+
+                case TemplateType.Video:
+                    allowed.UnionWith(spatialProps);
+                    allowed.UnionWith(appearanceProps);
+                    allowed.UnionWith(new[] { "Path", "Loop", "Speed" }); // 视频专属
+                    break;
+
+                case TemplateType.Line:
+                    allowed.UnionWith(baseProps);
+                    // 线条特殊空间坐标体系
+                    allowed.UnionWith(new[] { "Width", "X", "Y", "Z", "RotX", "RotY", "RotZ", "X1", "X2", "Y1", "Y2", "Opacity", "Layer", "Order", "Color" });
+                    break;
+
+                case TemplateType.Controller:
+                    // 彻底补全控制器的三大体系
+                    allowed.UnionWith(new[] {
+                        "X", "Y", "Z", "RotX", "RotY", "RotZ", // 核心相机
+                        "Perspective", "Fov",
+                        "StoryboardOpacity", "UiOpacity", "ScanlineOpacity", "BackgroundDim", "NoteOpacityMultiplier", // UI控制
+                        "ScanlineColor", "NoteRingColor", "OverrideScanlinePos", "ScanlinePos","NoteFillColors",
+                        // 滤镜阵列
+                        "Chromatical", "ChromaticalFade", "ChromaticalIntensity", "ChromaticalSpeed",
+                        "Bloom", "BloomIntensity", "RadialBlur", "RadialBlurIntensity",
+                        "ColorFilter", "ColorFilterColor", "GrayScale", "GrayScaleIntensity",
+                        "Noise", "NoiseIntensity", "Sepia", "SepiaIntensity", "Dream", "DreamIntensity"
+                    });
+                    break;
+
+                case TemplateType.NoteController:
+                    allowed.UnionWith(new[] {
+                        "OverrideX", "X", "OverrideY", "Y", "OverrideZ", "Z",
+                        "OverrideRotX", "RotX", "OverrideRotY", "RotY", "OverrideRotZ", "RotZ",
+                        "NoteTarget", "NoteSizeMultiplier", "HitboxMultiplier"
+                    });
+                    break;
+            }
+            return allowed;
+        }
+
+        // ==========================================\
+        // 🔍 智能法术 3：判断某个属性是否允许出现在当前模板中
+        // ==========================================\
+        public static bool IsPropertyAllowed(string propertyName, TemplateType type)
+        {
+            var allowedSet = GetAllowedPropertiesForType(type);
+            if (allowedSet == null) return true; // Generic 放行所有
+            return allowedSet.Contains(propertyName);
+        }
     }
 }

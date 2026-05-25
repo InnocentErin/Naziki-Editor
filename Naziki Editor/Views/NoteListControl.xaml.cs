@@ -15,8 +15,8 @@ namespace Naziki_Editor.Views
 {
     public partial class NoteListControl : UserControl
     {
-        // 🌟 重要事件：当用户点击“导出事件”按钮时，把打包好的 TreeViewItem（包含选中音符信息）丢出去，让主窗口接收并放到“音符抽屉”里！
-        public event Action<TreeViewItem> OnNoteGroupExported;
+        // 🌟 换成小艾的卡哇伊纯数据流专线：
+        public event Action<List<C2Note>> OnNotesImportRequested;
         // 🌟 重要缓存：当前谱面里被选中的音符集合（通过勾选框维护），用来批量导出事件时打包数据！
         public HashSet<C2Note> _selectedNotes = new HashSet<C2Note>();
         // 🌟 重要缓存：谱面里最后一个音符的时间（秒），用来限制搜索区间的最大值，避免用户输入过大导致引擎闪退！
@@ -241,43 +241,27 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // ==========================================
-        // 🌟 谱面列表里的导入事件按钮：把购物车里的音符打包成一个新的“音符控制器”，然后丢到左侧的“音符抽屉”里！
-        // ==========================================
+        // ==========================================================
+        // 🚀 一键导入事件：只传神圣的原始数据，拒绝制造垃圾 UI 壳子！
+        // ==========================================================
         private void ImportEventBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedNotes.Count == 0)
             {
-                MessageBox.Show("还没有选择音符哦！", "提示");
+                MessageBox.Show("还没有选择音符哦！指挥官快去勾选几个吧~", "提示");
                 return;
             }
 
-            TreeViewItem groupItem = new TreeViewItem();
-            string groupName = $"🎵 音符控制组_{DateTime.Now:HHmmss} ({_selectedNotes.Count}个音符)";
-            groupItem.Header = groupName;
-            groupItem.Foreground = Brushes.DarkSlateBlue;
-            groupItem.FontWeight = FontWeights.Bold;
+            // 🎯 数据提纯：按 Tick 时间线排好序，直接打包发射出去！
+            var sortedNotes = _selectedNotes.OrderBy(n => n.tick).ToList();
 
-            TreeViewItem effectNode = new TreeViewItem() { Header = "[+] 添加动画特效...", Foreground = Brushes.Gray };
-            groupItem.Items.Add(effectNode);
+            // 📡 呼叫主窗口基站接收数据包
+            OnNotesImportRequested?.Invoke(sortedNotes);
 
-            TreeViewItem targetFolder = new TreeViewItem() { Header = "▷ 绑定的音符列表", IsExpanded = false };
-
-            foreach (var note in _selectedNotes.OrderBy(n => n.tick))
-            {
-                double time = Context.TimeEngine.TickToSeconds(note.tick);
-                string noteInfo = $"ID: {note.id} | 时间: {time:0.000}s | X: {note.x}";
-                targetFolder.Items.Add(new TreeViewItem() { Header = noteInfo });
-            }
-
-            groupItem.Items.Add(targetFolder);
-            // 触发事件，把做好的 groupItem 丢出去！
-            OnNoteGroupExported?.Invoke(groupItem);
-
-            MessageBox.Show($"成功将 {_selectedNotes.Count} 个音符打包并传送到“音符抽屉”！", "传送成功");
+            MessageBox.Show($"成功将 {sortedNotes.Count} 个音符打包并传送至故事板核心账本！(๑•̀ㅂ•́)و✧", "传送成功");
         }
 
-        
+
 
     }
 }

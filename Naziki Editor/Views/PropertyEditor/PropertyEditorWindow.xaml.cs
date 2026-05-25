@@ -27,8 +27,8 @@ namespace Naziki_Editor.Views.PropertyEditor
             _originalId = targetObject.Id ?? "";
 
             // 1. 完美的克隆魔法（不带自定义转换器，纯净保留内存中的 BaseState 和 Keyframes）
-            string jsonClone = JsonConvert.SerializeObject(targetObject);
-            _editingObject = (IStoryboardEntity)JsonConvert.DeserializeObject(jsonClone, targetObject.GetType());
+            string jsonClone = Core.StoryboardSerializer.ToJson(targetObject);
+            _editingObject = (IStoryboardEntity)JsonConvert.DeserializeObject(jsonClone, targetObject.GetType(), Core.StoryboardSerializer.GetSettings());
 
             // 2. 将数据分发给各个子模块！
             ModIdentity.LoadData(_editingObject, _context);
@@ -36,7 +36,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             // ⚡ 强绑定专线：只要列表选了帧，就塞给详情编辑面板
             ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
-                ModFrameDetails.LoadState(state, title, rootState, isRoot);
+                ModFrameDetails.LoadState(state, title, rootState, isRoot, _context);
 
             BtnCancel.Click += (s, e) => { this.DialogResult = false; };
             BtnSave.Click += BtnSave_Click;
@@ -50,21 +50,47 @@ namespace Naziki_Editor.Views.PropertyEditor
             _isTemplateMode = true;
             _templateName = templateName;
 
-            // 1. 完美的克隆魔法：确保用户点取消时绝对不污染原件
-            string jsonClone = JsonConvert.SerializeObject(targetTemplate);
-            _editingTemplate = JsonConvert.DeserializeObject<C2Template>(jsonClone);
+            // ==========================================================
+            // 🧵【完美的完全体缝合代码】（既消灭了Bug，又接通了新功能！）
+            // ==========================================================
 
-            // 2. 改造身份面板：模板不需要“跟随目标(Parent)”，隐藏无用控件
-            ModIdentity.TxtObjectId.Text = templateName;
+            // 1. 完美的克隆魔法：确保用户点取消时绝对不污染原件
+            string jsonClone = Core.StoryboardSerializer.ToJson(targetTemplate);
+            _editingTemplate = JsonConvert.DeserializeObject<C2Template>(jsonClone, Core.StoryboardSerializer.GetSettings());
+
+            // 🌟【新线 A】：从项目账本里读取类型，如果新模板没记录，就启动雷达智能推断！
+            TemplateType tType = TemplateType.Generic;
+            if (_context.ProjectData.TemplateTypes != null && _context.ProjectData.TemplateTypes.ContainsKey(templateName))
+                tType = _context.ProjectData.TemplateTypes[templateName];
+            else
+                tType = Core.TemplateManager.InferTemplateType(_editingTemplate);
+
+            // 2. 改造身份面板：把原来的 TxtObjectId.Text 升级为调用我们的新初始化方法！
+            ModIdentity.LoadTemplateData(templateName, tType);
+
+            // （保留你原本的隐藏 Parent 控件的防呆逻辑，非常棒！）
             ModIdentity.TxtParentId.Visibility = Visibility.Collapsed;
             if (ModIdentity.TxtParentId.Parent is Grid parentGrid) parentGrid.Visibility = Visibility.Collapsed;
+
+            // 🌟【新线 B】：把推断出来的门派类型喂给右侧详情面板，开启属性白名单拦截！
+            ModFrameDetails.SetTemplateTypeLimit(tType);
+
+            // 🌟【新线 C】：死死栓住身份面板的下拉菜单！只要用户切换门派，立刻同步记账并刷新右侧面板！
+            ModIdentity.OnTemplateTypeChanged += (newType) =>
+            {
+                if (_context.ProjectData.TemplateTypes == null)
+                    _context.ProjectData.TemplateTypes = new System.Collections.Generic.Dictionary<string, TemplateType>();
+
+                _context.ProjectData.TemplateTypes[templateName] = newType; // 永久记入小本本
+                ModFrameDetails.SetTemplateTypeLimit(newType); // 强行刷新右侧
+            };
 
             // 3. 核心解封：把单帧详情面板喂给模板全局字典，开启上锁雷达
             ModFrameDetails.InitTemplates(_context.Storyboard.templates);
 
             // 4. 时空对接：让关键帧列表模块以“模板特化模式”加载
             ModFrameList.OnFrameSelected += (state, title, rootState, isRoot) =>
-                ModFrameDetails.LoadState(state, title, rootState, isRoot);
+                ModFrameDetails.LoadState(state, title, rootState, isRoot, _context);
 
             // 🚀 激活列表：专门传入模板和状态数组
             ModFrameList.LoadTemplateData(_editingTemplate, _context);

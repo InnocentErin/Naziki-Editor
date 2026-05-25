@@ -1,19 +1,63 @@
-﻿using Naziki_Editor.Models;
+﻿using Naziki_Editor.Core;
+using Naziki_Editor.Models;
+using Naziki_Editor.State;
 using System;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
-using Naziki_Editor.Core;
+using static Naziki_Editor.Views.PropertyEditor.TimeBindingConverter;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
+
+
+
+
+
     // ==========================================
     // ✨ 专属翻译官：防止 Time 数组或空值转义成乱码
     // ==========================================
     public class TimeBindingConverter : IValueConverter
     {
+        // ==========================================
+        // ✨ 专属翻译官 2 号：完美解析 System.Object 和 复杂数组！
+        // ==========================================
+        public class UniversalObjectConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                if (value == null) return "";
+                // 如果是普通的数字或纯字符串，直接打印
+                if (value is string || value is int || value is float || value is double) return value.ToString();
+
+                // 🎯【破解 System.Object】：如果是复杂的 JSON 选择器或 Pos 数组，把它序列化成漂亮的 JSON 字符串展示！
+                try { return Newtonsoft.Json.JsonConvert.SerializeObject(value, Newtonsoft.Json.Formatting.None); }
+                catch { return value.ToString(); }
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                string s = value?.ToString()?.Trim() ?? "";
+                if (string.IsNullOrEmpty(s)) return null;
+
+                // 如果用户手打了 JSON 括号，智能反序列化为对象！
+                if (s.StartsWith("{") || s.StartsWith("["))
+                {
+                    try { return Newtonsoft.Json.JsonConvert.DeserializeObject(s); } catch { return s; }
+                }
+                // 如果手打的是纯数字，智能转化回 int
+                if (int.TryParse(s, out int iVal)) return iVal;
+
+                // 兜底：纯字符串（例如 "$note"）
+                return s;
+            }
+        }
+
+
+
+
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             if (value is System.Collections.IList list)
@@ -53,8 +97,11 @@ namespace Naziki_Editor.Views.PropertyEditor
         private object _rootState;
         private bool _isRoot;
 
+        private Naziki_Editor.State.ProjectDataContext _context;
+
         private System.Collections.Generic.HashSet<string> _manuallyActivatedProps = new System.Collections.Generic.HashSet<string>();
         private System.Collections.Generic.Dictionary<string, C2Template> _globalTemplates;
+        private HashSet<string> _invalidProperties = new HashSet<string>();
 
         public void InitTemplates(System.Collections.Generic.Dictionary<string, C2Template> templates)
         {
@@ -69,9 +116,9 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 📥 终极修正入口：精准对接新世界时空
         // ==========================================
-        public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot)
+        public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot, ProjectDataContext context)
         {
-
+            _context = context;
             _currentState = stateReference;
             _rootState = rootState;
             _isRoot = isRoot;
@@ -95,17 +142,61 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelControllerCards.Visibility = isController ? Visibility.Visible : Visibility.Collapsed;
 
             // ✨ 核心强打通：绑定常驻时间轴参数
-            BindStaticProperty(TxtTime, "Time");
+            
             BindStaticProperty(TxtEasing, "Easing");
 
-            PanelStateTimeOptions.Visibility = _isRoot ? Visibility.Collapsed : Visibility.Visible;
-            if (!_isRoot)
+            // 1. 让原先写死在 XAML 里的旧输入框全部隐身退场，防止双向数据打架！
+            TxtTime.Visibility = Visibility.Collapsed;
+            PanelStateTimeOptions.Visibility = Visibility.Collapsed;
+
+            // 2. 拔掉上一次残留的老控件，防止切换帧时在界面上无限堆叠套娃
+            UIElement expiredCtrl = null;
+            foreach (UIElement child in RowTime.Children)
             {
-                BindStaticProperty(TxtAddTime, "AddTime");
-                BindStaticProperty(TxtRelativeTime, "RelativeTime");
+                if (child is StoryboardTimeControl) { expiredCtrl = child; break; }
             }
+            if (expiredCtrl != null) RowTime.Children.Remove(expiredCtrl);
+
+            // 3. 动态降临最新科技：完全体时间锚点控制中心！
+            // 传递当前帧 _currentState、是否为首帧 _isRoot、以及全局大管家 _context！
+            var timeCenterCtrl = new StoryboardTimeControl(_currentState, _isRoot, _context);
+
+            // 塞进原有的 RowTime 网格的右侧大阵营（Grid.Column=1）！
+            Grid.SetColumn(timeCenterCtrl, 1);
+            RowTime.Children.Add(timeCenterCtrl);
 
             BuildDynamicPanel();
+
+            // 4. 🧲 基因属性大挪移：寻找时间轴容器，清理历史残留
+            StackPanel timePanel = RowTime.Parent as StackPanel;
+            if (timePanel != null)
+            {
+                UIElement oldFixedContainer = null;
+                foreach (UIElement child in timePanel.Children)
+                {
+                    if (child is StackPanel sp && sp.Name == "PanelRootFixedProps") { oldFixedContainer = child; break; }
+                }
+                if (oldFixedContainer != null) timePanel.Children.Remove(oldFixedContainer);
+
+                // 📌 核心逻辑：只有在初始状态 (_isRoot == true) 时，才把这几个固定 DNA 属性展示出来！
+                if (_isRoot)
+                {
+                    StackPanel fixedPropsContainer = new StackPanel { Name = "PanelRootFixedProps", Margin = new Thickness(0, 10, 0, 0) };
+
+                    PropertyInfo[] props = _currentState.GetType().GetProperties();
+                    foreach (var prop in props)
+                    {
+                        // 筛选需要置顶的初始固定属性
+                        if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
+                        {
+                            var row = CreateFixedPropertyRow(prop);
+                            fixedPropsContainer.Children.Add(row);
+                        }
+                    }
+                    timePanel.Children.Add(fixedPropsContainer);
+                }
+            }
+
         }
 
         private void BindStaticProperty(TextBox txt, string propName)
@@ -149,7 +240,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     return;
                 }
                 prop.SetValue(_currentState, null);
-                LoadState(_currentState, _currentTitle, _rootState, _isRoot);
+                LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
             };
             Grid.SetColumn(btnDel, 2);
             grid.Children.Add(btnDel);
@@ -166,11 +257,28 @@ namespace Naziki_Editor.Views.PropertyEditor
             Type pType = prop.PropertyType;
             Type uType = Nullable.GetUnderlyingType(pType) ?? pType;
 
+            // 1. ⚖️ 询问《参数限制大管家》，获取当前属性的至高展现形态
+            var constraint = Core.PropertyConstraintManager.GetConstraint(prop.Name);
+
+            // 🔒 2. 模板死锁机制
             if (isLocked)
             {
                 return new TextBox { Text = templateValue?.ToString() ?? "", Padding = new Thickness(5), IsEnabled = false, Foreground = Brushes.Gray };
             }
 
+            // 🎚️ 3. 【核心进化一】：如果是滑块形态属性 (如 Opacity)，一键降临离散滑块组件！
+            if (constraint.UIType == Core.PropertyUIType.Slider)
+            {
+                return new BoundedSliderControl(prop, _currentState, AttachValidationProbe);
+            }
+
+            // 🎨 4. 【核心进化二】：如果是单体选色器属性 (如 ScanlineColor)，一键召唤单体选色框！
+            if (constraint.UIType == Core.PropertyUIType.ColorPicker)
+            {
+                return new SingleColorPickerControl(prop, _currentState, AttachValidationProbe);
+            }
+
+            // 🔘 5. 常规布尔值开关
             if (uType == typeof(bool))
             {
                 CheckBox chk = new CheckBox { VerticalAlignment = VerticalAlignment.Center };
@@ -178,6 +286,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 chk.SetBinding(CheckBox.IsCheckedProperty, b);
                 return chk;
             }
+            // 📏 6. 坐标参考系复合框 (UnitFloat)
             else if (uType == typeof(UnitFloat))
             {
                 Grid g = new Grid();
@@ -191,20 +300,25 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                 TextBox txt = new TextBox { Padding = new Thickness(5) };
                 txt.SetBinding(TextBox.TextProperty, new Binding(prop.Name + ".Value") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+
+                AttachValidationProbe(txt, prop.Name); // 挂载探头
+
                 Grid.SetColumn(txt, 1); g.Children.Add(txt);
                 return g;
             }
+            // 🌈 7. 【核心进化三】：如果是12色列表阵列 (List<string>)，一键铺开 2x6 矩阵调色盘！
             else if (uType == typeof(System.Collections.Generic.List<string>))
             {
-                // 12色特殊阵列定制 TextBox
-                TextBox txt = new TextBox { Padding = new Thickness(5) };
-                txt.SetBinding(TextBox.TextProperty, new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, Converter = new TimeBindingConverter(), UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
-                return txt;
+                return new TwelveColorPickerControl(prop, _currentState);
             }
+            // 📝 8. 其余普通的纯文本/数值属性 (兜底保留原生双向 Binding)
             else
             {
                 TextBox txt = new TextBox { Padding = new Thickness(5) };
                 txt.SetBinding(TextBox.TextProperty, new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+
+                AttachValidationProbe(txt, prop.Name); // 挂载探头
+
                 return txt;
             }
         }
@@ -228,6 +342,18 @@ namespace Naziki_Editor.Views.PropertyEditor
             return 2;
         }
 
+        // 1. 在类的顶部加入记录当前模板类型的变量
+        private TemplateType _currentTemplateType = TemplateType.Generic;
+
+        // 2. 增加接收类型变更的方法
+        public void SetTemplateTypeLimit(TemplateType type)
+        {
+            _currentTemplateType = type;
+            if (_currentState != null)
+            {
+                BuildDynamicPanel(); // 门派变了，立刻重新粉刷右侧的界面！
+            }
+        }
         private void BuildDynamicPanel()
         {
             PanelSpatialContainer.Children.Clear(); CmbSpatialProps.Items.Clear();
@@ -242,8 +368,19 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "AddTime" || prop.Name == "RelativeTime") continue;
                 if (prop.Name == "Id" || prop.Name == "ParentId" || prop.Name == "TargetId" || prop.Name == "States" || prop.Name == "Keyframes") continue;
-
+                // 只要是这几个不可做动画的固定 DNA 属性，全宇宙无条件隐身！绝对不进动态编辑面板！
+                if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos" || prop.Name == "Template") continue;
+                // 
                 if (IsStaticDnaProperty(prop.Name) && !_isRoot) continue;
+
+                // 🌟 【小艾的终极防线】：如果处于模板编辑模式，且该属性不属于此门派，直接蒸发！
+                if (_rootState != null && _rootState.GetType().Name == "TemplateState") // 只要是模板类
+                {
+                    if (!Core.TemplateManager.IsPropertyAllowed(prop.Name, _currentTemplateType))
+                    {
+                        continue; // 不允许显示的属性，看都不给看，直接跳过！
+                    }
+                }
 
                 object val = prop.GetValue(_currentState);
                 bool isActive = (val != null);
@@ -254,25 +391,59 @@ namespace Naziki_Editor.Views.PropertyEditor
                     if (!_manuallyActivatedProps.Contains(prop.Name)) isActive = false;
                 }
 
-                int cat = GetPropertyCategory(prop.Name);
+                // ==========================================
+                // 🌟 小艾的完美分拣法术：确保没有任何一个属性流浪！
+                // ==========================================
+                StackPanel targetPanel = null;
+                ComboBox targetComboBox = null;
+
+                string n = prop.Name;
+
+                // 1. 📏 空间与尺寸 (Spatial)
+                if (new[] { "X", "Y", "Z", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height", "W", "H", "PivotX", "PivotY", "X1", "X2", "Y1", "Y2", "OverrideX", "OverrideY", "OverrideZ", "OverrideRotX", "OverrideRotY", "OverrideRotZ" }.Contains(n))
+                {
+                    targetPanel = PanelSpatialContainer;
+                    targetComboBox = CmbSpatialProps;
+                }
+                // 2. 🎨 外观与内容 (Appearance)
+                else if (new[] { "Opacity", "Color", "Layer", "Order", "Path", "TextContent", "Size", "Align", "LetterSpacing", "LineSpacing", "Font", "FontStyle", "PreserveAspect", "Loop", "Speed", "RingColor", "FillColor", "OverrideRingColor", "OverrideFillColor", "OpacityMultiplier", "SizeMultiplier", "NoteSizeMultiplier", "NoteTarget", "Destroy", "Note" }.Contains(n))
+                {
+                    targetPanel = PanelAppearanceContainer;
+                    targetComboBox = CmbAppearanceProps;
+                }
+                // 3. 🎛️ 游戏UI与控制 (UI Control)
+                else if (new[] { "StoryboardOpacity", "UiOpacity", "BackgroundDim", "ScanlineOpacity", "NoteOpacityMultiplier", "ScanlineColor", "NoteRingColor", "OverrideScanlinePos", "ScanlinePos", "HitboxMultiplier", "HoldDirection", "Style" ,"NoteFillColors" }.Contains(n))
+                {
+                    targetPanel = PanelUiContainer;
+                    targetComboBox = CmbUiProps;
+                }
+                // 4. 🎥 相机 (Camera)
+                else if (new[] { "Perspective", "Fov" }.Contains(n))
+                {
+                    targetPanel = PanelCameraContainer;
+                    targetComboBox = CmbCameraProps;
+                }
+                // 5. ✨ 屏幕特效 (Effects) - 利用 Contains 模糊抓取所有后缀为 Intensity, Speed 等的滤镜属性
+                else if (n.Contains("Bloom") || n.Contains("Vignette") || n.Contains("Glitch") || n.Contains("Chromatic") || n.Contains("Blur") || n.Contains("Dream") || n.Contains("Noise") || n.Contains("Arcade") || n.Contains("Tape") || n.Contains("Fisheye") || n.Contains("Shockwave") || n.Contains("Focus") || n.Contains("Sepia") || n.Contains("GrayScale") || n.Contains("ColorFilter") || n.Contains("Artifact"))
+                {
+                    targetPanel = PanelEffectsContainer;
+                    targetComboBox = CmbEffectsProps;
+                }
+                else
+                {
+                    targetPanel = PanelAppearanceContainer;
+                    targetComboBox = CmbAppearanceProps;
+                }
 
                 if (isActive)
                 {
                     var row = CreateDynamicRow(prop, val);
-                    if (cat == 1) PanelSpatialContainer.Children.Add(row);
-                    else if (cat == 2) PanelAppearanceContainer.Children.Add(row);
-                    else if (cat == 3) PanelUiContainer.Children.Add(row);
-                    else if (cat == 4) PanelCameraContainer.Children.Add(row);
-                    else if (cat == 5) PanelEffectsContainer.Children.Add(row);
+                    targetPanel.Children.Add(row);
                 }
                 else
                 {
                     var item = new ComboBoxItem { Content = prop.Name, Tag = prop };
-                    if (cat == 1) CmbSpatialProps.Items.Add(item);
-                    else if (cat == 2) CmbAppearanceProps.Items.Add(item);
-                    else if (cat == 3) CmbUiProps.Items.Add(item);
-                    else if (cat == 4) CmbCameraProps.Items.Add(item);
-                    else if (cat == 5) CmbEffectsProps.Items.Add(item);
+                    targetComboBox.Items.Add(item);
                 }
             }
 
@@ -298,7 +469,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                 _manuallyActivatedProps.Add(prop.Name);
                 prop.SetValue(_currentState, defaultVal);
-                LoadState(_currentState, _currentTitle, _rootState, _isRoot);
+                LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
             }
         }
 
@@ -334,7 +505,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 if (prop != null)
                 {
                     prop.SetValue(_currentState, newTemplate);
-                    LoadState(_currentState, _currentTitle, _rootState, _isRoot);
+                    LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
                 }
             }
         }
@@ -362,6 +533,171 @@ namespace Naziki_Editor.Views.PropertyEditor
             return false;
         }
 
-        public bool ValidateAndSave() => true;
+        public bool ValidateAndSave()
+        {
+            if (_invalidProperties.Count > 0)
+            {
+                string errorList = string.Join(", ", _invalidProperties);
+                MessageBox.Show($"指挥官，发现 {_invalidProperties.Count} 个参数填写错误哦！\n\n" +
+                                $"【异常参数】: {errorList}\n\n" +
+                                $"带有红框的输入框必须修改正确，否则达咩（绝对不行）！请修改后再保存吧！",
+                                "小艾的严肃拦截", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            return true;
+        }
+
+
+        // ==========================================
+        // 🎨 探头辅助工具箱（只管视觉，不管赋值！）
+        // ==========================================
+
+        /// <summary>
+        /// 🔴 触发红色警报：把框框标红，记录案犯属性
+        /// </summary>
+        private void SetError(TextBox txt, string propName, string tooltipMsg)
+        {
+            txt.BorderBrush = System.Windows.Media.Brushes.Red;
+            txt.BorderThickness = new Thickness(2);
+            // 换上淡淡的红色背景，超显眼！
+            txt.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 0, 0));
+            txt.ToolTip = tooltipMsg;
+
+            _invalidProperties.Add(propName); // 丢进收容所，大门锁死！
+        }
+
+        /// <summary>
+        /// 🟢 解除警报：恢复原样，从黑名单中踢出
+        /// </summary>
+        private void ClearError(TextBox txt, string propName)
+        {
+            txt.ClearValue(TextBox.BorderBrushProperty);
+            txt.ClearValue(TextBox.BorderThicknessProperty);
+            txt.ClearValue(TextBox.BackgroundProperty);
+            txt.ToolTip = null;
+
+            _invalidProperties.Remove(propName); // 释放属性，允许保存！
+        }
+
+        // ==========================================
+        // 📡 独立监控基站：专门给输入框加装审查探头
+        // ==========================================
+        private void AttachValidationProbe(TextBox txtValue, string propName)
+        {
+            if (txtValue == null) return;
+
+            // 1. ⚖️ 提前向《属性宪法》大管家拿到该参数的合法规则
+            var rule = Core.PropertyConstraintManager.GetConstraint(propName);
+
+            // 2. ⚡ 挂载 TextChanged 实时审查视线
+            txtValue.TextChanged += (s, e) =>
+            {
+                string input = txtValue.Text.Trim();
+
+                // 🚨 铁腕规则一：空值绝对拦截！强制要求重填
+                if (string.IsNullOrEmpty(input))
+                {
+                    SetError(txtValue, propName, "⚠️ 这里的参数不能为空哦！如果不想要它，请使用侧面的属性关闭功能把它移除。");
+                    return; // 标红后直接拦截，不往下执行
+                }
+
+                bool isError = false;
+                string errorMsg = "";
+
+                // 🔬 铁腕规则二：根据门派和规则开始对输入的文本进行严苛审查
+                if (rule.UIType == Core.PropertyUIType.Slider || rule.UIType == Core.PropertyUIType.FloatBox || rule.UIType == Core.PropertyUIType.UnitBox)
+                {
+                    if (float.TryParse(input, out float fVal))
+                    {
+                        if (fVal < rule.Min || fVal > rule.Max)
+                        {
+                            isError = true;
+                            errorMsg = $"⚠️ 数值越界啦！指挥官，这里只能填入 {rule.Min} 到 {rule.Max} 之间的数字哦！";
+                        }
+                    }
+                    else
+                    {
+                        isError = true;
+                        errorMsg = "⚠️ 格式不正确！这里必须填入合法的数字（支持小数）哦！";
+                    }
+                }
+                else if (rule.UIType == Core.PropertyUIType.IntBox)
+                {
+                    if (int.TryParse(input, out int iVal))
+                    {
+                        if (iVal < rule.Min || iVal > rule.Max)
+                        {
+                            isError = true;
+                            errorMsg = $"⚠️ 越界达咩！这里只能填入 {rule.Min} 到 {rule.Max} 之间的整数哦！";
+                        }
+                    }
+                    else
+                    {
+                        isError = true;
+                        errorMsg = "⚠️ 这里只能填入纯整数（不能有小数点）哦！";
+                    }
+                }
+                else if (rule.UIType == Core.PropertyUIType.ColorPicker)
+                {
+                    // 简单的十六进制颜色防呆审查
+                    if (!input.StartsWith("#") || (input.Length != 7 && input.Length != 9))
+                    {
+                        isError = true;
+                        errorMsg = "⚠️ 颜色代码格式错啦！必须以 # 开头，例如 #FFFFFF（6位）或 #FF4568DC（8位）哦！";
+                    }
+                }
+
+                // 🎨 审判结果宣判：只控红框和名单，绝对不执行 SetValue 干扰 Binding！
+                if (isError)
+                {
+                    SetError(txtValue, propName, errorMsg);
+                }
+                else
+                {
+                    ClearError(txtValue, propName);
+                }
+            };
+        }
+
+        // 📦 专门为置顶的“固定属性”制造带有专属翻译官的 UI 排版行
+        private UIElement CreateFixedPropertyRow(PropertyInfo prop)
+        {
+            Grid grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            string icon = "📌";
+            if (prop.Name == "Path") icon = "🖼️";
+            else if (prop.Name == "TextContent") icon = "📝";
+            else if (prop.Name == "NoteTarget") icon = "🎯";
+            else if (prop.Name == "Pos") icon = "〰️";
+
+            TextBlock lbl = new TextBlock
+            {
+                Text = $"{icon} 初始核心 ({prop.Name}):",
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = FontWeights.Bold,
+                Foreground = (Brush)Application.Current.Resources["HighlightBorderColor"] ?? Brushes.LightSkyBlue
+            };
+            Grid.SetColumn(lbl, 0);
+            grid.Children.Add(lbl);
+
+            TextBox txt = new TextBox { Padding = new Thickness(5) };
+            Binding b = new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
+
+            // 给 NoteTarget 和 Pos 数组挂上我们的万能翻译官，彻底消灭 System.Object！
+            if (prop.Name == "NoteTarget" || prop.Name == "Pos")
+                b.Converter = new UniversalObjectConverter();
+
+            txt.SetBinding(TextBox.TextProperty, b);
+            Grid.SetColumn(txt, 1);
+            grid.Children.Add(txt);
+
+            return grid;
+        }
+
+
+
+
     }
 }

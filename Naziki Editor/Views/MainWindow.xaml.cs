@@ -177,13 +177,50 @@ namespace Naziki_Editor.Views
             // ==========================================
             EventList.OnAssetScanned += (bundle) => AssetList.RefreshAssetListUI(bundle);
 
-            NoteList.OnNoteGroupExported += (groupItem) =>
+            // 🎵【核心补漏】：音符数据一键转化为真实音符控制器事件！
+            NoteList.OnNotesImportRequested += (selectedNotes) =>
             {
                 if (ResolveDataConflictIfNeeded())
                 {
+                    // 1. 🕒 时光机抢先记账拍快照
                     _undoRedoManager.RecordSnapshot(Context.Storyboard);
                     _isVisualDirty = true;
-                    EventList.AddNoteGroupToTree(groupItem);
+
+                    // 2. 🏃 循环开始！为每一个选中的音符，在内存中原地捏出真实的物理对象
+                    foreach (var note in selectedNotes)
+                    {
+                        // 🧱 实例化故事板官方认可的音符控制器包装盒
+                        var noteCtrl = new C2NoteController
+                        {
+                            Id = $"note_ctrl_{note.id}_{DateTime.Now.Ticks}" // 赋予唯一的灵魂身份证
+                        };
+
+                        // 🔍 利用反射，安全、智能地把音符 ID 拍进它的 BaseState.Note 属性里
+                        var baseState = noteCtrl.GetType().GetProperty("BaseState")?.GetValue(noteCtrl);
+                        if (baseState != null)
+                        {
+                            var noteProp = baseState.GetType().GetProperty("Note");
+                            if (noteProp != null)
+                            {
+                                // 根据底层模型的实际定义（string / int / object）自动适配，稳如老狗！
+                                if (noteProp.PropertyType == typeof(string))
+                                    noteProp.SetValue(baseState, note.id.ToString());
+                                else if (noteProp.PropertyType == typeof(int))
+                                    noteProp.SetValue(baseState, note.id);
+                                else
+                                    noteProp.SetValue(baseState, note.id); // 完美兼容 object
+                            }
+                        }
+
+                        // 📥 正式编入故事板的核心全量军队中！
+                        Context.Storyboard.note_controllers.Add(noteCtrl);
+                    }
+
+                    // 3. 🔄 【见证奇迹】：命令左侧事件列表根据最新的核心账本，全量重新刷新粉刷 UI！
+                    EventList.LoadStoryboardUI();
+
+                    // 4. 📢 惊醒大宇宙，标记工程变脏
+                    Context.MarkAsModified();
                 }
             };
 

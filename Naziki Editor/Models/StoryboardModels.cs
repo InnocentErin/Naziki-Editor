@@ -109,12 +109,18 @@ namespace Naziki_Editor.Models
         [JsonProperty("color")] public string Color { get; set; }
     }
 
+    // 🌟 1. 确保在 LineState 的上方，加上官方的端点位置类型！
+    public class LinePosition
+    {
+        [JsonProperty("x")] public UnitFloat X { get; set; }
+        [JsonProperty("y")] public UnitFloat Y { get; set; }
+        [JsonProperty("z")] public UnitFloat Z { get; set; }
+    }
+
+    // 🌟 2. 改造线条状态模型
     public class LineState : StageObjectState
     {
-        [JsonProperty("x1")] public UnitFloat X1 { get; set; }
-        [JsonProperty("y1")] public UnitFloat Y1 { get; set; }
-        [JsonProperty("x2")] public UnitFloat X2 { get; set; }
-        [JsonProperty("y2")] public UnitFloat Y2 { get; set; }
+        [JsonProperty("pos")] public List<LinePosition> Pos { get; set; } = new List<LinePosition>();
         [JsonProperty("width")] public float? Width { get; set; }
         [JsonProperty("color")] public string Color { get; set; }
     }
@@ -129,7 +135,83 @@ namespace Naziki_Editor.Models
         [JsonProperty("speed")] public float? Speed { get; set; }
     }
 
-    public class TemplateState : StageObjectState { /* 继承通用属性 */ }
+    // ==========================================\
+    // 🌟 TemplateState 终极进化：囊括宇宙万物属性！
+    // ==========================================\
+    public class TemplateState : ObjectState
+    {
+        // 1. 场景/尺寸属性 (继承的基础 XYZ 之外)
+        public float? Scale { get; set; }
+        public float? ScaleX { get; set; }
+        public float? ScaleY { get; set; }
+        public UnitFloat Width { get; set; }
+        public UnitFloat Height { get; set; }
+        public float? W { get; set; } // 兼容你提到的 w, h
+        public float? H { get; set; }
+        public float? PivotX { get; set; }
+        public float? PivotY { get; set; }
+
+        // 2. 文本与精灵 (Text & Sprite)
+        public string TextContent { get; set; }
+        public int? Size { get; set; }
+        public string Align { get; set; }
+        public float? LetterSpacing { get; set; }
+        public float? LineSpacing { get; set; }
+        public string Font { get; set; }
+        public string FontStyle { get; set; }
+        public string Path { get; set; }
+        public string Color { get; set; }
+        public bool? PreserveAspect { get; set; }
+        public bool? Loop { get; set; }
+        public float? Speed { get; set; }
+
+        // 3. 线条 (Line)
+
+
+        // 4. 游戏UI与相机控制 (Controller)
+        public float? StoryboardOpacity { get; set; }
+        public float? UiOpacity { get; set; }
+        public float? ScanlineOpacity { get; set; }
+        public float? BackgroundDim { get; set; }
+        public float? NoteOpacityMultiplier { get; set; }
+        public string ScanlineColor { get; set; }
+        public string NoteRingColor { get; set; }
+        public bool? OverrideScanlinePos { get; set; }
+        public UnitFloat ScanlinePos { get; set; }
+        public bool? Perspective { get; set; }
+        public float? Fov { get; set; }
+
+        // 5. 屏幕滤镜特效 (Effects - 这里列出你提到的核心词缀)
+        public bool? Chromatical { get; set; }
+        public float? ChromaticalFade { get; set; }
+        public float? ChromaticalIntensity { get; set; }
+        public float? ChromaticalSpeed { get; set; }
+        public bool? Bloom { get; set; }
+        public float? BloomIntensity { get; set; }
+        public bool? RadialBlur { get; set; }
+        public float? RadialBlurIntensity { get; set; }
+        public bool? ColorFilter { get; set; }
+        public string ColorFilterColor { get; set; }
+        public bool? GrayScale { get; set; }
+        public float? GrayScaleIntensity { get; set; }
+        public bool? Noise { get; set; }
+        public float? NoiseIntensity { get; set; }
+        public bool? Sepia { get; set; }
+        public float? SepiaIntensity { get; set; }
+        public bool? Dream { get; set; }
+        public float? DreamIntensity { get; set; }
+
+        // 6. 音符控制器 (Note Controller)
+        public bool? OverrideX { get; set; }
+        public bool? OverrideY { get; set; }
+        public bool? OverrideZ { get; set; }
+        public bool? OverrideRotX { get; set; }
+        public bool? OverrideRotY { get; set; }
+        public bool? OverrideRotZ { get; set; }
+        public string NoteTarget { get; set; }
+        public float? NoteSizeMultiplier { get; set; }
+        public float? HitboxMultiplier { get; set; }
+    }
 
     // 🌟 核心：音符控制器规格
     public class NoteControllerState : ObjectState
