@@ -248,7 +248,7 @@ namespace Naziki_Editor.Views
         {
             if (_selectedNotes.Count == 0)
             {
-                MessageBox.Show("还没有选择音符哦！指挥官快去勾选几个吧~", "提示");
+                MessageBox.Show("还没有选择音符哦！设计师快去勾选几个吧~", "提示");
                 return;
             }
 

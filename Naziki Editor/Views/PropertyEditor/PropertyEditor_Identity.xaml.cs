@@ -223,7 +223,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             string newId = TxtObjectId.Text.Trim();
             if (string.IsNullOrEmpty(newId))
             {
-                TxtIdWarning.Text = "⚠️ 指挥官，ID绝对不能为空哦！";
+                TxtIdWarning.Text = "⚠️ 设计师，ID绝对不能为空哦！";
                 TxtIdWarning.Visibility = Visibility.Visible;
                 return false;
             }

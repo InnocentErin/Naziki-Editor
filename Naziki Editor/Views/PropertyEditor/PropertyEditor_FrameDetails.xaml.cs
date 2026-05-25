@@ -236,7 +236,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             btnDel.Click += (s, e) => {
                 if (prop.PropertyType.IsValueType && Nullable.GetUnderlyingType(prop.PropertyType) == null)
                 {
-                    MessageBox.Show($"指挥官，底层模型中的【{prop.Name}】不是可空类型，无法被删除！", "底层限制");
+                    MessageBox.Show($"设计师，底层模型中的【{prop.Name}】不是可空类型，无法被删除！", "底层限制");
                     return;
                 }
                 prop.SetValue(_currentState, null);
@@ -538,7 +538,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (_invalidProperties.Count > 0)
             {
                 string errorList = string.Join(", ", _invalidProperties);
-                MessageBox.Show($"指挥官，发现 {_invalidProperties.Count} 个参数填写错误哦！\n\n" +
+                MessageBox.Show($"设计师，发现 {_invalidProperties.Count} 个参数填写错误哦！\n\n" +
                                 $"【异常参数】: {errorList}\n\n" +
                                 $"带有红框的输入框必须修改正确，否则达咩（绝对不行）！请修改后再保存吧！",
                                 "小艾的严肃拦截", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -612,7 +612,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                         if (fVal < rule.Min || fVal > rule.Max)
                         {
                             isError = true;
-                            errorMsg = $"⚠️ 数值越界啦！指挥官，这里只能填入 {rule.Min} 到 {rule.Max} 之间的数字哦！";
+                            errorMsg = $"⚠️ 数值越界啦！设计师，这里只能填入 {rule.Min} 到 {rule.Max} 之间的数字哦！";
                         }
                     }
                     else

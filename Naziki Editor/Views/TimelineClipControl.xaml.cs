@@ -191,7 +191,7 @@ namespace Naziki_Editor.Views
         }
 
         // ==========================================
-        // 🧪 测试法术：为了让指挥官能马上看到效果
+        // 🧪 测试法术：为了让设计师能马上看到效果
         // ==========================================
         private void AddTestNode(double x, double opacityValue)
         {

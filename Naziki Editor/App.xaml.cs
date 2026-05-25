@@ -99,7 +99,7 @@ namespace Naziki_Editor
                 }
             }
 
-            // 🕒 核心驱动 3：【普通启动流程】（指挥官你之前删掉的窗口，小艾帮你加回来啦！）
+            // 🕒 核心驱动 3：【普通启动流程】（设计师你之前删掉的窗口，小艾帮你加回来啦！）
             ProjectHubWindow hubWindow = new ProjectHubWindow();
             hubWindow.Show();
         }

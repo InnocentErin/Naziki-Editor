@@ -175,10 +175,30 @@ namespace Naziki_Editor.Views
                 AddPropertyRow("线段宽度", state.Width?.ToString() ?? "默认");
                 AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0");
                 AddPropertyRow("线条颜色", state.Color ?? "默认");
-                AddPropertyRow("起点 X1", FormatUnitFloat(state.X1));
-                AddPropertyRow("起点 Y1", FormatUnitFloat(state.Y1));
-                AddPropertyRow("终点 X2", FormatUnitFloat(state.X2));
-                AddPropertyRow("终点 Y2", FormatUnitFloat(state.Y2));
+
+                // 多端点全自动点兵雷达（完美消灭编译报错！）
+
+                if (state.Pos != null && state.Pos.Count > 0)
+                {
+                    for (int i = 0; i < state.Pos.Count; i++)
+                    {
+                        var point = state.Pos[i];
+
+                        // 自动为每一个顶点编上卡哇伊的序号，如“顶点 1 X”、“顶点 2 Y”
+                        AddPropertyRow($"顶点 {i + 1} X", FormatUnitFloat(point.X));
+                        AddPropertyRow($"顶点 {i + 1} Y", FormatUnitFloat(point.Y));
+
+                        // 🛡️ 防灾机制：如果谱面开启了3D深度，有 Z 轴数据才显示，否则默默隐藏
+                        if (point.Z != null && point.Z.Value != 0)
+                        {
+                            AddPropertyRow($"顶点 {i + 1} Z", FormatUnitFloat(point.Z));
+                        }
+                    }
+                }
+                else
+                {
+                    AddPropertyRow("〰️ 线条状态", "当前未包含任何有效顶点坐标");
+                }
             }
         }
 

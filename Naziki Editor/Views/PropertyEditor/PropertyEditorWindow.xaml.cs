@@ -107,7 +107,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 string newName = ModIdentity.TxtObjectId.Text.Trim();
                 if (string.IsNullOrEmpty(newName))
                 {
-                    MessageBox.Show("指挥官，模板名称绝对不能为空哦！", "保存被拦截");
+                    MessageBox.Show("设计师，模板名称绝对不能为空哦！", "保存被拦截");
                     return;
                 }
 
@@ -115,6 +115,17 @@ namespace Naziki_Editor.Views.PropertyEditor
                 if (newName != _templateName)
                 {
                     Core.TemplateManager.RenameTemplateGlobally(_context.Storyboard, _templateName, newName);
+                }
+
+                // 🌟【时空联动修正】：在把模板塞回字典前，利用我们的静态雷达重新给它的 BaseState 验明正身！
+                if (_editingTemplate != null && _editingTemplate.BaseState != null)
+                {
+                    // 自动测绘该模板当前最新的基因流派（Sprite, Text 还是 Controller）
+                    var deducedType = Core.Compiler.TemplateClassifier.AnalyzeTemplate(_editingTemplate.BaseState);
+
+                    // 轰入我们的元数据小账本（确保未来前端列表过滤时，它能去到正确的房间！）
+                    // 假设我们在未来的大管家或 Context 里有一个 StoryboardMeta 小账本，先做好防空预留：
+                    // _context.StoryboardMeta.TemplateOverrides[newName] = deducedType;
                 }
 
                 // 把修改后的完全体克隆实体塞回大本营字典
@@ -126,7 +137,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 return;
             }
 
-            // 🛑 呼叫核心安检基站进行拦截
+            // 🛑 呼叫核心安检基站进行拦截（普通非模板对象）
             var validationResult = Core.StoryboardValidator.ValidateStateConflicts(_editingObject);
 
             if (!validationResult.IsValid)
@@ -137,10 +148,6 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             // 🟢 安检通过！把克隆好并修改过的最终数据装进 Tag 胶囊里！
             this.Tag = _editingObject;
-
-            // 通知项目有未保存的修改
-            _context.MarkAsModified();
-
             this.DialogResult = true;
             this.Close();
         }

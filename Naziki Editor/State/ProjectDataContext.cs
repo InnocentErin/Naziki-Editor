@@ -14,6 +14,8 @@ namespace Naziki_Editor.State
         public string StoryboardPath { get; set; }
         // 🌟 现在的 StoryboardRoot 肚子里装的全是 C2 包装盒啦！
         public StoryboardRoot Storyboard { get; set; } = new StoryboardRoot();
+        // 📒【新点亮的科技树】：元数据小账本专属内存房间！
+        public StoryboardMeta StoryboardMeta { get; set; } = new StoryboardMeta();
 
         public C2Chart Chart { get; set; }
         public ChartTimeEngine TimeEngine { get; set; }

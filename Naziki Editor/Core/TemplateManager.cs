@@ -110,7 +110,7 @@ namespace Naziki_Editor.Core
             if (hasNoteCtrlProp) return TemplateType.NoteController;
             if (hasText) return TemplateType.Text;
             if (hasPos) return TemplateType.Line;
-            if (hasPath) return TemplateType.Sprite; // 视频和精灵特征太像，默认给精灵，指挥官可手动改
+            if (hasPath) return TemplateType.Sprite; // 视频和精灵特征太像，默认给精灵，设计师可手动改
             if (hasSpatialProp) return TemplateType.StageObject;
 
             return TemplateType.Generic; // 实在认不出来，归入混沌！

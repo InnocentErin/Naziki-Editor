@@ -67,7 +67,7 @@ namespace Naziki_Editor.Core
                     {
                         string json = File.ReadAllText(nemFile);
 
-                        // ✨ 抛弃 NemDocument 外壳，直接按指挥官设定的“微型宇宙”进行解析！
+                        // ✨ 抛弃 NemDocument 外壳，直接按设计师设定的“微型宇宙”进行解析！
                         var miniRoot = JsonConvert.DeserializeObject<StoryboardRoot>(json);
 
                         if (miniRoot != null)

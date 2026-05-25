@@ -56,7 +56,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 _slider.Value = currentVal;
             }
 
-            // 📡 挂载指挥官之前写好的严肃标红拦截探头
+            // 📡 挂载设计师之前写好的严肃标红拦截探头
             attachProbeAction?.Invoke(_textBox, prop.Name);
 
             // 🔄 拖拽滑块时：仅实时高频更新文本框的“视觉数字”，绝不写入内存污染时光机！
@@ -299,18 +299,10 @@ namespace Naziki_Editor.Views.PropertyEditor
 
 
     // ==========================================================
-    // ⏱️ 4. StoryboardTimeControl (时空锚点动态智能交互面板)
+    // 🎚️ 4. StoryboardTimeRow (时空锚点单体功能细胞行 - 逻辑严密对齐版)
     // ==========================================================
-    public class StoryboardTimeControl : StackPanel
+    public class StoryboardTimeRow : Grid
     {
-        private readonly PropertyInfo _propTime;
-        private readonly PropertyInfo _propRel;
-        private readonly PropertyInfo _propAdd;
-        private readonly object _state;
-        private readonly bool _isRoot;
-        private readonly State.ProjectDataContext _context;
-
-        // 核心UI零部件
         private ComboBox _cmbMainMode;
         private StackPanel _panelTimeMode;
         private RadioButton _rbAbsolute;
@@ -321,11 +313,306 @@ namespace Naziki_Editor.Views.PropertyEditor
         private StackPanel _panelNoteMode;
         private TextBox _txtNoteId;
         private ComboBox _cmbNoteAnchor;
-        private ComboBoxItem _itemIntro; // 专门用来动态隐藏的“淡入”项
-        private RadioButton _rbOffset;
-        private RadioButton _rbPercent;
+        private ComboBoxItem _itemStart;
+        private ComboBoxItem _itemEnd;
+        private ComboBoxItem _itemIntro;
+        private ComboBoxItem _itemAt;      // 🌟 “在 (at)” 核心时刻
+        private TextBlock _lblParamHint;   // 🌟 动态切换 “延(s):” 或 “比(%):” 的提示标签
         private TextBox _txtNoteParam;
 
+        private bool _isInternalUpdating = false;
+        private readonly bool _isRoot;
+        private readonly Core.ChartTimeEngine _engine;
+        private readonly Models.C2Chart _chart;
+        private readonly Action _onChangedCallback;
+
+        // 🌟 物理手柄
+        public Border DragHandle { get; private set; }
+        public Button BtnDelete { get; private set; }
+
+        public StoryboardTimeRow(object initialValue, bool isRoot, State.ProjectDataContext context, Action onChangedCallback)
+        {
+            _isRoot = isRoot;
+            _engine = context?.TimeEngine;
+            _chart = context?.Chart;
+            _onChangedCallback = onChangedCallback;
+
+            Margin = new Thickness(0, 2, 0, 4);
+
+            // 布局切分：[ ☰ 拖拽(30) ] + [ 🔮 核心控制中心(*) ] + [ 🗑️ 销毁(35) ]
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(35) });
+
+            BuildRowLayout();
+            HookRowEvents();
+            SetValue(initialValue);
+        }
+
+        private void BuildRowLayout()
+        {
+            // 1. 🎽 左侧神圣拖拽手柄
+            DragHandle = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(55, 55, 55)),
+                CornerRadius = new CornerRadius(3, 0, 0, 3),
+                Cursor = System.Windows.Input.Cursors.SizeNS,
+                ToolTip = "按住左键上下拖动，可任意重排时空顺序哦！",
+                Child = new TextBlock { Text = "⣿", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.Gray, FontSize = 12 }
+            };
+            Grid.SetColumn(DragHandle, 0);
+            Children.Add(DragHandle);
+
+            // 2. 🔮 中间控制卡片容器（完美的流线型横向排列单行长廊）
+            var centerStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Background = new SolidColorBrush(Color.FromRgb(43, 43, 43)) };
+            Border centerBorder = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(65, 65, 65)), BorderThickness = new Thickness(0, 1, 0, 1), Padding = new Thickness(8, 3, 8, 3), Child = centerStack };
+            Grid.SetColumn(centerBorder, 1);
+            Children.Add(centerBorder);
+
+            // 🏷️ 门派主模式选择框
+            var rowMode = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+            _cmbMainMode = new ComboBox { Width = 100, Height = 22, FontSize = 10, Padding = new Thickness(2) };
+            _cmbMainMode.Items.Add(new ComboBoxItem { Content = "📅 基础时空", Tag = "Time" });
+            _cmbMainMode.Items.Add(new ComboBoxItem { Content = "🎵 音符锚点", Tag = "Anchor" });
+            rowMode.Children.Add(new TextBlock { Text = "模式: ", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.DarkGray, FontSize = 10, Margin = new Thickness(0, 0, 4, 0) });
+            rowMode.Children.Add(_cmbMainMode);
+            centerStack.Children.Add(rowMode);
+
+            // A 面：基础时空轴配置仓
+            _panelTimeMode = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _rbAbsolute = new RadioButton { Content = "绝对", IsChecked = true, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            _rbRelative = new RadioButton { Content = "相对", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            _rbAdditive = new RadioButton { Content = "附加", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            if (_isRoot) { _rbRelative.Visibility = Visibility.Collapsed; _rbAdditive.Visibility = Visibility.Collapsed; }
+            _txtTimeValue = new TextBox { Width = 65, Height = 20, FontSize = 10, Padding = new Thickness(1), Margin = new Thickness(4, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
+
+            _panelTimeMode.Children.Add(_rbAbsolute); _panelTimeMode.Children.Add(_rbRelative); _panelTimeMode.Children.Add(_rbAdditive);
+            _panelTimeMode.Children.Add(new TextBlock { Text = " ⏳ 秒数:", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.DarkGray, FontSize = 10, Margin = new Thickness(4, 0, 2, 0) });
+            _panelTimeMode.Children.Add(_txtTimeValue);
+            centerStack.Children.Add(_panelTimeMode);
+
+            // B 面：音符锚点控制仓（遵照设计师大宪法重塑后的无缝面板）
+            _panelNoteMode = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _txtNoteId = new TextBox { Width = 45, Height = 20, FontSize = 10, Padding = new Thickness(1), VerticalContentAlignment = VerticalAlignment.Center };
+
+            _cmbNoteAnchor = new ComboBox { Width = 75, Height = 20, FontSize = 10, Margin = new Thickness(4, 0, 4, 0) };
+            _itemStart = new ComboBoxItem { Content = "开始(start)", Tag = "start" };
+            _itemEnd = new ComboBoxItem { Content = "结束(end)", Tag = "end" };
+            _itemIntro = new ComboBoxItem { Content = "淡入(intro)", Tag = "intro" };
+            _itemAt = new ComboBoxItem { Content = "在(at)", Tag = "at" }; // 🌟 迎回 at 王者
+            _cmbNoteAnchor.Items.Add(_itemStart); _cmbNoteAnchor.Items.Add(_itemEnd); _cmbNoteAnchor.Items.Add(_itemIntro); _cmbNoteAnchor.Items.Add(_itemAt);
+            _cmbNoteAnchor.SelectedIndex = 0;
+
+            // 🌟 动态提示语，初始默认为延迟
+            _lblParamHint = new TextBlock { Text = " 延(s):", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.DarkGray, FontSize = 10, Margin = new Thickness(4, 0, 2, 0) };
+            _txtNoteParam = new TextBox { Width = 45, Height = 20, FontSize = 10, Padding = new Thickness(1), VerticalContentAlignment = VerticalAlignment.Center, Text = "0" };
+
+            _panelNoteMode.Children.Add(new TextBlock { Text = "ID:", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.DarkGray, FontSize = 10, Margin = new Thickness(0, 0, 2, 0) });
+            _panelNoteMode.Children.Add(_txtNoteId);
+            _panelNoteMode.Children.Add(_cmbNoteAnchor);
+            _panelNoteMode.Children.Add(_lblParamHint);
+            _panelNoteMode.Children.Add(_txtNoteParam);
+            centerStack.Children.Add(_panelNoteMode);
+
+            // 3. 🗑️ 右侧销毁按钮
+            BtnDelete = new Button
+            {
+                Content = "✕",
+                Foreground = Brushes.IndianRed,
+                Background = new SolidColorBrush(Color.FromRgb(50, 50, 50)),
+                BorderThickness = new Thickness(0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "将此条时间轴锚点抹杀！"
+            };
+            Grid.SetColumn(BtnDelete, 2);
+            Children.Add(BtnDelete);
+        }
+
+        private void HookRowEvents()
+        {
+            _cmbMainMode.SelectionChanged += (s, e) =>
+            {
+                var tag = (_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                _panelTimeMode.Visibility = tag == "Time" ? Visibility.Visible : Visibility.Collapsed;
+                _panelNoteMode.Visibility = tag == "Anchor" ? Visibility.Visible : Visibility.Collapsed;
+                if (!_isInternalUpdating) _onChangedCallback?.Invoke();
+            };
+
+            RoutedEventHandler reTrigger = (s, e) => { if (!_isInternalUpdating) _onChangedCallback?.Invoke(); };
+            _rbAbsolute.Checked += reTrigger; _rbRelative.Checked += reTrigger; _rbAdditive.Checked += reTrigger;
+
+            // 🌟【宪法防御一】：实时调整后缀提示语，杜绝 at 与延迟、非 at 与百分比发生越界踩踏
+            _cmbNoteAnchor.SelectionChanged += (s, e) =>
+            {
+                if (_cmbNoteAnchor.SelectedItem is ComboBoxItem item && _lblParamHint != null)
+                {
+                    string anchorTag = item.Tag.ToString();
+                    _lblParamHint.Text = (anchorTag == "at") ? " 比(%):" : " 延(s):";
+                }
+                if (!_isInternalUpdating) _onChangedCallback?.Invoke();
+            };
+
+            _txtTimeValue.LostFocus += (s, e) => _onChangedCallback?.Invoke();
+            _txtNoteParam.LostFocus += (s, e) => _onChangedCallback?.Invoke();
+            _txtNoteId.TextChanged += (s, e) => { TriggerNoteTypeRadar(); _onChangedCallback?.Invoke(); };
+        }
+
+        private void TriggerNoteTypeRadar()
+        {
+            if (_chart?.note_list == null) return;
+            string inputId = _txtNoteId.Text.Trim();
+            if (int.TryParse(inputId, out int noteId))
+            {
+                var targetNote = _chart.note_list.Find(n => n.id == noteId);
+                if (targetNote != null)
+                {
+                    bool isContinuous = (targetNote.type == 1 || targetNote.type == 2); // 1:Hold, 2:LHold
+                    if (!isContinuous)
+                    {
+                        // 🚨【宪法防御二】：点类音符绝对不允许染指 intro 和 at！一见发现，铁腕遣返归为 start 形态！
+                        var currentTag = (_cmbNoteAnchor.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                        if (currentTag == "intro" || currentTag == "at") _cmbNoteAnchor.SelectedItem = _itemStart;
+
+                        _itemIntro.Visibility = Visibility.Collapsed;
+                        _itemAt.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        _itemIntro.Visibility = Visibility.Visible;
+                        _itemAt.Visibility = Visibility.Visible;
+                    }
+                    return;
+                }
+            }
+            _itemIntro.Visibility = Visibility.Visible;
+            _itemAt.Visibility = Visibility.Visible;
+        }
+
+        public void SetArrayModeRestrictions(bool isArray)
+        {
+            if (_isRoot) return;
+            if (isArray)
+            {
+                if (_rbRelative.IsChecked == true || _rbAdditive.IsChecked == true) _rbAbsolute.IsChecked = true;
+                _rbRelative.Visibility = Visibility.Collapsed;
+                _rbAdditive.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                _rbRelative.Visibility = Visibility.Visible;
+                _rbAdditive.Visibility = Visibility.Visible;
+            }
+        }
+
+        public bool IsModifierSelected()
+        {
+            if ((_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString() != "Time") return false;
+            return _rbRelative.IsChecked == true || _rbAdditive.IsChecked == true;
+        }
+
+        public string GetMainMode() => (_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        public string GetTimeSubMode() => _rbAbsolute.IsChecked == true ? "Absolute" : (_rbRelative.IsChecked == true ? "Relative" : "Additive");
+        public string GetTimeValue() => _txtTimeValue.Text.Trim();
+        public string GetNoteId() => _txtNoteId.Text.Trim();
+        public string GetNoteAnchor() => (_cmbNoteAnchor.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "start";
+        public bool IsPercent() => (_cmbNoteAnchor.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "at";
+        public string GetNoteParam() => _txtNoteParam.Text.Trim();
+
+        public void SetValue(object value)
+        {
+            _isInternalUpdating = true;
+            string raw = value?.ToString() ?? "";
+
+            if (raw.StartsWith("relative:"))
+            {
+                _cmbMainMode.SelectedIndex = 0; _panelTimeMode.Visibility = Visibility.Visible;
+                _rbRelative.IsChecked = true; _txtTimeValue.Text = raw.Replace("relative:", "");
+            }
+            else if (raw.StartsWith("additive:"))
+            {
+                _cmbMainMode.SelectedIndex = 0; _panelTimeMode.Visibility = Visibility.Visible;
+                _rbAdditive.IsChecked = true; _txtTimeValue.Text = raw.Replace("additive:", "");
+            }
+            else if (raw.Contains(":") || raw.Contains("$"))
+            {
+                _cmbMainMode.SelectedIndex = 1; _panelNoteMode.Visibility = Visibility.Visible;
+                var parts = raw.Split(':');
+                if (parts.Length >= 2)
+                {
+                    _txtNoteId.Text = parts[1];
+
+                    // 🔮 智能反向读取机制：当探测到 at 前缀时，精准咬合 at 菜单项并切换为百分比视图
+                    if (parts[0] == "at")
+                    {
+                        _cmbNoteAnchor.SelectedItem = _itemAt;
+                        _lblParamHint.Text = " 比(%):";
+                        _txtNoteParam.Text = parts.Length > 2 ? parts[2] : "0.5";
+                    }
+                    else
+                    {
+                        foreach (ComboBoxItem item in _cmbNoteAnchor.Items) if (item.Tag.ToString() == parts[0]) _cmbNoteAnchor.SelectedItem = item;
+                        _lblParamHint.Text = " 延(s):";
+                        _txtNoteParam.Text = parts.Length > 2 ? parts[2] : "0";
+                    }
+                }
+                else if (raw.Contains("$note")) _txtNoteId.Text = "$note";
+            }
+            else
+            {
+                _cmbMainMode.SelectedIndex = 0; _panelTimeMode.Visibility = Visibility.Visible;
+                _rbAbsolute.IsChecked = true;
+                _txtTimeValue.Text = (raw.Contains("3.402823") || string.IsNullOrEmpty(raw)) ? "" : raw;
+            }
+            _isInternalUpdating = false;
+            TriggerNoteTypeRadar();
+        }
+
+        public object GetValue()
+        {
+            var mainTag = (_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            if (mainTag == "Time")
+            {
+                string valStr = _txtTimeValue.Text.Trim();
+                if (string.IsNullOrEmpty(valStr)) return float.MaxValue;
+                float.TryParse(valStr, out float parsedVal);
+                return parsedVal;
+            }
+            else
+            {
+                string noteId = _txtNoteId.Text.Trim();
+                if (string.IsNullOrEmpty(noteId)) return float.MaxValue;
+                string anchor = (_cmbNoteAnchor.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "start";
+                string param = _txtNoteParam.Text.Trim();
+                float.TryParse(param, out float pVal);
+
+                // 🚀【数据落盘核心】：当处于 at 时刻，由于其不支持延迟参数，无条件输出标准的 at:id:百分比 字符串！
+                if (anchor == "at")
+                {
+                    return $"at:{noteId}:{(string.IsNullOrEmpty(param) ? "0.5" : param)}";
+                }
+                // 🚀 当处于 start, end, intro 时，完全对应延迟后缀。如果没填或填0则智能合并兜底
+                return (pVal != 0f && !string.IsNullOrEmpty(param)) ? $"{anchor}:{noteId}:{param}" : $"{anchor}:{noteId}";
+            }
+        }
+    }
+
+    // ==========================================================
+    // 🌍 5. StoryboardTimeControl (时空锚点调度管理母仓 - 完全体拖拽矩阵版)
+    // ==========================================================
+    public class StoryboardTimeControl : StackPanel
+    {
+        private readonly PropertyInfo _propTime;
+        private readonly PropertyInfo _propRel;
+        private readonly PropertyInfo _propAdd;
+        private readonly object _state;
+        private readonly bool _isRoot;
+        private readonly State.ProjectDataContext _context;
+
+        private StackPanel _rowsContainer;
+        private Button _btnAddRow;
+
+        private bool _isDragging = false;
+        private StoryboardTimeRow _draggedRow = null;
         private bool _isInternalUpdating = false;
 
         public StoryboardTimeControl(object state, bool isRoot, State.ProjectDataContext context)
@@ -335,257 +622,198 @@ namespace Naziki_Editor.Views.PropertyEditor
             _context = context;
             this.Orientation = Orientation.Vertical;
 
-            // 1. 🔍 抓取底层的互斥三剑客
             _propTime = state.GetType().GetProperty("Time");
             _propRel = state.GetType().GetProperty("RelativeTime");
             _propAdd = state.GetType().GetProperty("AddTime");
 
-            BuildMainLayout();
+            _rowsContainer = new StackPanel { Orientation = Orientation.Vertical };
+            this.Children.Add(_rowsContainer);
+
+            _btnAddRow = new Button
+            {
+                Content = "➕ 添加多重时间轴轴心锚点 (Add Time Row)",
+                Margin = new Thickness(0, 5, 0, 5),
+                Padding = new Thickness(10, 6, 10, 6),
+                Background = new SolidColorBrush(Color.FromRgb(45, 90, 45)),
+                Foreground = Brushes.LightGreen,
+                FontWeight = FontWeights.Bold,
+                BorderThickness = new Thickness(0),
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+            _btnAddRow.Click += (s, e) => { AddNewTimeRow(float.MaxValue); UpdateUiRestrictionsAndSave(); };
+
+            if (!_isRoot) this.Children.Add(_btnAddRow);
+
             LoadCurrentData();
-            HookEvents();
         }
 
-        private void BuildMainLayout()
-        {
-            // 🌍 第一行：主模式选择下拉菜单
-            var row1 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
-            var lblMode = new TextBlock { Text = "时间模式: ", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray, FontSize = 11, Width = 65 };
-            _cmbMainMode = new ComboBox { Width = 150, Padding = new Thickness(3) };
-            _cmbMainMode.Items.Add(new ComboBoxItem { Content = "📅 基础时间轴", Tag = "Time" });
-            _cmbMainMode.Items.Add(new ComboBoxItem { Content = "🎵 音符 ID 锚点", Tag = "Anchor" });
-            row1.Children.Add(lblMode);
-            row1.Children.Add(_cmbMainMode);
-            this.Children.Add(row1);
-
-            // 🕒 第二行 A 面：时间轴配置仓
-            _panelTimeMode = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5), Visibility = Visibility.Collapsed };
-            _rbAbsolute = new RadioButton { Content = "绝对", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-            _rbRelative = new RadioButton { Content = "相对", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-            _rbAdditive = new RadioButton { Content = "附加", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-
-            // 如果是初始属性 (Root)，强制隐藏相对和附加单选按钮
-            if (_isRoot) { _rbRelative.Visibility = Visibility.Collapsed; _rbAdditive.Visibility = Visibility.Collapsed; }
-
-            _txtTimeValue = new TextBox { Width = 100, Padding = new Thickness(3), Margin = new Thickness(5, 0, 0, 0) };
-            _panelTimeMode.Children.Add(_rbAbsolute);
-            _panelTimeMode.Children.Add(_rbRelative);
-            _panelTimeMode.Children.Add(_rbAdditive);
-            _panelTimeMode.Children.Add(new TextBlock { Text = "值(秒):", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray, FontSize = 10, Margin = new Thickness(5, 0, 0, 0) });
-            _panelTimeMode.Children.Add(_txtTimeValue);
-            this.Children.Add(_panelTimeMode);
-
-            // 🎵 第二行 B 面：音符雷达控制仓 (超豪华拼装件)
-            _panelNoteMode = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5), Visibility = Visibility.Collapsed };
-            _txtNoteId = new TextBox { Width = 50, Padding = new Thickness(3), ToolTip = "请输入谱面中的音符 ID" };
-
-            _cmbNoteAnchor = new ComboBox { Width = 70, Padding = new Thickness(3), Margin = new Thickness(5, 0, 0, 0) };
-            _cmbNoteAnchor.Items.Add(new ComboBoxItem { Content = "开始", Tag = "start" });
-            _cmbNoteAnchor.Items.Add(new ComboBoxItem { Content = "结束", Tag = "end" });
-            _itemIntro = new ComboBoxItem { Content = "淡入", Tag = "intro" };
-            _cmbNoteAnchor.Items.Add(_itemIntro);
-            _cmbNoteAnchor.SelectedIndex = 0;
-
-            _rbOffset = new RadioButton { Content = "延迟(s)", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 4, 0) };
-            _rbPercent = new RadioButton { Content = "比例(%)", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 4, 0) };
-            _txtNoteParam = new TextBox { Width = 60, Padding = new Thickness(3), Text = "0" };
-
-            _panelNoteMode.Children.Add(new TextBlock { Text = "音符ID:", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray, FontSize = 10 });
-            _panelNoteMode.Children.Add(_txtNoteId);
-            _panelNoteMode.Children.Add(_cmbNoteAnchor);
-            _panelNoteMode.Children.Add(_rbOffset);
-            _panelNoteMode.Children.Add(_rbPercent);
-            _panelNoteMode.Children.Add(_txtNoteParam);
-            this.Children.Add(_panelNoteMode);
-        }
-
-        // 🧠 逆向工程：从底层乱七八糟的内存值或字符串中，拆解还原 UI 的摆放姿态
         private void LoadCurrentData()
         {
             _isInternalUpdating = true;
+            _rowsContainer.Children.Clear();
 
-            string rawTime = _propTime?.GetValue(_state)?.ToString() ?? "";
+            object rawTimeObj = _propTime?.GetValue(_state);
             string rawRel = _propRel?.GetValue(_state)?.ToString() ?? "";
             string rawAdd = _propAdd?.GetValue(_state)?.ToString() ?? "";
 
-            // 优先探测有没有好玩的“音符锚点字符串”冒充
-            string activeAnchorStr = "";
-            if (rawTime.Contains(":") || rawTime.Contains("$")) activeAnchorStr = rawTime;
-            else if (rawRel.Contains(":") || rawRel.Contains("$")) activeAnchorStr = rawRel;
-            else if (rawAdd.Contains(":") || rawAdd.Contains("$")) activeAnchorStr = rawAdd;
-
-            if (!string.IsNullOrEmpty(activeAnchorStr))
+            if (rawTimeObj is System.Collections.IList list)
             {
-                // 🔮 触发音符锚点形态还原！
-                _cmbMainMode.SelectedIndex = 1;
-                _panelNoteMode.Visibility = Visibility.Visible;
+                foreach (var item in list) AddNewTimeRow(item);
+            }
+            else if (!string.IsNullOrEmpty(rawRel) && rawRel != "0" && !_isRoot)
+            {
+                AddNewTimeRow($"relative:{rawRel}");
+            }
+            else if (!string.IsNullOrEmpty(rawAdd) && rawAdd != "0" && !_isRoot)
+            {
+                AddNewTimeRow($"additive:{rawAdd}");
+            }
+            else
+            {
+                AddNewTimeRow(rawTimeObj);
+            }
 
-                var parts = activeAnchorStr.Split(':');
-                if (parts.Length >= 2)
+            _isInternalUpdating = false;
+            UpdateUiRestrictionsAndSave();
+        }
+
+        private void AddNewTimeRow(object val)
+        {
+            var row = new StoryboardTimeRow(val, _isRoot, _context, UpdateUiRestrictionsAndSave);
+
+            row.BtnDelete.Click += (s, e) =>
+            {
+                _rowsContainer.Children.Remove(row);
+                UpdateUiRestrictionsAndSave();
+            };
+
+            row.DragHandle.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                _isDragging = true; _draggedRow = row;
+                row.DragHandle.CaptureMouse(); e.Handled = true;
+            };
+
+            row.DragHandle.PreviewMouseMove += (s, e) =>
+            {
+                if (!_isDragging || _draggedRow != row) return;
+
+                Point mousePos = e.GetPosition(_rowsContainer);
+                int targetIndex = -1; double heightAccumulator = 0;
+
+                for (int i = 0; i < _rowsContainer.Children.Count; i++)
                 {
-                    _txtNoteId.Text = parts[1];
-                    foreach (ComboBoxItem item in _cmbNoteAnchor.Items)
-                        if (item.Tag.ToString() == parts[0]) _cmbNoteAnchor.SelectedItem = item;
-
-                    if (parts[0] == "at")
-                    {
-                        _rbPercent.IsChecked = true;
-                        _txtNoteParam.Text = parts.Length > 2 ? parts[2] : "0.5";
-                    }
-                    else
-                    {
-                        _rbOffset.IsChecked = true;
-                        _txtNoteParam.Text = parts.Length > 2 ? parts[2] : "0";
-                    }
+                    var child = _rowsContainer.Children[i] as FrameworkElement;
+                    heightAccumulator += child.ActualHeight;
+                    if (mousePos.Y < heightAccumulator) { targetIndex = i; break; }
                 }
-                else if (activeAnchorStr.Contains("$note")) // 兼容特殊占位符
+                if (targetIndex == -1) targetIndex = _rowsContainer.Children.Count - 1;
+
+                int currentIndex = _rowsContainer.Children.IndexOf(_draggedRow);
+                if (currentIndex != targetIndex && targetIndex >= 0)
                 {
-                    _txtNoteId.Text = "$note";
+                    _rowsContainer.Children.Remove(_draggedRow);
+                    _rowsContainer.Children.Insert(targetIndex, _draggedRow);
+                }
+            };
+
+            row.DragHandle.PreviewMouseLeftButtonUp += (s, e) =>
+            {
+                if (_isDragging && _draggedRow == row)
+                {
+                    row.DragHandle.ReleaseMouseCapture(); _isDragging = false; _draggedRow = null;
+                    UpdateUiRestrictionsAndSave();
+                }
+            };
+
+            _rowsContainer.Children.Add(row);
+        }
+
+        private void UpdateUiRestrictionsAndSave()
+        {
+            if (_isInternalUpdating) return;
+
+            int count = _rowsContainer.Children.Count;
+            bool isArrayMode = count > 1;
+
+            foreach (StoryboardTimeRow row in _rowsContainer.Children)
+            {
+                row.SetArrayModeRestrictions(isArrayMode);
+            }
+
+            if (count == 1)
+            {
+                var firstRow = _rowsContainer.Children[0] as StoryboardTimeRow;
+                if (firstRow != null && firstRow.IsModifierSelected())
+                {
+                    _btnAddRow.IsEnabled = false; _btnAddRow.Opacity = 0.4;
+                    _btnAddRow.ToolTip = "⚠️ 提示：当第一行被指定为相对(Relative)或附加(Additive)时间时，无法再点击添加平行复数矩阵行哦！";
+                }
+                else
+                {
+                    _btnAddRow.IsEnabled = true; _btnAddRow.Opacity = 1.0; _btnAddRow.ToolTip = null;
                 }
             }
             else
             {
-                // 📅 触发传统时间轴形态还原！
-                _cmbMainMode.SelectedIndex = 0;
-                _panelTimeMode.Visibility = Visibility.Visible;
-
-                if (!string.IsNullOrEmpty(rawAdd) && rawAdd != "0")
-                {
-                    _rbAdditive.IsChecked = true; _txtTimeValue.Text = rawAdd;
-                }
-                else if (!string.IsNullOrEmpty(rawRel) && rawRel != "0")
-                {
-                    _rbRelative.IsChecked = true; _txtTimeValue.Text = rawRel;
-                }
-                else
-                {
-                    _rbAbsolute.IsChecked = true;
-                    // float.MaxValue 代表未启用，UI 展现为空白白
-                    _txtTimeValue.Text = (rawTime.Contains("3.402823") || string.IsNullOrEmpty(rawTime)) ? "" : rawTime;
-                }
+                _btnAddRow.IsEnabled = true; _btnAddRow.Opacity = 1.0; _btnAddRow.ToolTip = null;
             }
 
-            _isInternalUpdating = false;
-            TriggerNoteTypeRadar(); // 顺手开启雷达扫描一次
+            SaveToMemory();
         }
 
-        private void HookEvents()
-        {
-            // 主切换大闸
-            _cmbMainMode.SelectionChanged += (s, e) =>
-            {
-                var tag = (_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-                _panelTimeMode.Visibility = tag == "Time" ? Visibility.Visible : Visibility.Collapsed;
-                _panelNoteMode.Visibility = tag == "Anchor" ? Visibility.Visible : Visibility.Collapsed;
-                SaveToMemory();
-            };
-
-            // 监听所有能导致数值变动的神经元
-            RoutedEventHandler reSave = (s, e) => SaveToMemory();
-            TextChangedEventHandler tcSave = (s, e) => SaveToMemory();
-
-            _rbAbsolute.Checked += reSave; _rbRelative.Checked += reSave; _rbAdditive.Checked += reSave;
-            _rbOffset.Checked += reSave; _rbPercent.Checked += reSave;
-            _cmbNoteAnchor.SelectionChanged += (s, e) => SaveToMemory();
-
-            _txtTimeValue.LostFocus += (s, e) => SaveToMemory();
-            _txtNoteParam.LostFocus += (s, e) => SaveToMemory();
-
-            // 📡 【核心绑定】：音符 ID 输入框实时雷达！
-            _txtNoteId.TextChanged += (s, e) =>
-            {
-                TriggerNoteTypeRadar();
-                SaveToMemory();
-            };
-        }
-
-        // 🎵 【小艾的音符基因核验雷达】：查表断定音符门派，智能隐藏专属组件！
-        private void TriggerNoteTypeRadar()
-        {
-            if (_context?.Chart?.note_list == null) return;
-            string inputId = _txtNoteId.Text.Trim();
-
-            if (int.TryParse(inputId, out int noteId))
-            {
-                // 去大管家的数据包里顺藤摸瓜找音符
-                var targetNote = _context.Chart.note_list.Find(n => n.id == noteId);
-                if (targetNote != null)
-                {
-                    // 依据 ChartLogic 和模型：type == 1(Hold) 或 2(LongHold) 才是持续性音符！
-                    bool isContinuous = (targetNote.type == 1 || targetNote.type == 2);
-
-                    if (!isContinuous)
-                    {
-                        // 🚨 触发铁腕隐身术：点类音符剥夺“淡入”和“百分比”权利！
-                        if (_cmbNoteAnchor.SelectedItem == _itemIntro) _cmbNoteAnchor.SelectedIndex = 0;
-                        _itemIntro.Visibility = Visibility.Collapsed;
-                        _rbPercent.Visibility = Visibility.Collapsed;
-                        _rbOffset.IsChecked = true; // 强制打回原形
-                    }
-                    else
-                    {
-                        // 🟢 恢复名誉：让持续音符的专属道具重新现身
-                        _itemIntro.Visibility = Visibility.Visible;
-                        _rbPercent.Visibility = Visibility.Visible;
-                    }
-                    return;
-                }
-            }
-            // 混沌情况（比如手打 $note 时），全面放行保证最大包容度
-            _itemIntro.Visibility = Visibility.Visible;
-            _rbPercent.Visibility = Visibility.Visible;
-        }
-
-        // 🪄 【乐高拼装落盘引擎】：把 UI 状态打碎并严丝合缝地塞回底层 C# 模型
         private void SaveToMemory()
         {
             if (_isInternalUpdating) return;
 
-            object finalTime = float.MaxValue; // 默认未激活状态
+            object finalTime = float.MaxValue;
             object finalRel = null;
             object finalAdd = null;
 
-            var mainTag = (_cmbMainMode.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-
-            if (mainTag == "Time")
+            int count = _rowsContainer.Children.Count;
+            if (count == 0)
             {
-                // 📅 1. 传统时间轴拼装逻辑
-                string valStr = _txtTimeValue.Text.Trim();
-                float.TryParse(valStr, out float parsedVal);
+                _propTime?.SetValue(_state, float.MaxValue);
+                _propRel?.SetValue(_state, null); _propAdd?.SetValue(_state, null);
+                _context?.MarkAsModified(); return;
+            }
 
-                if (_rbAbsolute.IsChecked == true) finalTime = string.IsNullOrEmpty(valStr) ? float.MaxValue : parsedVal;
-                else if (_rbRelative.IsChecked == true) { finalTime = 0f; finalRel = parsedVal; }
-                else if (_rbAdditive.IsChecked == true) { finalTime = 0f; finalAdd = parsedVal; }
+            if (count == 1)
+            {
+                var row = _rowsContainer.Children[0] as StoryboardTimeRow;
+                string mainMode = row.GetMainMode();
+
+                if (mainMode == "Time")
+                {
+                    string subMode = row.GetTimeSubMode(); string valStr = row.GetTimeValue();
+                    float.TryParse(valStr, out float parsedVal);
+
+                    if (subMode == "Absolute") finalTime = string.IsNullOrEmpty(valStr) ? float.MaxValue : (object)parsedVal;
+                    else if (subMode == "Relative") { finalTime = 0f; finalRel = parsedVal; }
+                    else if (subMode == "Additive") { finalTime = 0f; finalAdd = parsedVal; }
+                }
+                else
+                {
+                    finalTime = row.GetValue();
+                }
             }
             else
             {
-                // 🎵 2. 音符锚点拼装逻辑
-                string noteId = _txtNoteId.Text.Trim();
-                if (!string.IsNullOrEmpty(noteId))
+                var finalList = new List<object>();
+                foreach (StoryboardTimeRow row in _rowsContainer.Children)
                 {
-                    string anchor = (_cmbNoteAnchor.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "start";
-                    string param = _txtNoteParam.Text.Trim();
-                    float.TryParse(param, out float pVal);
-
-                    if (_rbPercent.IsChecked == true)
+                    var val = row.GetValue();
+                    if (val != null && !val.ToString().Contains("3.402823"))
                     {
-                        // 百分比格式强制拼装为 at:id:百分比
-                        finalTime = $"at:{noteId}:{param}";
-                    }
-                    else
-                    {
-                        // 延迟偏移格式
-                        if (pVal != 0f && !string.IsNullOrEmpty(param)) finalTime = $"{anchor}:{noteId}:{param}";
-                        else finalTime = $"{anchor}:{noteId}";
+                        finalList.Add(val);
                     }
                 }
+                finalTime = finalList.Count > 0 ? finalList : (object)float.MaxValue;
             }
 
-            // ✍️ 轰入内存实体
             _propTime?.SetValue(_state, finalTime);
             _propRel?.SetValue(_state, finalRel);
             _propAdd?.SetValue(_state, finalAdd);
 
-            // 📢 惊醒时光机记账
             _context?.MarkAsModified();
         }
     }

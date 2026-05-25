@@ -55,6 +55,26 @@ namespace Naziki_Editor.Views
                     StoryboardParser.StandardizeStoryboardIds(root);
                     if (root == null) throw new Exception("故事板解析出来空空如也，是不是文件损坏了？");
 
+                    // 🌟 物理接线：提前将路径汇报给大管家，确保 TryLoad 探头能拿到正确的坐标！
+                    Context.StoryboardPath = openFileDialog.FileName;
+
+                    // 📒【联动加载】：空降读取谱面时，立刻探测其屁股后面有没有附带 _meta.json 账本
+                    string metaPath = Context.StoryboardPath + "_meta.json";
+                    if (File.Exists(metaPath))
+                    {
+                        try
+                        {
+                            string metaContent = File.ReadAllText(metaPath);
+                            Context.StoryboardMeta = JsonConvert.DeserializeObject<Naziki_Editor.Models.StoryboardMeta>(metaContent)
+                                                     ?? new Naziki_Editor.Models.StoryboardMeta();
+                        }
+                        catch { Context.StoryboardMeta = new Naziki_Editor.Models.StoryboardMeta(); }
+                    }
+                    else
+                    {
+                        Context.StoryboardMeta = new Naziki_Editor.Models.StoryboardMeta(); // 野生文件，给它捏一个纯净空账本
+                    }
+
                     Context.Storyboard = root;
                     LoadStoryboardUI();
                     OnStoryboardLoaded?.Invoke(openFileDialog.FileName, root);

@@ -62,7 +62,7 @@ namespace Naziki_Editor.Core
             _undoStack.RemoveAt(_undoStack.Count - 1);
 
             success = true;
-            // 魔法：自动把 JSON 变回指挥官想要的类型（比如 StoryboardRoot）
+            // 魔法：自动把 JSON 变回设计师想要的类型（比如 StoryboardRoot）
             return JsonConvert.DeserializeObject<T>(previousStateJson);
         }
 

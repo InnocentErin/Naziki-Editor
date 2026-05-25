@@ -162,7 +162,7 @@ namespace Naziki_Editor.ProjectManagement
                 // 🛑 【安检 B 面】：纳尼？！项目玩失踪移形换位了！
                 else
                 {
-                    // 强制弹出符合指挥官设想的最终决断弹窗
+                    // 强制弹出符合设计师设想的最终决断弹窗
                     var result = MessageBox.Show(
                         $"抱歉主人！无法在原路径找到该工程文件：\n［{historyItem.FilePath}］\n\n该工程可能已被手动移动、重命名或无情删除。\n\n是否直接从历史档案馆中［删除记录］？",
                         "⚠️ 档案馆警报：检测到失效资产",

@@ -150,6 +150,7 @@ namespace Naziki_Editor.Models
         public float? H { get; set; }
         public float? PivotX { get; set; }
         public float? PivotY { get; set; }
+        [JsonProperty("pos")] public List<LinePosition> Pos { get; set; }
 
         // 2. 文本与精灵 (Text & Sprite)
         public string TextContent { get; set; }

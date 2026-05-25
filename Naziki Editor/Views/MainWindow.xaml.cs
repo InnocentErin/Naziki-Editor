@@ -96,6 +96,9 @@ namespace Naziki_Editor.Views
                     string jsonText = File.ReadAllText(projectData.StoryboardExportPath);
                     Context.Storyboard = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText, StoryboardSerializer.GetSettings());
 
+                    // 📒【点亮科技树】：在此处级联捞起元数据小账本！
+                    TryLoadStoryboardMetaFile();
+
                     EventList.LoadStoryboardUI();
                     CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();
@@ -125,6 +128,37 @@ namespace Naziki_Editor.Views
             }
 
             RefreshAllAssets();
+        }
+
+        // ========================================================
+        // 📒【小账本核心法术】：随盘自动读取函数（写在 MainWindow 的类体内部任意位置即可）
+        // ========================================================
+        private void TryLoadStoryboardMetaFile()
+        {
+            if (string.IsNullOrEmpty(Context.StoryboardPath)) return;
+
+            string metaPath = Context.StoryboardPath + "_meta.json";
+            try
+            {
+                if (File.Exists(metaPath))
+                {
+                    // 📖 账本存在，直接读入内存房间！
+                    string metaContent = File.ReadAllText(metaPath);
+                    Context.StoryboardMeta = JsonConvert.DeserializeObject<Naziki_Editor.Models.StoryboardMeta>(metaContent)
+                                             ?? new Naziki_Editor.Models.StoryboardMeta();
+                }
+                else
+                {
+                    // 🆕 账本不存在（可能是外来的野生独立 JSON 谱面），小艾乖巧地原地捏一个空账本！
+                    Context.StoryboardMeta = new Naziki_Editor.Models.StoryboardMeta();
+                }
+            }
+            catch (Exception ex)
+            {
+                // 呆胶布！账本损坏绝不卡死主界面，悄悄记录日志并回退到干净状态
+                Context.StoryboardMeta = new Naziki_Editor.Models.StoryboardMeta();
+                System.Diagnostics.Debug.WriteLine($"[小艾账本探头] 读取元数据账本时发生了穿模: {ex.Message}");
+            }
         }
 
         private void SilentImportChart(string chartPath)
@@ -378,7 +412,7 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                MessageBox.Show("指挥官，这已经是当前宇宙最前沿的最新数据啦！", "时空尽头");
+                MessageBox.Show("设计师，这已经是当前宇宙最前沿的最新数据啦！", "时空尽头");
             }
         }
 
@@ -494,10 +528,12 @@ namespace Naziki_Editor.Views
             var line = new C2Line { Id = "line_" + DateTime.Now.Ticks };
             line.BaseState.Width = 2.0f;
             line.BaseState.Color = "#FFFFFF";
-            line.BaseState.X1 = new UnitFloat { Value = -100, Unit = ReferenceUnit.World };
-            line.BaseState.Y1 = new UnitFloat { Value = 0, Unit = ReferenceUnit.World };
-            line.BaseState.X2 = new UnitFloat { Value = 100, Unit = ReferenceUnit.World };
-            line.BaseState.Y2 = new UnitFloat { Value = 0, Unit = ReferenceUnit.World };
+            // 默认给它分配左右两个端点，拼成一条基础的线段：
+            line.BaseState.Pos = new List<LinePosition>
+            {
+                new LinePosition { X = new UnitFloat { Value = -100, Unit = ReferenceUnit.World }, Y = new UnitFloat { Value = 0, Unit = ReferenceUnit.World } },
+                new LinePosition { X = new UnitFloat { Value = 100, Unit = ReferenceUnit.World }, Y = new UnitFloat { Value = 0, Unit = ReferenceUnit.World } }
+            };
 
             Context.Storyboard.lines.Add(line);
             EventList.LoadStoryboardUI();
@@ -538,17 +574,88 @@ namespace Naziki_Editor.Views
 
             try
             {
-                // ✨ 核心升华：使用定制序列化配置输出极其纯净、严格符合官方标准的蛇形 JSON！
-                string jsonOutput = StoryboardSerializer.ToJson(Context.Storyboard);
+                // ========================================================
+                // 🧙‍♂️ 1. 影子分离术 (Shadow Clone)
+                // ========================================================
+                // 先用定制配置把当前的内存大账本序列化，再反序列化出一份纯净不影响界面的“影子故事板”
+                string rawJson = StoryboardSerializer.ToJson(Context.Storyboard);
+                var shadowStoryboard = JsonConvert.DeserializeObject<Naziki_Editor.Models.StoryboardRoot>(
+                    rawJson,
+                    StoryboardSerializer.GetSettings()
+                );
+
+                // ========================================================
+                // 🚀 2. 启动时空编译器进行全量展平与降维打击
+                // ========================================================
+                var compiler = new Naziki_Editor.Core.Compiler.StoryboardCompiler(
+                    Context.Chart,
+                    Context.TimeEngine,
+                    shadowStoryboard.templates // 将影子故事板的模板字典喂给编译器
+                );
+
+                // 执行物理展平 (法则 B：附加时间展平法)
+                compiler.FlattenStoryboard(shadowStoryboard);
+
+                // ========================================================
+                // 📡 3. 惊醒静态安检雷达，如果有 Bug 或者是 destroy 踩踏，可爱警告！
+                // ========================================================
+                if (compiler.CompileWarnings.Count > 0)
+                {
+                    string warningMsg = "🌟 设计师！时空安检雷达在展平落盘时发现了一些瑕疵，不过呆胶布（没关系），文件已安全生成：\n\n" +
+                                        string.Join("\n", compiler.CompileWarnings.Take(5)); // 最多显示前5条，防弹窗炸裂
+                    if (compiler.CompileWarnings.Count > 5)
+                        warningMsg += $"\n... 以及其他 {compiler.CompileWarnings.Count - 5} 条时空安检警报。";
+
+                    MessageBox.Show(warningMsg, "小艾的时空安检报告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                // ========================================================
+                // 💾 4. 谱面主文件物理落盘 (纯净无套娃官方格式)
+                // ========================================================
+                string jsonOutput = StoryboardSerializer.ToJson(shadowStoryboard);
                 File.WriteAllText(Context.StoryboardPath, jsonOutput);
 
+                // ========================================================
+                // 📒 5.【核心新增】：动态测绘全量模板并安全写入元数据小账本！
+                // ========================================================
+                if (Context.StoryboardMeta == null) Context.StoryboardMeta = new StoryboardMeta();
+
+                // 预清洗旧账本，防止残留已经被删掉的模板名称
+                Context.StoryboardMeta.TemplateOverrides.Clear();
+
+                if (Context.Storyboard.templates != null)
+                {
+                    foreach (var kvp in Context.Storyboard.templates)
+                    {
+                        if (kvp.Value != null && kvp.Value.BaseState != null)
+                        {
+                            // 呼叫雷达测绘当前的流派
+                            var deducedType = Core.Compiler.TemplateClassifier.AnalyzeTemplate(kvp.Value.BaseState);
+                            Context.StoryboardMeta.TemplateOverrides[kvp.Key] = deducedType;
+                        }
+                    }
+                }
+
+                // 计算小账本应该躺的物理路径（跟主 json 文件在同一个文件夹下，后缀为 .storyboard_meta.json）
+                string metaPath = Context.StoryboardPath + "_meta.json";
+                string metaJson = JsonConvert.SerializeObject(Context.StoryboardMeta, Formatting.Indented);
+                File.WriteAllText(metaPath, metaJson);
+
+                // 保存原本的工程配置文件 `.nep`
                 SaveProjectNepFile();
 
+                // ========================================================
+                // 🎉 6. 刷新界面，华丽收尾
+                // ========================================================
                 _isVisualDirty = false;
                 CanvasArea.RefreshJsonView();
-                MessageBox.Show("故事板与工程配置文件均已物理写入硬盘！(๑•̀ㅂ•́)و✧", "全盘保存成功");
+
+                MessageBox.Show("故事板已完美展平，元数据小账本也已同步写入硬盘！(๑>ᴗ<๑)✧", "全盘保存成功");
             }
-            catch (Exception ex) { MessageBox.Show("写入磁盘爆炸啦 QAQ：\n" + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("时空网关在写入磁盘时爆炸啦 QAQ：\n" + ex.Message, "物理写盘错误");
+            }
         }
 
         private void TriggerAutoLinkIfReady()
