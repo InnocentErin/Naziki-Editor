@@ -76,29 +76,42 @@ namespace Naziki_Editor.Views
             }
         }
         // 🎨 辅助法术：专门造具有漂亮颜色的树叶
+        // 🎨 辅助法术：专门造具有漂亮颜色的树叶（新增方向雷达读取）
         private TreeViewItem CreateNoteTreeItem(List<C2Note> allNotes, int currentIndex, ChartTimeEngine engine)
         {
             C2Note note = allNotes[currentIndex];
             double realTime = engine.TickToSeconds(note.tick);
-            string typeName = "Unknown";
+
+            // 复用 ChartLogic 里的官方类型翻译官！
+            string typeName = ChartLogic.GetNoteTypeString(note.type);
             Brush colorBrush = Brushes.Gray;
 
             switch (note.type)
             {
-                case 0: typeName = "Click"; colorBrush = Brushes.LightSeaGreen; break;
-                case 1: typeName = "Hold"; colorBrush = Brushes.Magenta; break;
-                case 2: typeName = "L-Hold"; colorBrush = Brushes.Gold; break;
-                case 3: typeName = "Drag"; colorBrush = Brushes.MediumPurple; break;
-                case 4: typeName = "D-Child"; colorBrush = Brushes.MediumPurple; break;
-                case 5: typeName = "Flick"; colorBrush = Brushes.IndianRed; break;
-                case 6: typeName = "CDrag"; colorBrush = Brushes.SkyBlue; break;
-                case 7: typeName = "CD-Child"; colorBrush = Brushes.SkyBlue; break;
+                case 0: colorBrush = Brushes.LightSeaGreen; break;
+                case 1: colorBrush = Brushes.Magenta; break;
+                case 2: colorBrush = Brushes.Gold; break;
+                case 3: colorBrush = Brushes.MediumPurple; break;
+                case 4: colorBrush = Brushes.MediumPurple; break;
+                case 5: colorBrush = Brushes.IndianRed; break;
+                case 6: colorBrush = Brushes.SkyBlue; break;
+                case 7: colorBrush = Brushes.SkyBlue; break;
             }
 
+            // 🌟 官方跨表查询：获取该音符所在页面的方向！
+            int pageDir = 1;
+            if (Context.Chart.page_list != null && note.page_index >= 0 && note.page_index < Context.Chart.page_list.Count)
+            {
+                pageDir = Context.Chart.page_list[note.page_index].scan_line_direction;
+            }
+            string dirText = pageDir == 1 ? "⬆ 向上" : "⬇ 向下";
+
             Grid rowGrid = new Grid();
+            // 与 XAML 骨架严丝合缝对齐
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(25) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(45) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(55) });
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(65) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(45) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(40) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -139,7 +152,7 @@ namespace Naziki_Editor.Views
             idPanel.Children.Add(new TextBlock() { Text = note.id.ToString(), FontSize = 10 });
             Grid.SetColumn(idPanel, 1); rowGrid.Children.Add(idPanel);
 
-            TextBlock timeTxt = new TextBlock() { Text = realTime.ToString("0.000"), FontSize = 10 };
+            TextBlock timeTxt = new TextBlock() { Text = realTime.ToString("0.00"), FontSize = 10 };
             Grid.SetColumn(timeTxt, 2); rowGrid.Children.Add(timeTxt);
 
             TextBlock typeTxt = new TextBlock() { Text = typeName, FontSize = 10, Foreground = colorBrush };
@@ -147,6 +160,10 @@ namespace Naziki_Editor.Views
 
             TextBlock xTxt = new TextBlock() { Text = note.x.ToString("0.00"), FontSize = 10 };
             Grid.SetColumn(xTxt, 4); rowGrid.Children.Add(xTxt);
+
+            // 🌟 新增：显示页面扫线方向
+            TextBlock dirTxt = new TextBlock() { Text = dirText, FontSize = 10, Foreground = Brushes.Gray };
+            Grid.SetColumn(dirTxt, 5); rowGrid.Children.Add(dirTxt);
 
             item.Header = rowGrid;
             item.IsExpanded = false;

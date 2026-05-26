@@ -328,6 +328,38 @@ namespace Naziki_Editor.Models
 
 
     }
+
+    // ==========================================
+    // 🎯 核心：音符雷达选择器模型 (Note Selector)
+    // ==========================================
+    public class NoteSelectorModel
+    {
+        [JsonProperty("type", NullValueHandling = NullValueHandling.Ignore)]
+        public List<int> Type { get; set; } // 如果没值，序列化时不输出，等效于全选
+
+        [JsonProperty("start", NullValueHandling = NullValueHandling.Ignore)]
+        public int? Start { get; set; }
+
+        [JsonProperty("end", NullValueHandling = NullValueHandling.Ignore)]
+        public int? End { get; set; }
+
+        [JsonProperty("direction", NullValueHandling = NullValueHandling.Ignore)]
+        public int? Direction { get; set; }
+
+        [JsonProperty("min_x", NullValueHandling = NullValueHandling.Ignore)]
+        public float? MinX { get; set; }
+
+        [JsonProperty("max_x", NullValueHandling = NullValueHandling.Ignore)]
+        public float? MaxX { get; set; }
+    }
+
+
+
+
+
+
+
+
     // ==========================================
     // 🌟 完美归位的 UnitFloatConverter 专属车间
     // ==========================================
@@ -379,4 +411,9 @@ namespace Naziki_Editor.Models
             return uf;
         }
     }
+
+
+
+
+
 }

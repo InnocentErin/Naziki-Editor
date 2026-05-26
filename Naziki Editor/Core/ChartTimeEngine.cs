@@ -1,15 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Naziki_Editor.Models;
 
 namespace Naziki_Editor.Core
 {
     // 🌟 定义一下 JSON 里的 Tempo 对象长什么样
-    public class TempoEvent
-    {
-        public int tick { get; set; }
-        public long value { get; set; } // 单位是微秒哦！
-    }
 
     // 🌟 我们的核心时空引擎！
     public class ChartTimeEngine

@@ -142,12 +142,30 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelControllerCards.Visibility = isController ? Visibility.Visible : Visibility.Collapsed;
 
             // ✨ 核心强打通：绑定常驻时间轴参数
-            
-            BindStaticProperty(TxtEasing, "Easing");
+            // BindStaticProperty(TxtEasing, "Easing"); // 🚫 彻底抛弃旧的文本框数据绑定！
 
             // 1. 让原先写死在 XAML 里的旧输入框全部隐身退场，防止双向数据打架！
             TxtTime.Visibility = Visibility.Collapsed;
             PanelStateTimeOptions.Visibility = Visibility.Collapsed;
+            TxtEasing.Visibility = Visibility.Collapsed; // 🌟 让原有的干瘪缓动输入框永久隐身！
+
+            // 🌟 1.5【魔法降临】：挂载全新的“缓动视觉矩阵触发按钮”！
+            // 先拔掉上一次残留的老按钮，防止切换关键帧时无限套娃
+            UIElement oldEasingPicker = null;
+            foreach (UIElement child in RowEasing.Children)
+            {
+                if (child is EasingPickerControl) { oldEasingPicker = child; break; }
+            }
+            if (oldEasingPicker != null) RowEasing.Children.Remove(oldEasingPicker);
+
+            // 用反射抓取当前帧的 Easing 属性，生成魔法按钮并塞进 RowEasing 容器！
+            var easingProp = _currentState.GetType().GetProperty("Easing");
+            if (easingProp != null)
+            {
+                var easingPicker = new EasingPickerControl(easingProp, _currentState, AttachValidationProbe);
+                Grid.SetColumn(easingPicker, 1); // 放在容器的右侧列
+                RowEasing.Children.Add(easingPicker);
+            }
 
             // 2. 拔掉上一次残留的老控件，防止切换帧时在界面上无限堆叠套娃
             UIElement expiredCtrl = null;
@@ -662,7 +680,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         // 📦 专门为置顶的“固定属性”制造带有专属翻译官的 UI 排版行
         private UIElement CreateFixedPropertyRow(PropertyInfo prop)
         {
-            Grid grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            Grid grid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -675,23 +693,36 @@ namespace Naziki_Editor.Views.PropertyEditor
             TextBlock lbl = new TextBlock
             {
                 Text = $"{icon} 初始核心 ({prop.Name}):",
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = prop.Name == "NoteTarget" ? VerticalAlignment.Top : VerticalAlignment.Center, // 雷达太高了，标题顶对齐
                 FontWeight = FontWeights.Bold,
-                Foreground = (Brush)Application.Current.Resources["HighlightBorderColor"] ?? Brushes.LightSkyBlue
+                Foreground = (Brush)Application.Current.Resources["HighlightBorderColor"] ?? Brushes.LightSkyBlue,
+                Margin = new Thickness(0, 5, 0, 0)
             };
             Grid.SetColumn(lbl, 0);
             grid.Children.Add(lbl);
 
-            TextBox txt = new TextBox { Padding = new Thickness(5) };
-            Binding b = new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
+            // ==========================================================
+            // 🚀 【超级法术接线】：如果是 NoteTarget，拒绝使用普通文本框，一键降临超级雷达！
+            // ==========================================================
+            if (prop.Name == "NoteTarget")
+            {
+                var selectorCtrl = new NoteSelectorBuilderControl(prop, _currentState, _context);
+                Grid.SetColumn(selectorCtrl, 1);
+                grid.Children.Add(selectorCtrl);
+            }
+            else
+            {
+                // 其他常规固定属性 (Path, TextContent) 保持不变
+                TextBox txt = new TextBox { Padding = new Thickness(5) };
+                Binding b = new Binding(prop.Name) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
 
-            // 给 NoteTarget 和 Pos 数组挂上我们的万能翻译官，彻底消灭 System.Object！
-            if (prop.Name == "NoteTarget" || prop.Name == "Pos")
-                b.Converter = new UniversalObjectConverter();
+                if (prop.Name == "Pos")
+                    b.Converter = new UniversalObjectConverter();
 
-            txt.SetBinding(TextBox.TextProperty, b);
-            Grid.SetColumn(txt, 1);
-            grid.Children.Add(txt);
+                txt.SetBinding(TextBox.TextProperty, b);
+                Grid.SetColumn(txt, 1);
+                grid.Children.Add(txt);
+            }
 
             return grid;
         }

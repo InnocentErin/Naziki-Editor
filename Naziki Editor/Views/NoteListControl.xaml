@@ -76,16 +76,18 @@
             <Grid Grid.Row="2" Background="{DynamicResource MainBgColor}" Margin="0,0,0,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="25"/>
+                    <ColumnDefinition Width="45"/>
                     <ColumnDefinition Width="55"/>
-                    <ColumnDefinition Width="65"/>
+                    <ColumnDefinition Width="45"/>
                     <ColumnDefinition Width="40"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="选" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                 <Button Grid.Column="1" Content="ID ▲" FontSize="10" Padding="0"/>
-                <TextBlock Grid.Column="2" Text=" 时间(秒)" FontSize="10" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="3" Text=" 类型" FontSize="10" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="4" Text=" X轴" FontSize="10" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="时间(s)" FontSize="10" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="类型" FontSize="10" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4" Text="X轴" FontSize="10" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="5" Text="方向" FontSize="10" VerticalAlignment="Center"/>
             </Grid>
 
             <TreeView x:Name="NoteTreeView" Grid.Row="3" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1"/>
