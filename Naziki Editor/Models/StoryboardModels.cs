@@ -22,6 +22,7 @@ namespace Naziki_Editor.Models
     public interface IStoryboardEntity
     {
         string Id { get; set; }
+        string TargetId { get; set; }
         string ParentId { get; set; }
         object GetBaseState();
         System.Collections.IList GetKeyframes();
@@ -30,6 +31,8 @@ namespace Naziki_Editor.Models
     public abstract class StoryboardEntity<TState> : IStoryboardEntity where TState : ObjectState, new()
     {
         [JsonProperty("id")] public string Id { get; set; }
+        [JsonProperty("target_id", NullValueHandling = NullValueHandling.Ignore)]
+        public string TargetId { get; set; }
         [JsonProperty("parent_id")] public string ParentId { get; set; }
 
         [JsonIgnore] public TState BaseState { get; set; } = new TState();

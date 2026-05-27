@@ -24,18 +24,16 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
-            <Button x:Name="BtnCancel" Content="取消 (Cancel)" Padding="20,8" Margin="0,0,10,0" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-            <Button x:Name="BtnSave" Content="💾 确认并保存魔法" Padding="20,8" Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+            <Button x:Name="BtnCancel" Content="取消 (Cancel)" Padding="20,8" Margin="0,0,10,0" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand" Click="BtnCancel_Click"/>
+            <Button x:Name="BtnSave" Content="💾 确认并保存魔法" Padding="20,8" Background="{DynamicResource HighlightBorderColor}" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnSave_Click"/>
         </StackPanel>
 
         <GroupBox Grid.Row="1" Header="🎭 对象基础身份 (Identity)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
             <local:PropertyEditor_Identity x:Name="ModIdentity" Margin="5"/>
         </GroupBox>
 
-        <!-- <GroupBox Grid.Row="2" Header="🎬 初始属性 (Root Properties)" BorderBrush="{DynamicResource BorderColor}" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,10">
-           <local:PropertyEditor_InitialState x:Name="ModInitialState" Margin="5"/> 
-        </GroupBox> -->
-        
+        <local:PropertyEditor_ControlBoardTabs x:Name="ModControlBoards" Grid.Row="2" Margin="0,0,0,10"/>
+
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250"/>

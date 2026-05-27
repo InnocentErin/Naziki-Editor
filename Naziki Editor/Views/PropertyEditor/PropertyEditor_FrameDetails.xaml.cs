@@ -134,7 +134,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelDetails.Visibility = Visibility.Visible;
             TxtEmptyState.Visibility = Visibility.Collapsed;
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
-            PopulateTemplateDropdown();
+            // PopulateTemplateDropdown(); 顶部已隐身，不再重复刷新它
 
             // ✨ 核心修正：不管是普通对象还是状态类，只要属于场景控制器，全部分流
             bool isController = (_rootState is ControllerState || _currentState is ControllerState);
@@ -201,12 +201,42 @@ namespace Naziki_Editor.Views.PropertyEditor
                 {
                     StackPanel fixedPropsContainer = new StackPanel { Name = "PanelRootFixedProps", Margin = new Thickness(0, 10, 0, 0) };
 
+                    // 🌟 1. 【黑魔法】：从父窗口偷看当前对象到底是不是“控制板”！
+                    bool isControlBoard = false;
+                    var parentWin = Window.GetWindow(this);
+                    if (parentWin != null)
+                    {
+                        var field = parentWin.GetType().GetField("_currentActiveObject", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field != null)
+                        {
+                            var activeObj = field.GetValue(parentWin) as IStoryboardEntity;
+                            if (activeObj != null && !string.IsNullOrEmpty(activeObj.TargetId))
+                            {
+                                isControlBoard = true;
+                            }
+                        }
+                    }
+
+                    // 🌟 2. 给予用户贴心的提示，替换掉原有的输入框
+                    if (isControlBoard)
+                    {
+                        fixedPropsContainer.Children.Add(new TextBlock
+                        {
+                            Text = "👻 控制板隐身模式：此对象仅传递动画，初始视觉核心已禁用。",
+                            Foreground = Brushes.Gray,
+                            Margin = new Thickness(0, 0, 0, 10)
+                        });
+                    }
+
                     PropertyInfo[] props = _currentState.GetType().GetProperties();
                     foreach (var prop in props)
                     {
                         // 筛选需要置顶的初始固定属性
                         if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
                         {
+                            // 🛑 【终极拦截】：如果是控制板，直接跳过生成，统统失去实体！
+                            if (isControlBoard) continue;
+
                             var row = CreateFixedPropertyRow(prop);
                             fixedPropsContainer.Children.Add(row);
                         }
@@ -272,6 +302,52 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         private FrameworkElement BuildBoundInputControl(PropertyInfo prop, object value, bool isLocked, object templateValue)
         {
+            // 🌟【高阶魔法】：如果用户在关键帧中开启了 Template 属性，动态为它空降一个模板专属选择下拉框！
+            if (prop.Name == "Template")
+            {
+                ComboBox cmbTemplateBox = new ComboBox { Padding = new Thickness(5) };
+                cmbTemplateBox.Items.Add(new ComboBoxItem { Content = "🚫 不使用模板", Tag = null });
+
+                if (_globalTemplates != null)
+                {
+                    foreach (var kvp in _globalTemplates)
+                    {
+                        cmbTemplateBox.Items.Add(new ComboBoxItem { Content = $"✨ {kvp.Key}", Tag = kvp.Key });
+                    }
+                }
+
+                // 反查当前帧被赋予的模板值并挂载初值
+                string currentTemplateVal = prop.GetValue(_currentState) as string;
+                cmbTemplateBox.SelectedIndex = 0;
+                if (!string.IsNullOrEmpty(currentTemplateVal))
+                {
+                    for (int idx = 1; idx < cmbTemplateBox.Items.Count; idx++)
+                    {
+                        if ((cmbTemplateBox.Items[idx] as ComboBoxItem)?.Tag?.ToString() == currentTemplateVal)
+                        {
+                            cmbTemplateBox.SelectedIndex = idx;
+                            break;
+                        }
+                    }
+                }
+
+                // 当谱师在关键帧里换了模板印章，立刻重刷右侧，让模板的“锁死/变灰”防御性逻辑实时刷新联动！
+                cmbTemplateBox.SelectionChanged += (s, e) =>
+                {
+                    if (cmbTemplateBox.SelectedItem is ComboBoxItem selectItem)
+                    {
+                        prop.SetValue(_currentState, selectItem.Tag as string);
+                        // 时空同步：重新走一遍 LoadState 刷洗变灰状态！
+                        LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
+                    }
+                };
+                return cmbTemplateBox;
+            }
+
+
+
+
+
             Type pType = prop.PropertyType;
             Type uType = Nullable.GetUnderlyingType(pType) ?? pType;
 
@@ -346,19 +422,6 @@ namespace Naziki_Editor.Views.PropertyEditor
             propName == "Pos" || propName == "Template" || propName == "Layer" ||
             propName == "Font" || propName == "Align" || propName == "Note";
 
-        private int GetPropertyCategory(string name)
-        {
-            string n = name.ToLower();
-            if (n == "x" || n == "y" || n == "z" || n == "width" || n == "height" || n.Contains("scale") || n.Contains("pivot") || n.Contains("rot") || n.StartsWith("x1") || n.StartsWith("x2") || n.StartsWith("y1") || n.StartsWith("y2") || n.Contains("pos"))
-                return 1;
-            if (n == "fov" || n == "perspective" || n == "size")
-                return 4;
-            if (n.Contains("bloom") || n.Contains("vignette") || n.Contains("arcade") || n == "tape" || n.Contains("chromatical") || n.Contains("blur") || n.Contains("filter") || n.Contains("adjustment") || n == "glitch" || n.Contains("noise") || n.Contains("focus") || n.Contains("shockwave") || n.Contains("sepia") || n.Contains("dream") || n.Contains("fisheye") || n.Contains("gray_scale"))
-                return 5;
-            if (n.Contains("dim") || n.Contains("multiplier") || n.Contains("offset") || n.Contains("override") || n.Contains("opacity") || n.Contains("color"))
-                return 3;
-            return 2;
-        }
 
         // 1. 在类的顶部加入记录当前模板类型的变量
         private TemplateType _currentTemplateType = TemplateType.Generic;
@@ -387,8 +450,8 @@ namespace Naziki_Editor.Views.PropertyEditor
                 if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "AddTime" || prop.Name == "RelativeTime") continue;
                 if (prop.Name == "Id" || prop.Name == "ParentId" || prop.Name == "TargetId" || prop.Name == "States" || prop.Name == "Keyframes") continue;
                 // 只要是这几个不可做动画的固定 DNA 属性，全宇宙无条件隐身！绝对不进动态编辑面板！
-                if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos" || prop.Name == "Template") continue;
-                // 
+                if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos") continue;
+                //  
                 if (IsStaticDnaProperty(prop.Name) && !_isRoot) continue;
 
                 // 🌟 【小艾的终极防线】：如果处于模板编辑模式，且该属性不属于此门派，直接蒸发！
@@ -412,45 +475,23 @@ namespace Naziki_Editor.Views.PropertyEditor
                 // ==========================================
                 // 🌟 小艾的完美分拣法术：确保没有任何一个属性流浪！
                 // ==========================================
+                // 🌟【解耦对接】：呼叫我们在公共 Core 文件夹里造出来的公共分拣大脑！
+                var category = Core.PropertyClassifier.GetCategory(prop.Name);
                 StackPanel targetPanel = null;
                 ComboBox targetComboBox = null;
 
-                string n = prop.Name;
-
-                // 1. 📏 空间与尺寸 (Spatial)
-                if (new[] { "X", "Y", "Z", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height", "W", "H", "PivotX", "PivotY", "X1", "X2", "Y1", "Y2", "OverrideX", "OverrideY", "OverrideZ", "OverrideRotX", "OverrideRotY", "OverrideRotZ" }.Contains(n))
+                switch (category)
                 {
-                    targetPanel = PanelSpatialContainer;
-                    targetComboBox = CmbSpatialProps;
-                }
-                // 2. 🎨 外观与内容 (Appearance)
-                else if (new[] { "Opacity", "Color", "Layer", "Order", "Path", "TextContent", "Size", "Align", "LetterSpacing", "LineSpacing", "Font", "FontStyle", "PreserveAspect", "Loop", "Speed", "RingColor", "FillColor", "OverrideRingColor", "OverrideFillColor", "OpacityMultiplier", "SizeMultiplier", "NoteSizeMultiplier", "NoteTarget", "Destroy", "Note" }.Contains(n))
-                {
-                    targetPanel = PanelAppearanceContainer;
-                    targetComboBox = CmbAppearanceProps;
-                }
-                // 3. 🎛️ 游戏UI与控制 (UI Control)
-                else if (new[] { "StoryboardOpacity", "UiOpacity", "BackgroundDim", "ScanlineOpacity", "NoteOpacityMultiplier", "ScanlineColor", "NoteRingColor", "OverrideScanlinePos", "ScanlinePos", "HitboxMultiplier", "HoldDirection", "Style" ,"NoteFillColors" }.Contains(n))
-                {
-                    targetPanel = PanelUiContainer;
-                    targetComboBox = CmbUiProps;
-                }
-                // 4. 🎥 相机 (Camera)
-                else if (new[] { "Perspective", "Fov" }.Contains(n))
-                {
-                    targetPanel = PanelCameraContainer;
-                    targetComboBox = CmbCameraProps;
-                }
-                // 5. ✨ 屏幕特效 (Effects) - 利用 Contains 模糊抓取所有后缀为 Intensity, Speed 等的滤镜属性
-                else if (n.Contains("Bloom") || n.Contains("Vignette") || n.Contains("Glitch") || n.Contains("Chromatic") || n.Contains("Blur") || n.Contains("Dream") || n.Contains("Noise") || n.Contains("Arcade") || n.Contains("Tape") || n.Contains("Fisheye") || n.Contains("Shockwave") || n.Contains("Focus") || n.Contains("Sepia") || n.Contains("GrayScale") || n.Contains("ColorFilter") || n.Contains("Artifact"))
-                {
-                    targetPanel = PanelEffectsContainer;
-                    targetComboBox = CmbEffectsProps;
-                }
-                else
-                {
-                    targetPanel = PanelAppearanceContainer;
-                    targetComboBox = CmbAppearanceProps;
+                    case Core.PropertyCategory.Spatial:
+                        targetPanel = PanelSpatialContainer; targetComboBox = CmbSpatialProps; break;
+                    case Core.PropertyCategory.UiControl:
+                        targetPanel = PanelUiContainer; targetComboBox = CmbUiProps; break;
+                    case Core.PropertyCategory.Camera:
+                        targetPanel = PanelCameraContainer; targetComboBox = CmbCameraProps; break;
+                    case Core.PropertyCategory.Effects:
+                        targetPanel = PanelEffectsContainer; targetComboBox = CmbEffectsProps; break;
+                    default:
+                        targetPanel = PanelAppearanceContainer; targetComboBox = CmbAppearanceProps; break;
                 }
 
                 if (isActive)
@@ -709,6 +750,12 @@ namespace Naziki_Editor.Views.PropertyEditor
                 var selectorCtrl = new NoteSelectorBuilderControl(prop, _currentState, _context);
                 Grid.SetColumn(selectorCtrl, 1);
                 grid.Children.Add(selectorCtrl);
+            }
+            else if (prop.Name == "Pos") // ✨ 新增：拦截 Pos，降临线条端点矩阵！
+            {
+                var lineCtrl = new LinePointsEditorControl(prop, _currentState, _context);
+                Grid.SetColumn(lineCtrl, 1);
+                grid.Children.Add(lineCtrl);
             }
             else
             {

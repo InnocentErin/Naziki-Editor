@@ -10,17 +10,91 @@ using System.Linq;
 namespace Naziki_Editor.Core
 {
     // ==========================================
-    // 🔮 故事板解析器快捷命名空间代理（小艾帮你补办的通行证！）
+    // 🔮 故事板全量智能赋名枢纽（导入故事板时的终极安检门！）
     // ==========================================
     public static class StoryboardParser
     {
-        /// <summary>
-        /// 全局高雅自增发证官：自动把无名氏 ID 规范化为 sprite001 等格式
-        /// </summary>
         public static void StandardizeStoryboardIds(StoryboardRoot root)
         {
-            // 转发给真正的转换器执行
-            StoryboardEntityConverter.StandardizeStoryboardIds(root);
+            if (root == null) return;
+
+            // 依次全量洗盘 6 大场景对象数组
+            ProcessList(root.sprites, "sprite", root);
+            ProcessList(root.texts, "text", root);
+            ProcessList(root.videos, "video", root);
+            ProcessList(root.lines, "line", root);
+            ProcessList(root.controllers, "controller", root);
+            ProcessList(root.note_controllers, "note", root);
+        }
+
+        private static void ProcessList<T>(List<T> list, string typePrefix, StoryboardRoot root) where T : IStoryboardEntity
+        {
+            if (list == null) return;
+            foreach (var entity in list)
+            {
+                if (string.IsNullOrEmpty(entity.Id))
+                {
+                    entity.Id = GenerateSmartIdForImport(entity, typePrefix, root);
+                }
+            }
+        }
+
+        private static string GenerateSmartIdForImport(IStoryboardEntity obj, string typePrefix, StoryboardRoot root)
+        {
+            string coreValue = "new";
+
+            // 🧬 提取核心特征
+            if (obj is C2Sprite s) coreValue = s.BaseState?.Path;
+            else if (obj is C2Text t) coreValue = t.BaseState?.TextContent;
+            else if (obj is C2Video v) coreValue = v.BaseState?.Path;
+            else if (obj is C2Line) coreValue = "pos";
+            else if (obj is C2SceneController) coreValue = "scene";
+            else if (obj is C2NoteController nc && nc.BaseState?.NoteTarget != null)
+            {
+                string sVal = nc.BaseState.NoteTarget.ToString();
+                coreValue = sVal.StartsWith("{") ? "selector" : sVal;
+            }
+
+            // 🧹 净化特征文字
+            if (string.IsNullOrEmpty(coreValue)) coreValue = "item";
+            else
+            {
+                try
+                {
+                    coreValue = System.IO.Path.GetFileNameWithoutExtension(coreValue);
+                    coreValue = System.Text.RegularExpressions.Regex.Replace(coreValue, @"[^a-zA-Z0-9\u4e00-\u9fa5]", "_");
+                    coreValue = System.Text.RegularExpressions.Regex.Replace(coreValue, @"_+", "_").Trim('_');
+                    if (coreValue.Length > 15) coreValue = coreValue.Substring(0, 15);
+                    if (string.IsNullOrEmpty(coreValue)) coreValue = "item";
+                }
+                catch { coreValue = "item"; }
+            }
+
+            string baseId = $"{typePrefix}_{coreValue}".ToLower();
+            string finalId = baseId;
+            int index = 1;
+
+            // 🛡️ 严格查户口，防止在导入的对象之间互相撞名！
+            while (IsIdExistsInRoot(finalId, root))
+            {
+                finalId = $"{baseId}_{index}";
+                index++;
+            }
+
+            return finalId;
+        }
+
+        private static bool IsIdExistsInRoot(string id, StoryboardRoot root)
+        {
+            if (root == null) return false;
+            bool exists = false;
+            if (root.sprites != null) exists |= root.sprites.Exists(x => x.Id == id);
+            if (root.texts != null) exists |= root.texts.Exists(x => x.Id == id);
+            if (root.videos != null) exists |= root.videos.Exists(x => x.Id == id);
+            if (root.lines != null) exists |= root.lines.Exists(x => x.Id == id);
+            if (root.controllers != null) exists |= root.controllers.Exists(x => x.Id == id);
+            if (root.note_controllers != null) exists |= root.note_controllers.Exists(x => x.Id == id);
+            return exists;
         }
     }
 
@@ -90,7 +164,8 @@ namespace Naziki_Editor.Core
                 foreach (var prop in baseObj.Properties())
                 {
                     // 踢掉无效数据和特权属性
-                    if (prop.Value.Type != JTokenType.Null && prop.Name != "time" && prop.Name != "easing" && prop.Name != "note")
+                    // 🌟 核心修复：放行 time 和 easing，只拦截特权属性 note！彻底修复初始属性时间无法保存的 Bug！
+                    if (prop.Value.Type != JTokenType.Null && prop.Name != "note")
                     {
                         rootObj[prop.Name] = prop.Value;
                     }
@@ -189,61 +264,6 @@ namespace Naziki_Editor.Core
             }
 
             return entity;
-        }
-
-
-
-        // ==========================================
-        // 🔮 终极高雅自增发证官 (完全保留，无需导出删除)
-        // ==========================================
-        public static void StandardizeStoryboardIds(StoryboardRoot root)
-        {
-            if (root == null) return;
-
-            // 用来统计当前宇宙中各类组件已经用到了多少序号，防止和已有的名字撞车
-            int spriteCount = 1;
-            int textCount = 1;
-            int lineCount = 1;
-            int videoCount = 1;
-            int sceneCount = 1;
-            int noteCtrlCount = 1;
-
-            // 1. 先扫描全场，把别人本来就写好了的、优雅的数字后缀记录下来，继续往下数
-            if (root.sprites != null) foreach (var x in root.sprites.Where(s => !string.IsNullOrEmpty(s.Id) && s.Id.StartsWith("sprite")))
-            {
-                if (int.TryParse(x.Id.Replace("sprite", ""), out int num)) spriteCount = Math.Max(spriteCount, num + 1);
-            }
-            if (root.texts != null) foreach (var x in root.texts.Where(s => !string.IsNullOrEmpty(s.Id) && s.Id.StartsWith("text")))
-            {
-                if (int.TryParse(x.Id.Replace("text", ""), out int num)) textCount = Math.Max(textCount, num + 1);
-            }
-            if (root.lines != null) foreach (var x in root.lines.Where(s => !string.IsNullOrEmpty(s.Id) && s.Id.StartsWith("line")))
-            {
-                if (int.TryParse(x.Id.Replace("line", ""), out int num)) lineCount = Math.Max(lineCount, num + 1);
-            }
-            if (root.controllers != null) foreach (var x in root.controllers.Where(s => !string.IsNullOrEmpty(s.Id) && s.Id.StartsWith("scene")))
-            {
-                if (int.TryParse(x.Id.Replace("scene", ""), out int num)) sceneCount = Math.Max(sceneCount, num + 1);
-            }
-
-            // 2. 开始给无名氏挨个补办高雅的 001 式身份证！
-            if (root.sprites != null) foreach (var x in root.sprites.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"sprite{spriteCount++:D3}"; // :D3 格式会自动把 1 变成 001 噢！卡哇伊！
-
-            if (root.texts != null) foreach (var x in root.texts.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"text{textCount++:D3}";
-
-            if (root.lines != null) foreach (var x in root.lines.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"line{lineCount++:D3}";
-
-            if (root.videos != null) foreach (var x in root.videos.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"video{videoCount++:D3}";
-
-            if (root.controllers != null) foreach (var x in root.controllers.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"scene{sceneCount++:D3}";
-
-            if (root.note_controllers != null) foreach (var x in root.note_controllers.Where(s => string.IsNullOrEmpty(s.Id)))
-                x.Id = $"notectrl{noteCtrlCount++:D3}";
         }
     }
 
