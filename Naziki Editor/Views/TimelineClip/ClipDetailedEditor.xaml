@@ -1,0 +1,45 @@
+﻿<UserControl x:Class="Naziki_Editor.Views.TimelineClip.ClipDetailedEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BoardBgColor}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="🎭 属性时间切片" Foreground="{DynamicResource TipsColor}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <ScrollViewer x:Name="ScrollMicroRuler" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                    <Canvas x:Name="MicroRulerCanvas" Height="30" Width="1000"/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" SharedSizeGroup="TrackHeaderCol"/>
+                <ColumnDefinition Width="2"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{DynamicResource SideBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
+                <ScrollViewer x:Name="ScrollPropHeaders" VerticalScrollBarVisibility="Hidden">
+                    <StackPanel x:Name="PropHeadersStackPanel"/>
+                </ScrollViewer>
+            </Border>
+
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}"/>
+
+            <ScrollViewer x:Name="ScrollPropCanvas" Grid.Column="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="PropTracksStackPanel"/>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -20,4 +20,16 @@
     <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#000000"/>
     <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
 
+
+<!-- 以下是针对时间轴剪辑的专用颜色资源，保持与整体浅色调一致但具有区分度-->
+    <SolidColorBrush x:Key="SpriteClipBgBrush" Color="#E2F0D9"/>
+    <SolidColorBrush x:Key="SpriteClipBorderBrush" Color="#388E3C"/>
+    <SolidColorBrush x:Key="TextClipBgBrush" Color="#DDEBF7"/>
+    <SolidColorBrush x:Key="TextClipBorderBrush" Color="#1F75FE"/>
+    <SolidColorBrush x:Key="VideoClipBgBrush" Color="#FFF2CC"/>
+    <SolidColorBrush x:Key="VideoClipBorderBrush" Color="#F39C12"/>
+
+    <SolidColorBrush x:Key="ClipTextBrush" Color="#333333"/>
+    <SolidColorBrush x:Key="VirtualLineBrush" Color="#CC2222"/>
+
 </ResourceDictionary>
