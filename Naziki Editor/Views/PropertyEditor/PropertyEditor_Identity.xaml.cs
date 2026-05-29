@@ -47,6 +47,30 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 BuildEventGroupContextMenu();
             }
+
+            // 🎭 方案B基因锁定：只有当选中的是控制板（TargetId不为空）时，才让 Target 闪亮登场！
+            if (RowTargetId != null && TxtTargetId != null)
+            {
+                if (!string.IsNullOrEmpty(_editingObject.TargetId))
+                {
+                    // 1. 唤醒前台展示行
+                    RowTargetId.Visibility = Visibility.Visible;
+                    // 2. 将其死死抓着的主体对象 ID 优雅展现
+                    TxtTargetId.Text = _editingObject.TargetId;
+
+                    // 💡 顺手小优化：既然是控制板，它的 Parent 属性一般交由主体决定，在前台可以提示锁定或变灰
+                    TxtParentId.IsEnabled = false;
+                    TxtParentId.ToolTip = "💡 幽灵控制板的跟随目标将由其控制的主体对象全权代理哦！";
+                }
+                else
+                {
+                    // 如果是普通实体对象，此行彻底蒸发，不占一丝空间
+                    RowTargetId.Visibility = Visibility.Collapsed;
+                    TxtParentId.IsEnabled = true;
+                    TxtParentId.ToolTip = null;
+                }
+            }
+
         }
 
         // ==========================================
@@ -190,36 +214,84 @@ namespace Naziki_Editor.Views.PropertyEditor
         }
 
         // 🌟 增加模板专属加载入口
-        public void LoadTemplateData(string templateName, TemplateType currentType)
+        public void LoadTemplateData(string templateName, ProjectDataContext context)
         {
             _isTemplateMode = true;
-            RowTemplateType.Visibility = Visibility.Visible;
-            TxtParentId.Visibility = Visibility.Collapsed;
+            _context = context;
+            _originalId = templateName;
+            _editingObject = null; // 模板无实体，安全置空
 
             TxtObjectId.Text = templateName;
 
-            foreach (ComboBoxItem item in CmbTemplateType.Items)
+            // 👁️ 视觉魔法：显示门派下拉框，隐藏无用的 Parent 和 Target
+            if (RowTemplateType != null) RowTemplateType.Visibility = Visibility.Visible;
+            if (RowParentId != null) RowParentId.Visibility = Visibility.Collapsed;
+            if (RowTargetId != null) RowTargetId.Visibility = Visibility.Collapsed;
+
+            // 📖 自动回显门派类型
+            if (_context?.ProjectData?.TemplateTypes != null && _context.ProjectData.TemplateTypes.TryGetValue(templateName, out TemplateType type))
             {
-                if (item.Tag.ToString() == currentType.ToString())
+                CmbTemplateType.SelectionChanged -= CmbTemplateType_SelectionChanged; // 拔掉网线防误触
+                foreach (ComboBoxItem item in CmbTemplateType.Items)
                 {
-                    CmbTemplateType.SelectedItem = item;
-                    break;
+                    if (item.Tag?.ToString() == type.ToString())
+                    {
+                        CmbTemplateType.SelectedItem = item;
+                        break;
+                    }
                 }
+                CmbTemplateType.SelectionChanged += CmbTemplateType_SelectionChanged;
             }
         }
 
         private void CmbTemplateType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!_isTemplateMode || CmbTemplateType.SelectedItem == null) return;
+            if (!_isTemplateMode || _context == null || !_context.HasStoryboard) return;
 
-            if (Enum.TryParse((CmbTemplateType.SelectedItem as ComboBoxItem).Tag.ToString(), out TemplateType newType))
+            if (CmbTemplateType.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
-                OnTemplateTypeChanged?.Invoke(newType);
+                string typeStr = item.Tag.ToString();
+                if (Enum.TryParse(typeStr, out TemplateType selectedType))
+                {
+                    OnTemplateTypeChanged?.Invoke(selectedType); // 广播给大本营
+
+                    // 📛 自动冠名：前缀_编号
+                    string prefix = typeStr.ToLower();
+                    int count = 1;
+                    string newName = $"{prefix}_{count}";
+
+                    while (_context.Storyboard.templates != null && _context.Storyboard.templates.ContainsKey(newName) && newName != _originalId)
+                    {
+                        count++;
+                        newName = $"{prefix}_{count}";
+                    }
+                    TxtObjectId.Text = newName;
+                }
             }
         }
 
         public bool ValidateAndSave()
         {
+
+            // 🛡️ 模板模式专属验证：只校验名字，不干涉实体
+            if (_isTemplateMode)
+            {
+                string newTplId = TxtObjectId.Text.Trim();
+                if (string.IsNullOrEmpty(newTplId)) { TxtIdWarning.Text = "⚠️ 模板名不能为空！"; TxtIdWarning.Visibility = Visibility.Visible; return false; }
+                if (newTplId != _originalId && _context.Storyboard.templates != null && _context.Storyboard.templates.ContainsKey(newTplId)) { TxtIdWarning.Text = "⚠️ 模板名冲突！"; TxtIdWarning.Visibility = Visibility.Visible; return false; }
+                TxtIdWarning.Visibility = Visibility.Collapsed;
+                return true;
+            }
+
+
+
+            // 🔒 幽灵免检特权：如果是控制板对象（TargetId不为空），其ID由系统顺位账本无缝托管，
+            // 绝不需要前台文本框校验，直接大开绿灯安全放行！
+            if (_editingObject != null && !string.IsNullOrEmpty(_editingObject.TargetId))
+            {
+                return true;
+            }
+
             string newId = TxtObjectId.Text.Trim();
             if (string.IsNullOrEmpty(newId))
             {

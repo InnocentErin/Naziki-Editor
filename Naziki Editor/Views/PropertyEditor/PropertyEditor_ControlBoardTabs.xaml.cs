@@ -52,10 +52,13 @@ namespace Naziki_Editor.Views.PropertyEditor
             var mainTab = new TabItem { Header = "🎭 主体对象", Tag = _mainObject };
             TabControlBoards.Items.Add(mainTab);
 
+            // ✨ 极简自增优化：用 1, 2, 3 的代号隐藏掉长长的真实 ID 全称！
+            int targetIndex = 1;
             foreach (var cb in ControlBoards)
             {
-                var cbTab = new TabItem { Header = $"🎛️ {cb.Id}", Tag = cb };
+                var cbTab = new TabItem { Header = $"🎛️ Target_{targetIndex}", Tag = cb };
                 TabControlBoards.Items.Add(cbTab);
+                targetIndex++; // 编号自增，为未来的轨道组排版埋下引线
             }
 
             TabControlBoards.SelectedIndex = (currentIndex >= 0 && currentIndex < TabControlBoards.Items.Count) ? currentIndex : 0;

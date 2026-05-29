@@ -45,10 +45,11 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
 
-                                    <UniformGrid Grid.Row="0" Columns="3" Margin="5,5,5,2">
+                                    <UniformGrid Grid.Row="0" Columns="4" Margin="5,5,5,2">
                                         <Button Content="➕ 文字" x:Name="BtnAddText" Click="BtnAddText_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                         <Button Content="➕ 线条" x:Name="BtnAddLine" Click="BtnAddLine_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                         <Button Content="➕ 场景" x:Name="BtnAddScene" Click="BtnAddScene_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                        <Button Content="➕ 模板" x:Name="BtnAddTemplate" Click="BtnAddTemplate_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                     </UniformGrid>
 
                                     <Border Grid.Row="1" Background="Transparent">

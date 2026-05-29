@@ -96,10 +96,10 @@ namespace Naziki_Editor.Views.PropertyEditor
         private string _currentTitle;
         private object _rootState;
         private bool _isRoot;
+        private bool _isControlBoard = false; // ✨ 新增：高阶属性控制板检测锁
 
         private Naziki_Editor.State.ProjectDataContext _context;
 
-        private System.Collections.Generic.HashSet<string> _manuallyActivatedProps = new System.Collections.Generic.HashSet<string>();
         private System.Collections.Generic.Dictionary<string, C2Template> _globalTemplates;
         private HashSet<string> _invalidProperties = new HashSet<string>();
 
@@ -162,9 +162,34 @@ namespace Naziki_Editor.Views.PropertyEditor
             var easingProp = _currentState.GetType().GetProperty("Easing");
             if (easingProp != null)
             {
-                var easingPicker = new EasingPickerControl(easingProp, _currentState, AttachValidationProbe);
-                Grid.SetColumn(easingPicker, 1); // 放在容器的右侧列
-                RowEasing.Children.Add(easingPicker);
+                // 🌟 架构级数据分流：若为后续帧，绑定目标切换为初始属性 (_rootState) 以实现“纯显示继承”！
+                object targetState = _isRoot ? _currentState : _rootState;
+                var targetProp = targetState?.GetType().GetProperty("Easing") ?? easingProp;
+
+                var easingPicker = new EasingPickerControl(targetProp, targetState, AttachValidationProbe);
+
+                // 🔒 置灰控制：只有初始核心属性允许编辑，后续状态一律变灰锁死，绝对不写盘！
+                easingPicker.IsEnabled = _isRoot;
+
+                // 🏗️ 建立纵向排版包厢，确保小提示能够完美地顶在按钮的正下方
+                StackPanel easingLayoutGroup = new StackPanel { Orientation = Orientation.Vertical };
+                easingLayoutGroup.Children.Add(easingPicker);
+
+                if (!_isRoot)
+                {
+                    easingLayoutGroup.Children.Add(new TextBlock
+                    {
+                        Text = "⚠ 仅初始属性才可编辑缓动类型，状态内不允许编辑！",
+                        Foreground = Brushes.Gray,
+                        FontSize = 10,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        FontStyle = FontStyles.Italic,
+                        HorizontalAlignment = HorizontalAlignment.Left
+                    });
+                }
+
+                Grid.SetColumn(easingLayoutGroup, 1); // 放在容器的右侧列
+                RowEasing.Children.Add(easingLayoutGroup);
             }
 
             // 2. 拔掉上一次残留的老控件，防止切换帧时在界面上无限堆叠套娃
@@ -202,7 +227,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     StackPanel fixedPropsContainer = new StackPanel { Name = "PanelRootFixedProps", Margin = new Thickness(0, 10, 0, 0) };
 
                     // 🌟 1. 【黑魔法】：从父窗口偷看当前对象到底是不是“控制板”！
-                    bool isControlBoard = false;
+                    _isControlBoard = false;
                     var parentWin = Window.GetWindow(this);
                     if (parentWin != null)
                     {
@@ -212,30 +237,31 @@ namespace Naziki_Editor.Views.PropertyEditor
                             var activeObj = field.GetValue(parentWin) as IStoryboardEntity;
                             if (activeObj != null && !string.IsNullOrEmpty(activeObj.TargetId))
                             {
-                                isControlBoard = true;
+                                _isControlBoard = true;
                             }
                         }
                     }
 
                     // 🌟 2. 给予用户贴心的提示，替换掉原有的输入框
-                    if (isControlBoard)
+                    if (_isControlBoard)
                     {
                         fixedPropsContainer.Children.Add(new TextBlock
                         {
-                            Text = "👻 控制板隐身模式：此对象仅传递动画，初始视觉核心已禁用。",
+                            Text = "👻 控制板隐身模式：此对象仅传递动画，初始视觉核心（Path/Text/Pos）已禁用。",
                             Foreground = Brushes.Gray,
-                            Margin = new Thickness(0, 0, 0, 10)
+                            Margin = new Thickness(0, 0, 0, 10),
+                            FontStyle = FontStyles.Italic
                         });
                     }
 
                     PropertyInfo[] props = _currentState.GetType().GetProperties();
                     foreach (var prop in props)
                     {
-                        // 筛选需要置顶的初始固定属性
-                        if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
+                        // 筛选需要置顶的初始固定属性 (联动增加 Text 判定)
+                        if (prop.Name == "Path" || prop.Name == "Text" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
                         {
                             // 🛑 【终极拦截】：如果是控制板，直接跳过生成，统统失去实体！
-                            if (isControlBoard) continue;
+                            if (_isControlBoard) continue;
 
                             var row = CreateFixedPropertyRow(prop);
                             fixedPropsContainer.Children.Add(row);
@@ -453,6 +479,8 @@ namespace Naziki_Editor.Views.PropertyEditor
                 if (prop.Name == "Path" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos") continue;
                 //  
                 if (IsStaticDnaProperty(prop.Name) && !_isRoot) continue;
+                // ✨【控制板防御拦截】：如果是控制板叠加对象，其余任何诸如 Layer, Font, Align 等静态非动画属性一律不准在面板里露脸！
+                if (_isControlBoard && IsStaticDnaProperty(prop.Name)) continue;
 
                 // 🌟 【小艾的终极防线】：如果处于模板编辑模式，且该属性不属于此门派，直接蒸发！
                 if (_rootState != null && _rootState.GetType().Name == "TemplateState") // 只要是模板类
@@ -466,11 +494,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 object val = prop.GetValue(_currentState);
                 bool isActive = (val != null);
 
-                // ✨ 核心重修：修正可空 UnitFloat 初始默认判断
-                if (isActive && val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World)
-                {
-                    if (!_manuallyActivatedProps.Contains(prop.Name)) isActive = false;
-                }
+                
 
                 // ==========================================
                 // 🌟 小艾的完美分拣法术：确保没有任何一个属性流浪！
@@ -526,7 +550,6 @@ namespace Naziki_Editor.Views.PropertyEditor
                 Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 object defaultVal = uType == typeof(string) ? "" : (uType == typeof(UnitFloat) ? new UnitFloat { Value = 0, Unit = ReferenceUnit.World } : (uType == typeof(System.Collections.Generic.List<string>) ? new System.Collections.Generic.List<string>(new string[12]) : Activator.CreateInstance(uType)));
 
-                _manuallyActivatedProps.Add(prop.Name);
                 prop.SetValue(_currentState, defaultVal);
                 LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
             }

@@ -15,6 +15,13 @@ namespace Naziki_Editor
         // =========================================
         protected override void OnStartup(StartupEventArgs e)
         {
+            // 👇 🟢【源头级增量注入】：在所有业务、哨兵启动前，率先全量张开时空安全网！
+            this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
+
+
             // 🛑 【雷达修正核心】安全网升级：只要是带参数的哨兵（无论叫啥），通通拦截，绝对不许往下执行！
             if (e.Args.Length > 0 && (e.Args[0] == "--watch" || e.Args[0] == "--crash-watcher"))
             {
@@ -103,5 +110,63 @@ namespace Naziki_Editor
             ProjectHubWindow hubWindow = new ProjectHubWindow();
             hubWindow.Show();
         }
+
+        // =========================================================================
+        // 🛡️ 核心雷达总线：全量缉拿未捕获异常，拒绝沉默，现场抓捕！
+        // =========================================================================
+
+        /// <summary>
+        /// 💥 1. UI主干交互线程致命异常雷达
+        /// </summary>
+        private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            // 阻断异常继续向上抛引发程序直接黑屏闪退，为主程序留下调试自救的喘息时间！
+            e.Handled = true;
+            ShowDetailedErrorWindow("🔮 [UI 物理交互线程发生穿模]", e.Exception);
+        }
+
+        /// <summary>
+        /// 💥 2. 后台多线程/文件流等非UI异次元时空崩溃雷达
+        /// </summary>
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                ShowDetailedErrorWindow("📡 [后台或独立多线程发生引擎核爆]", ex);
+            }
+        }
+
+        /// <summary>
+        /// 💥 3. Async/Await 异步流未观察任务死锁/异常雷达
+        /// </summary>
+        private void TaskScheduler_UnobservedTaskException(object sender, System.Threading.Tasks.UnobservedTaskExceptionEventArgs e)
+        {
+            // 标志异常已被观察，防止垃圾回收 (GC) 时引发次生连带闪退
+            e.SetObserved();
+            ShowDetailedErrorWindow("⏳ [Async 异步时空遭遇因果悖论]", e.Exception);
+        }
+
+        /// <summary>
+        /// 📺 终极可视化弹窗：精准剥离真实病灶并定格现场
+        /// </summary>
+        private void ShowDetailedErrorWindow(string errorSource, Exception ex)
+        {
+            // 顺着藤蔓一路往下摸，揪出导致整体翻车的那个最底层、最真实的元凶异常
+            Exception realException = ex;
+            while (realException.InnerException != null)
+            {
+                realException = realException.InnerException;
+            }
+
+            // 格式化案发现场报告
+            string errorMsg = $"{errorSource}\n\n" +
+                              $"⚠️ 异常真名: {realException.GetType().FullName}\n" +
+                              $"💬 报错原因: {realException.Message}\n\n" +
+                              $"📍 崩溃精准定位 (StackTrace):\n{realException.StackTrace}";
+
+            // 祭出最高优先级的报错警告框
+            MessageBox.Show(errorMsg, "Naziki 核心物理引擎安检警报", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
+
 }

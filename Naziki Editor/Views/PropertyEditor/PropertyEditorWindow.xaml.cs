@@ -100,8 +100,14 @@ namespace Naziki_Editor.Views.PropertyEditor
             // 模板模式禁用控制板
             ModControlBoards.Visibility = Visibility.Collapsed;
 
-            ModIdentity.TxtObjectId.Text = _templateName;
-            ModFrameList.LoadTemplateData(_editingTemplate, _context);
+            ModIdentity.OnTemplateTypeChanged += (type) =>
+            {
+                // 通知右侧详情页动态刷新白名单
+                ModFrameDetails.SetTemplateTypeLimit(type);
+                // 实时记入小账本
+                if (_context.ProjectData.TemplateTypes != null) _context.ProjectData.TemplateTypes[ModIdentity.TxtObjectId.Text] = type;
+            };
+            ModIdentity.LoadTemplateData(_templateName, _context);
         }
 
         private IList GetTargetListByType(StoryboardRoot root, Type t)
@@ -120,6 +126,16 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            if (!ModIdentity.ValidateAndSave()) return;
+            if (ModControlBoards != null && ModControlBoards.ControlBoards != null)
+            {
+                foreach (var cb in ModControlBoards.ControlBoards)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[保存前夕审计] 控制板 ID: {cb.Id}, 它的 TargetId 是: '{cb.TargetId}'");
+                }
+            }
+
+
             if (_isTemplateMode)
             {
                 string newName = ModIdentity.TxtObjectId.Text.Trim();
@@ -158,9 +174,10 @@ namespace Naziki_Editor.Views.PropertyEditor
                     {
                         list.Add(cb);
                     }
+                    
                 }
             }
-
+            
             this.Tag = _mainObject;
             this.DialogResult = true;
             this.Close();
@@ -171,6 +188,33 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 🧠 智能命名中枢：根据对象基因自动生成优雅的 ID！
         // ==========================================
+
+        //private string GenerateSmartId(IStoryboardEntity obj, ProjectDataContext context)
+        //{
+        //    string typeName = "obj";
+
+        //    // 🧬 1. 完美保留大大的原版精髓：精准测绘门派基因，绝不丢失分类！
+        //    if (obj is C2Sprite s) { typeName = "sprite"; }
+        //    else if (obj is C2Text t) { typeName = "text"; }
+        //    else if (obj is C2Video v) { typeName = "video"; }
+        //    else if (obj is C2Line l) { typeName = "line"; }
+        //    else if (obj is C2SceneController) { typeName = "controller"; }
+        //    else if (obj is C2NoteController) { typeName = "note"; }
+
+        //    // 🧹 2. 彻底抛弃提取内容、时间戳和正则过滤，直接启用极简自增！
+        //    int index = 1;
+        //    string finalId = $"{typeName}_{index:D3}"; // 生成形如: sprite_001
+
+        //    // 🛡️ 3. 查户口：如果大本营里已经有人叫这个名字了，就不断向后进位！
+        //    while (IsIdExists(finalId, context))
+        //    {
+        //        index++;
+        //        finalId = $"{typeName}_{index:D3}";
+        //    }
+
+        //    return finalId;
+        //}
+
         private string GenerateSmartId(IStoryboardEntity obj, ProjectDataContext context)
         {
             string typeName = "obj";

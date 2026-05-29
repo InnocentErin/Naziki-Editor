@@ -96,6 +96,10 @@ namespace Naziki_Editor.Views
                     string jsonText = File.ReadAllText(projectData.StoryboardExportPath);
                     Context.Storyboard = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText, StoryboardSerializer.GetSettings());
 
+                    // 🌟 核心接入：在打开已有项目故事板时，立刻根据加载进来的 projectData 留痕账本全量复活控制板 ID！
+                    StoryboardParser.StandardizeStoryboardIds(Context.Storyboard, projectData);
+
+
                     // 📒【点亮科技树】：在此处级联捞起元数据小账本！
                     TryLoadStoryboardMetaFile();
 
@@ -136,6 +140,13 @@ namespace Naziki_Editor.Views
         private void TryLoadStoryboardMetaFile()
         {
             if (string.IsNullOrEmpty(Context.StoryboardPath)) return;
+
+
+            // 🌟 终极死锁留痕：在写盘保存前夕，根据当前的内存物理顺序，将控制板ID全量锁死进 .nep 账本中！
+            if (Context.ProjectData != null)
+            {
+                StoryboardParser.SyncControlBoardIdMaps(Context.Storyboard, Context.ProjectData);
+            }
 
             string metaPath = Context.StoryboardPath + "_meta.json";
             try
@@ -335,6 +346,7 @@ namespace Naziki_Editor.Views
             EventList.OnAddTextRequested += AddNewTextEvent;
             EventList.OnAddLineRequested += AddNewLineEvent;
             EventList.OnAddSceneRequested += AddNewSceneControllerEvent;
+            EventList.OnAddTemplateRequested += AddNewTemplateEvent;
 
             CanvasArea.OnBeforeActionCheckConflict = () => ResolveDataConflictIfNeeded();
 
@@ -554,6 +566,42 @@ namespace Naziki_Editor.Views
             Context.Storyboard.controllers.Add(controller);
             EventList.LoadStoryboardUI();
             Context.MarkAsModified();
+        }
+
+        // =========================================================================
+        // 🌟 主窗口接管：新建模板的全局造物法术
+        // =========================================================================
+        private void AddNewTemplateEvent()
+        {
+            if (Context == null || !Context.HasStoryboard) return;
+            var root = Context.Storyboard;
+            if (root.templates == null) root.templates = new System.Collections.Generic.Dictionary<string, Naziki_Editor.Models.C2Template>();
+
+            // 1. 生成不冲突的初始名字
+            string newKey = "generic_" + Guid.NewGuid().ToString().Substring(0, 4);
+            while (root.templates.ContainsKey(newKey))
+            {
+                newKey = "generic_" + Guid.NewGuid().ToString().Substring(0, 5);
+            }
+
+            // 2. 赋予纯净的数据灵魂
+            var newTemplate = new Naziki_Editor.Models.C2Template();
+            root.templates[newKey] = newTemplate;
+
+            // 3. 在大本营的顺位账本上登记造册
+            if (Context.ProjectData != null && Context.ProjectData.TemplateTypes != null)
+            {
+                Context.ProjectData.TemplateTypes[newKey] = Naziki_Editor.Models.TemplateType.Generic;
+            }
+
+            // 4. 惊醒时光机！让包括时间轴在内的所有全局视图准备刷新！
+            Context.MarkAsModified();
+
+            // 5. 刷新左侧 UI（因为数据变了，通知 UI 重新加载）
+            EventList.LoadStoryboardUI();
+
+            // 🌟 6. 【极度丝滑交互】：造出来的瞬间，直接弹出属性编辑器，不用打谱师再去双击！
+            OpenTemplatePropertyEditor(newKey, newTemplate);
         }
 
         private void MenuSave_Click(object sender, RoutedEventArgs e)

@@ -22,10 +22,16 @@ namespace Naziki_Editor.Views
         public event Action OnAddTextRequested;
         public event Action OnAddLineRequested;
         public event Action OnAddSceneRequested;
+        public event Action OnAddTemplateRequested; 
 
         private void BtnAddText_Click(object sender, RoutedEventArgs e) => OnAddTextRequested?.Invoke();
         private void BtnAddLine_Click(object sender, RoutedEventArgs e) => OnAddLineRequested?.Invoke();
         private void BtnAddScene_Click(object sender, RoutedEventArgs e) => OnAddSceneRequested?.Invoke();
+        private void BtnAddTemplate_Click(object sender, RoutedEventArgs e) => OnAddTemplateRequested?.Invoke();
+
+
+
+        public event Action<string, C2Template> OnTemplateDoubleClicked;
 
         public ProjectDataContext Context { get; private set; }
 
@@ -52,8 +58,7 @@ namespace Naziki_Editor.Views
                     string jsonText = File.ReadAllText(openFileDialog.FileName);
                     StoryboardRoot root = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText, StoryboardSerializer.GetSettings());
                     // 让自增发证官入场，全盘清洗无 ID 的伪空列表！
-                    StoryboardParser.StandardizeStoryboardIds(root);
-                    if (root == null) throw new Exception("故事板解析出来空空如也，是不是文件损坏了？");
+                    StoryboardParser.StandardizeStoryboardIds(root, Context.ProjectData); if (root == null) throw new Exception("故事板解析出来空空如也，是不是文件损坏了？");
 
                     // 🌟 物理接线：提前将路径汇报给大管家，确保 TryLoad 探头能拿到正确的坐标！
                     Context.StoryboardPath = openFileDialog.FileName;
@@ -101,25 +106,41 @@ namespace Naziki_Editor.Views
 
             ClearAllDrawers();
 
+            // ✨ 降临过滤器：只要 TargetId 属性里存在非空字串，意味着它是提线木偶，前台列表冷酷蒸发！
             if (root.sprites?.Count > 0) foreach (var obj in root.sprites)
+            {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue; 
                 SpriteListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+            }
 
             if (root.texts?.Count > 0) foreach (var obj in root.texts)
+            {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
                 TextListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+            }
 
             if (root.videos?.Count > 0) foreach (var obj in root.videos)
+            {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
                 VideoListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+            }
 
             if (root.lines?.Count > 0) foreach (var obj in root.lines)
+            {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
                 LinesListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+            }
 
             if (root.controllers?.Count > 0) foreach (var obj in root.controllers)
+            {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
                 SceneListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+            }
 
             if (root.note_controllers?.Count > 0) foreach (var obj in root.note_controllers)
             {
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
                 ListBoxItem item = new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj };
-                // ✨ 核心修正：属性读取路径更正
                 if (obj.BaseState?.NoteTarget is JObject) { item.Foreground = Brushes.DarkCyan; item.FontWeight = FontWeights.Bold; }
                 NoteCtrlListBox.Items.Add(item);
             }
@@ -228,11 +249,11 @@ namespace Naziki_Editor.Views
             ListBox activeList = GetCurrentActiveListBox();
             if (activeList == null || activeList.SelectedItems.Count == 0)
             {
-                MessageBox.Show("呆胶布？你还没有在列表中选择要删除的事件哦！", "小艾的提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("你还没有在列表中选择要删除的事件哦！", "小艾的提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var result = MessageBox.Show($"确认要将这 {activeList.SelectedItems.Count} 个事件从故事板中彻底抹除吗？\n此操作目前不可撤销哦！", "危险警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var result = MessageBox.Show($"确认要将这 {activeList.SelectedItems.Count} 个事件从故事板中彻底抹除吗？\n此操作不可撤销哦！", "危险警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes) return;
 
             var root = Context.Storyboard;
@@ -272,5 +293,7 @@ namespace Naziki_Editor.Views
                 OnEventNodeSelected?.Invoke(null);
             }
         }
+
+
     }
 }

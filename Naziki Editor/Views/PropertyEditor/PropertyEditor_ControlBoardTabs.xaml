@@ -1,16 +1,28 @@
 ﻿<UserControl x:Class="Naziki_Editor.Views.PropertyEditor.PropertyEditor_ControlBoardTabs"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid x:Name="RootContainer">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
+    <StackPanel Orientation="Vertical">
 
-        <TabControl x:Name="TabControlBoards" SelectionChanged="TabControlBoards_SelectionChanged" Background="Transparent" BorderThickness="0" Margin="0,0,10,0"/>
+        <Grid x:Name="RootContainer" Margin="0,0,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <Button x:Name="BtnDeleteControlBoard" Grid.Column="1" Content="🗑️ 销毁此板" Padding="10,5" Margin="0,0,5,0" Background="IndianRed" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnDeleteControlBoard_Click" Visibility="Collapsed"/>
-        <Button x:Name="BtnAddControlBoard" Grid.Column="2" Content="➕ 添加控制板" Padding="10,5" Background="MediumPurple" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnAddControlBoard_Click"/>
-    </Grid>
+            <TabControl x:Name="TabControlBoards" SelectionChanged="TabControlBoards_SelectionChanged" Background="Transparent" BorderThickness="0" Margin="0,0,10,0"/>
+
+                <Button x:Name="BtnDeleteControlBoard" Grid.Column="1" Content="🗑️ 销毁此板" Padding="10,5" Margin="0,0,5,0" Background="IndianRed" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnDeleteControlBoard_Click" Visibility="Collapsed"/>
+                    <Button x:Name="BtnAddControlBoard" Grid.Column="2" Content="➕ 添加控制板" Padding="10,5" Background="MediumPurple" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnAddControlBoard_Click"/>
+        </Grid>
+
+        <Border BorderThickness="1,0,0,0" BorderBrush="MediumPurple" Padding="8,2" Margin="4,0,0,0">
+            <TextBlock FontSize="10.5" LineHeight="16" Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap">
+                <Run Text="💡 留痕安全锁：在此处设定控制板属性，若未来需要在项目外修改，则尽量不要改变顺序，否则程序可能会映射错误；" />
+                <LineBreak/>
+                <Run Text="📝 若计划新建一个新的控制板，请先在该项目类内添加留痕。" Foreground="{DynamicResource HighlightBorderColor}" FontWeight="SemiBold"/>
+            </TextBlock>
+        </Border>
+
+    </StackPanel>
 </UserControl>

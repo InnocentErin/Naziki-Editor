@@ -16,7 +16,7 @@
             </StackPanel>
         </Grid>
 
-        <Grid Margin="0,0,0,10">
+        <Grid x:Name="RowParentId" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="100"/>
                 <ColumnDefinition Width="*"/>
@@ -24,6 +24,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            
             <TextBlock Text="跟随目标 (Parent):" VerticalAlignment="Center" FontWeight="Bold"/>
             <TextBox x:Name="TxtParentId" Grid.Column="1" Padding="5" ToolTip="填入其他场景对象或音符的ID，留空则代表不跟随"/>
 
@@ -39,6 +40,17 @@
                 </Button.ContextMenu>
             </Button>
         </Grid>
+
+        <Grid x:Name="RowTargetId" Margin="0,0,0,10" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="控制对象 (Target):" VerticalAlignment="Center" FontWeight="Bold" Foreground="{DynamicResource HighlightBorderColor}"/>
+            <TextBox x:Name="TxtTargetId" Grid.Column="1" Padding="5" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="MediumPurple" FontWeight="Bold" ToolTip="当前控制板对象所深情凝视的核心主体 ID"/>
+        </Grid>
+
+
 
         <Grid x:Name="RowTemplateType" Margin="0,0,0,10" Visibility="Collapsed">
             <Grid.ColumnDefinitions>

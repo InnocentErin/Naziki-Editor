@@ -9,72 +9,116 @@ using System.Linq;
 
 namespace Naziki_Editor.Core
 {
-    // ==========================================
-    // 🔮 故事板全量智能赋名枢纽（导入故事板时的终极安检门！）
-    // ==========================================
+    // =========================================================================
+    // 🔮 故事板全量智能赋名与顺位留痕枢纽（导入与存盘的终极安检门！）
+    // =========================================================================
     public static class StoryboardParser
     {
-        public static void StandardizeStoryboardIds(StoryboardRoot root)
+        // 📥 读盘/导入总线：全盘恢复或动态分配控制板身份证
+        public static void StandardizeStoryboardIds(StoryboardRoot root, NazikiProjectModel project)
         {
             if (root == null) return;
 
             // 依次全量洗盘 6 大场景对象数组
-            ProcessList(root.sprites, "sprite", root);
-            ProcessList(root.texts, "text", root);
-            ProcessList(root.videos, "video", root);
-            ProcessList(root.lines, "line", root);
-            ProcessList(root.controllers, "controller", root);
-            ProcessList(root.note_controllers, "note", root);
+            ProcessList(root.sprites, "sprite", root, project);
+            ProcessList(root.texts, "text", root, project);
+            ProcessList(root.videos, "video", root, project);
+            ProcessList(root.lines, "line", root, project);
+            ProcessList(root.controllers, "controller", root, project);
+            ProcessList(root.note_controllers, "note", root, project);
         }
 
-        private static void ProcessList<T>(List<T> list, string typePrefix, StoryboardRoot root) where T : IStoryboardEntity
+        private static void ProcessList<T>(List<T> list, string typePrefix, StoryboardRoot root, NazikiProjectModel project) where T : IStoryboardEntity
         {
             if (list == null) return;
+
+            // 针对每个宿主目标（TargetId）独立维护计数器，精准定位多胞胎控制板的出场顺位
+            var targetCounters = new Dictionary<string, int>();
+
             foreach (var entity in list)
             {
-                if (string.IsNullOrEmpty(entity.Id))
+                // 情况 A：如果在 JSON 里原本就有 id（属于有渲染肉体的标准场景实体），保持不变
+                if (!string.IsNullOrEmpty(entity.Id)) continue;
+
+                // 情况 B：如果是控制板对象（JSON里官方无id，但有 target_id）
+                if (!string.IsNullOrEmpty(entity.TargetId))
                 {
+                    string targetId = entity.TargetId;
+                    if (!targetCounters.ContainsKey(targetId)) targetCounters[targetId] = 0;
+                    int index = targetCounters[targetId]++;
+
+                    // 🛠️ 构造全宇宙唯一的顺位小账本检索钥匙
+                    string mapKey = $"cb_{typePrefix}_{targetId}_{index}";
+
+                    if (project != null && project.ControlBoardIdMaps != null && project.ControlBoardIdMaps.TryGetValue(mapKey, out string savedId))
+                    {
+                        // 📖 账本里有记录！说明是重启或二次打开，直接精准重合复活原有的唯一唯一ID！
+                        entity.Id = savedId;
+                    }
+                    else
+                    {
+                        // 🆕 初次导入野生谱面，账本无记录，小艾动态为它捏一个合法的身份证，并立刻在账本上留痕！
+                        string generatedId = $"{targetId}_target_{index + 1}_{Guid.NewGuid().ToString().Substring(0, 8)}";
+                        entity.Id = generatedId;
+
+                        if (project != null && project.ControlBoardIdMaps != null)
+                        {
+                            project.ControlBoardIdMaps[mapKey] = generatedId;
+                        }
+                    }
+                }
+                else
+                {
+                    // 情况 C：既没有id也没有target_id的野生实体，走原本的智能命名
                     entity.Id = GenerateSmartIdForImport(entity, typePrefix, root);
                 }
             }
         }
 
-        private static string GenerateSmartIdForImport(IStoryboardEntity obj, string typePrefix, StoryboardRoot root)
+        // 💾 存盘前夕反向同步总线：在写盘前，将内存中新创的控制板和顺位重新死死锁进 .nep 字典里！
+        public static void SyncControlBoardIdMaps(StoryboardRoot root, NazikiProjectModel project)
         {
-            string coreValue = "new";
+            if (root == null || project == null || project.ControlBoardIdMaps == null) return;
 
-            // 🧬 提取核心特征
-            if (obj is C2Sprite s) coreValue = s.BaseState?.Path;
-            else if (obj is C2Text t) coreValue = t.BaseState?.TextContent;
-            else if (obj is C2Video v) coreValue = v.BaseState?.Path;
-            else if (obj is C2Line) coreValue = "pos";
-            else if (obj is C2SceneController) coreValue = "scene";
-            else if (obj is C2NoteController nc && nc.BaseState?.NoteTarget != null)
-            {
-                string sVal = nc.BaseState.NoteTarget.ToString();
-                coreValue = sVal.StartsWith("{") ? "selector" : sVal;
-            }
+            project.ControlBoardIdMaps.Clear(); // 刷新旧账本，防残留
+            SyncList(root.sprites, "sprite", project);
+            SyncList(root.texts, "text", project);
+            SyncList(root.videos, "video", project);
+            SyncList(root.lines, "line", project);
+            SyncList(root.controllers, "controller", project);
+            SyncList(root.note_controllers, "note", project);
+        }
 
-            // 🧹 净化特征文字
-            if (string.IsNullOrEmpty(coreValue)) coreValue = "item";
-            else
+        private static void SyncList<T>(List<T> list, string typePrefix, NazikiProjectModel project) where T : IStoryboardEntity
+        {
+            if (list == null) return;
+            var targetCounters = new Dictionary<string, int>();
+
+            foreach (var entity in list)
             {
-                try
+                if (!string.IsNullOrEmpty(entity.TargetId) && !string.IsNullOrEmpty(entity.Id))
                 {
-                    coreValue = System.IO.Path.GetFileNameWithoutExtension(coreValue);
-                    coreValue = System.Text.RegularExpressions.Regex.Replace(coreValue, @"[^a-zA-Z0-9\u4e00-\u9fa5]", "_");
-                    coreValue = System.Text.RegularExpressions.Regex.Replace(coreValue, @"_+", "_").Trim('_');
-                    if (coreValue.Length > 15) coreValue = coreValue.Substring(0, 15);
-                    if (string.IsNullOrEmpty(coreValue)) coreValue = "item";
-                }
-                catch { coreValue = "item"; }
-            }
+                    string targetId = entity.TargetId;
+                    if (!targetCounters.ContainsKey(targetId)) targetCounters[targetId] = 0;
+                    int index = targetCounters[targetId]++;
 
-            string baseId = $"{typePrefix}_{coreValue}".ToLower();
+                    string mapKey = $"cb_{typePrefix}_{targetId}_{index}";
+                    project.ControlBoardIdMaps[mapKey] = entity.Id; // 将当前的活跃工作 ID 固化写盘
+                }
+            }
+        }
+
+        // =========================================================================
+        // 🟢【灵魂归位】：智能野生实体赋名官
+        // =========================================================================
+        private static string GenerateSmartIdForImport(IStoryboardEntity entity, string typePrefix, StoryboardRoot root)
+        {
+            // 依据对象门派前缀，揉入一串轻量级的高强度随机码作为初创基因
+            string baseId = $"{typePrefix}_{Guid.NewGuid().ToString().Substring(0, 8)}";
             string finalId = baseId;
             int index = 1;
 
-            // 🛡️ 严格查户口，防止在导入的对象之间互相撞名！
+            // 🛡️ 查户口：如果大本营根节点里已经有重名的倒霉蛋了，就不断自增数字后缀直到安全为止
             while (IsIdExistsInRoot(finalId, root))
             {
                 finalId = $"{baseId}_{index}";
@@ -83,6 +127,8 @@ namespace Naziki_Editor.Core
 
             return finalId;
         }
+
+
 
         private static bool IsIdExistsInRoot(string id, StoryboardRoot root)
         {
@@ -146,8 +192,15 @@ namespace Naziki_Editor.Core
             var entity = (IStoryboardEntity)value;
             JObject rootObj = new JObject();
 
-            // 1. 写出基础身份
-            if (!string.IsNullOrEmpty(entity.Id)) rootObj["id"] = entity.Id;
+            // 1. 写出基础身份 (🌟 时空两栖隔离：如果是控制板，隐藏 id 身份证以防播放器冲突)
+            if (!string.IsNullOrEmpty(entity.TargetId))
+            {
+                rootObj["target_id"] = entity.TargetId;
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(entity.Id)) rootObj["id"] = entity.Id;
+            }
             if (!string.IsNullOrEmpty(entity.ParentId)) rootObj["parent_id"] = entity.ParentId;
 
             // 如果是音符控制器，提取它特有的 note 绑定目标（放在最外层）
@@ -179,7 +232,16 @@ namespace Naziki_Editor.Core
                 JArray statesArray = new JArray();
                 foreach (var frame in keyframes)
                 {
-                    statesArray.Add(JObject.FromObject(frame, serializer));
+                    // 先将帧状态反射转换为 JSON 对象字典
+                    var frameObj = JObject.FromObject(frame, serializer);
+
+                    // ✨【时空硬性铁律】：关键帧内的 easing 只准在前台显示，绝对不准写入代码！在此处无情抹除！
+                    if (frameObj["easing"] != null)
+                    {
+                        frameObj.Remove("easing");
+                    }
+
+                    statesArray.Add(frameObj);
                 }
                 rootObj["states"] = statesArray;
             }
@@ -221,6 +283,7 @@ namespace Naziki_Editor.Core
             var entity = (IStoryboardEntity)Activator.CreateInstance(objectType);
 
             if (jObj["id"] != null) entity.Id = jObj["id"].ToString();
+            if (jObj["target_id"] != null) entity.TargetId = jObj["target_id"].ToString();
             if (jObj["parent_id"] != null) entity.ParentId = jObj["parent_id"].ToString();
 
             // 🧹 核心反求算：将除了核心标识外的所有扁平属性，全部塞进 BaseState 肚子里！
@@ -230,7 +293,7 @@ namespace Naziki_Editor.Core
                 JObject baseObj = new JObject();
                 foreach (var prop in jObj.Properties())
                 {
-                    if (prop.Name != "id" && prop.Name != "parent_id" && prop.Name != "states" && prop.Name != "note")
+                    if (prop.Name != "id" && prop.Name != "parent_id" && prop.Name != "target_id" && prop.Name != "states" && prop.Name != "note")
                     {
                         baseObj[prop.Name] = prop.Value;
                     }
