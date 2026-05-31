@@ -96,6 +96,15 @@
             <Button Grid.Row="1" x:Name="BtnDeleteEvent" Content="🗑️ 删除选中的事件" Click="BtnDeleteEvent_Click" 
                     Margin="10,5,10,10" Padding="5,8" Background="#FF5555" Foreground="White" 
                     FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+
+            <Border x:Name="ChartMissingOverlay" Grid.RowSpan="2" Background="{DynamicResource MainBgColor}" Panel.ZIndex="999" Visibility="Visible">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="⚠️ 请先导入谱面文件" Foreground="#FF5555" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="必须存在谱面，才能导入或编辑故事板" Foreground="{DynamicResource SecTextColor}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                    <Button x:Name="BtnOverlayImportChart" Content="🎵 导入谱面文件" Padding="15,8" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand" Click="BtnOverlayImportChart_Click"/>
+                </StackPanel>
+            </Border>
+
         </Grid>
     </Border>
 </UserControl>

@@ -295,5 +295,28 @@ namespace Naziki_Editor.Views
         }
 
 
+
+        // ==========================================
+        // 🛡️ 谱面状态锁：向外部暴漏的结界开关
+        // ==========================================
+        public void UpdateChartLockState(bool hasChart)
+        {
+            if (ChartMissingOverlay != null)
+            {
+                // 有谱面就隐藏结界，没谱面就显示结界！
+                ChartMissingOverlay.Visibility = hasChart ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        // 🔘 结界上的“导入谱面”按钮被点击时，跨频道呼叫主窗口的大魔法！
+        private void BtnOverlayImportChart_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow main)
+            {
+                ((dynamic)main).ExecuteImportChart();
+            }
+        }
+
+
     }
 }

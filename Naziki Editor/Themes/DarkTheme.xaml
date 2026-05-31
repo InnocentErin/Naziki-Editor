@@ -17,6 +17,7 @@
     <SolidColorBrush x:Key="BorderColor" Color="#3F3F46"/>
     <SolidColorBrush x:Key="SeparatorColor" Color="#333333"/>
     <SolidColorBrush x:Key="HighlightBorderColor" Color="#007ACC"/>
+    <SolidColorBrush x:Key="HighlightColor" Color="#4DB8FF"/>
     
 <!--下面是覆盖系统默认颜色资源的定义，确保内置控件（如菜单、工具栏等）在暗色主题下也能保持一致的视觉风格-->
     <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#2D2D30"/>

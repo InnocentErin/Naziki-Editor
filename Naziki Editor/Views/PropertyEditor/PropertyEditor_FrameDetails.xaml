@@ -50,6 +50,23 @@
                                 <TextBlock Text="相对时间 (RelativeTime):" VerticalAlignment="Center" Foreground="{DynamicResource TipsColor}"/>
                                 <TextBox x:Name="TxtRelativeTime" Grid.Column="1" Padding="5"/>
                             </Grid>
+                            
+                            <Grid Margin="0,0,0,10">
+                            </Grid>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                    <TextBlock Text="图层 (Layer)" FontSize="10" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="TxtLayer" Padding="4" ToolTip="大图层分组 (仅初始帧可编辑)"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                    <TextBlock Text="优先级 (Order)" FontSize="10" Foreground="{DynamicResource TipsColor}" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="TxtOrder" Padding="4" ToolTip="同图层内的上下遮挡关系 (仅初始帧可编辑)"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </StackPanel>
                 </Border>

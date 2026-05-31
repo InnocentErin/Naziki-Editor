@@ -70,6 +70,52 @@ namespace Naziki_Editor.Core
 
             return totalSeconds;
         }
+
+
+
+
+
+        // ==========================================\
+        // 🌟 终极翻译官：把 "start:1134:2" 或 "12.5" 统一翻译成绝对秒数！
+        // ==========================================\
+        public double ParseCytoidTimeExpression(object timeObj, List<Models.C2Note> allNotes)
+        {
+            if (timeObj == null) return 0;
+            string str = timeObj.ToString().Trim();
+
+            // 1. 如果是纯绝对秒数，直接秒解
+            if (double.TryParse(str, out double directVal)) return directVal;
+
+            // 2. 遇到锚点魔法，呼叫内部 TickToSeconds 引擎算账！
+            if (allNotes != null)
+            {
+                try
+                {
+                    string[] parts = str.Split(':');
+                    int noteId = -1;
+                    double offset = 0;
+
+                    if (parts.Length == 1) { if (int.TryParse(parts[0], out noteId)) offset = 0; }
+                    else if (parts.Length >= 2)
+                    {
+                        int.TryParse(parts[1], out noteId);
+                        if (parts.Length == 3) double.TryParse(parts[2], out offset);
+                    }
+
+                    var targetNote = allNotes.FirstOrDefault(n => n.id == noteId);
+                    if (targetNote != null)
+                    {
+                        double baseSeconds = this.TickToSeconds(targetNote.tick); // 直接调用自己的引擎
+                        return baseSeconds + offset;
+                    }
+                }
+                catch { /* 解析失败则兜底返回0 */ }
+            }
+            return 0;
+        }
+
+
+
     }
     
 }

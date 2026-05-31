@@ -38,6 +38,7 @@ namespace Naziki_Editor.Views
         public event Action<TimelineClipControl, int> OnTrackIndexChanged; // 换轨通知
         public event Action<TimelineClipControl> OnRequestNewTrack;        // 越界修路请求
         public event Action<TimelineClipModel> OnRequestDetailedEditMode;  // 双击进入微观世界
+        public event Action<TimelineClipModel> OnClipSelected;             // ✨ 追加：单点选中反射信号
 
         private double _originalY; // 记录拖拽前的 Y 坐标
 
@@ -167,11 +168,25 @@ namespace Naziki_Editor.Views
         // ==========================================
         private void ClipBackground_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // 屏蔽双击引发的单次点击判断
-            if (e.ClickCount >= 2) return;
+            // 🌟 物理叹息之墙：在这里统一判断双击还是单点！
+            if (e.ClickCount == 2)
+            {
+                // 如果第一次点击不小心触发了拖拽状态，赶紧强行释放！
+                _isDraggingClip = false;
+                RootGrid.ReleaseMouseCapture();
+                ClipBackground.Opacity = 1.0;
 
+                OnRequestDetailedEditMode?.Invoke(_model);
+                e.Handled = true; // 吞掉事件，防止它继续冒泡
+                return; // 直接退出，绝不执行下面的单点逻辑！
+            }
+
+            // --- 以下是原本的单次点击选中 + 拖拽逻辑 ---
             _model.IsSelected = true;
             DeselectAllNodes();
+
+            // ✨ 触觉触发！向外发射选中信号！
+            OnClipSelected?.Invoke(_model);
 
             _isDraggingClip = true;
             _clipDragStartPoint = e.GetPosition(this.Parent as UIElement);
@@ -263,14 +278,6 @@ namespace Naziki_Editor.Views
                 _context?.MarkAsModified();
                 EvaluateValidationWarning();
             }
-        }
-
-        // 🚪 结界入口：双击进入详细调整模式！
-        private void ClipBackground_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            // 向大本营广播：创作者要进入微观世界了！
-            OnRequestDetailedEditMode?.Invoke(_model);
-            e.Handled = true;
         }
 
 

@@ -82,10 +82,52 @@ namespace Naziki_Editor.Views
         {
             if (projectData == null) return;
 
+            bool needSaveNep = false;
+
+            // 🩸 1. 心脏检查：谱面文件 (Chart) 强制寻回
+            if (!string.IsNullOrEmpty(projectData.ChartFilePath) && !File.Exists(projectData.ChartFilePath))
+            {
+                var res = MessageBox.Show("⚠️ 糟糕！项目绑定的【谱面文件】丢失或被转移了！\n没有谱面，整个宇宙都无法运行哦！\n\n是否立即重新定位谱面文件？", "核心文件丢失", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                if (res == MessageBoxResult.No) return; // 🛑 拒绝抢救，直接阻断整个工程的打开！
+
+                OpenFileDialog openChartDlg = new OpenFileDialog { Filter = "Cytus II 谱面 (*.txt;*.json)|*.txt;*.json", Title = "请重新定位谱面文件" };
+                if (openChartDlg.ShowDialog() == true)
+                {
+                    projectData.ChartFilePath = openChartDlg.FileName;
+                    needSaveNep = true;
+                }
+                else return; // 🛑 打开了窗口但取消了，依然阻断！
+            }
+
+            // 👗 2. 皮肤检查：故事板文件 (Storyboard) 随缘寻回
+            if (!string.IsNullOrEmpty(projectData.StoryboardExportPath) && !File.Exists(projectData.StoryboardExportPath))
+            {
+                var res = MessageBox.Show("⚠️ 项目绑定的【故事板文件】丢失啦！\n但谱面依然可以正常加载。\n\n是否尝试重新定位故事板文件？\n(若选择否，将以空故事板状态打开工程)", "可选文件丢失", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (res == MessageBoxResult.Yes)
+                {
+                    OpenFileDialog openSbDlg = new OpenFileDialog { Filter = "故事板文件 (*.json)|*.json", Title = "请重新定位故事板文件" };
+                    if (openSbDlg.ShowDialog() == true)
+                    {
+                        projectData.StoryboardExportPath = openSbDlg.FileName;
+                        needSaveNep = true;
+                    }
+                    else projectData.StoryboardExportPath = null;
+                }
+                else projectData.StoryboardExportPath = null;
+            }
+
+            // 🌐 3. 环境挂载与自动保存
             Context.ProjectFilePath = projectPath;
             Context.ProjectData = projectData;
-
             this.Title = $"Naziki Editor - {projectData.ProjectName} ［{projectPath}］";
+
+            if (needSaveNep) SaveProjectNepFile(); // ✨ 如果发生了寻回，立刻自动保存 .nep
+
+            // 🎵 4. 强制前置：先加载谱面！（防止后续解析锚点时 TimeEngine 报空指针）
+            if (!string.IsNullOrEmpty(projectData.ChartFilePath) && File.Exists(projectData.ChartFilePath))
+            {
+                SilentImportChart(projectData.ChartFilePath);
+            }
 
             if (!string.IsNullOrEmpty(projectData.StoryboardExportPath) && File.Exists(projectData.StoryboardExportPath))
             {
@@ -191,6 +233,29 @@ namespace Naziki_Editor.Views
             catch { }
         }
 
+
+        // 🔐 全局状态更新：根据当前大本营是否有谱面，动态上锁或解锁！
+        public void UpdateGlobalUIState()
+        {
+            bool hasChart = Context != null && Context.HasChart;
+
+            // 锁死或解锁顶部的“导入 storyboard...” 按钮
+            if (MenuOpenProject != null) MenuOpenProject.IsEnabled = hasChart;
+
+            // 通知左侧事件列表升起或降下结界
+            if (EventList != null) EventList.UpdateChartLockState(hasChart);
+        }
+
+
+
+
+
+
+
+
+
+
+
         public MainWindow()
         {
             InitializeComponent();
@@ -215,6 +280,8 @@ namespace Naziki_Editor.Views
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
                 }
+                // ✨ 接入时间轴的脉搏！只要宇宙发生变化，时间轴立刻重新洗牌！
+                TimelineConsole.LoadStoryboardTimeline(Context);
             };
 
             // ==========================================
@@ -267,8 +334,9 @@ namespace Naziki_Editor.Views
                     // 4. 📢 惊醒大宇宙，标记工程变脏
                     Context.MarkAsModified();
                 }
+            
             };
-
+            // 
             EventList.OnStoryboardLoaded += (path, root) =>
             {
                 Context.StoryboardPath = path;
@@ -287,6 +355,8 @@ namespace Naziki_Editor.Views
                 _undoRedoManager.RecordSnapshot(Context.Storyboard);
 
                 TriggerAutoLinkIfReady();
+                // ✨ 宇宙苏醒，通知时间轴画板开工！
+                TimelineConsole.LoadStoryboardTimeline(Context);
             };
 
             PropertyPanel.OnApplyPropertiesRequested += () =>
@@ -363,6 +433,29 @@ namespace Naziki_Editor.Views
                 PropertyPanel.SetSelectedObject(obj);
                 CanvasArea.TrackSelectedObject(obj);
             };
+
+
+            // 🧠 全局反射弧：时间轴单点对象联调！
+            TimelineConsole.OnTimelineObjectSelected += (selectedEntity) =>
+            {
+                if (selectedEntity == null) return;
+
+                // 1. 👉 指挥右侧属性面板：立刻加载这个对象的数据！
+                PropertyPanel.SetSelectedObject(selectedEntity);
+
+                // 2. 👉 指挥中间画板：立刻把高亮选框套在这个对象上！
+                CanvasArea.TrackSelectedObject(selectedEntity);
+
+                // 3. 👉 指挥左侧事件列表：高亮对应的树节点 (如果大大的 EventList 有这个公开方法的话，没有可不写或以后补)
+                // EventList.SelectNodeByObject(selectedEntity); 
+            };
+
+
+
+            UpdateGlobalUIState();
+
+
+
         }
 
         // ==========================================
@@ -404,6 +497,8 @@ namespace Naziki_Editor.Views
                 EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
+                // ✨ 时光倒流，时间轴界面也要跟着穿越！
+                TimelineConsole.LoadStoryboardTimeline(Context);
             }
             else
             {
@@ -421,6 +516,8 @@ namespace Naziki_Editor.Views
                 EventList.LoadStoryboardUI();
                 CanvasArea.RefreshJsonView();
                 _isVisualDirty = false;
+                // ✨ 时光倒流，时间轴界面也要跟着穿越！
+                TimelineConsole.LoadStoryboardTimeline(Context);
             }
             else
             {
@@ -462,7 +559,7 @@ namespace Naziki_Editor.Views
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
         private void MenuImportChart_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) ExecuteImportChart(); }
 
-        private void ExecuteImportChart()
+        public void ExecuteImportChart()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog { Filter = "Cytus II 谱面 (*.json)|*.json", Title = "请选择你的谱面文件" };
             if (openFileDialog.ShowDialog() == true)
@@ -493,6 +590,8 @@ namespace Naziki_Editor.Views
                 catch (Exception ex) { MessageBox.Show($"解析发生爆炸 QAQ：\n{ex.Message}"); }
             }
             TriggerAutoLinkIfReady();
+            // 🌟 核心追加：谱面导入完毕，立刻刷新全局 UI（解锁故事板导入权限）
+            UpdateGlobalUIState();
         }
 
         // ✨ 核心修正：将残留的旧工厂创建方法升级，全面适配 IStoryboardEntity 通用接口！

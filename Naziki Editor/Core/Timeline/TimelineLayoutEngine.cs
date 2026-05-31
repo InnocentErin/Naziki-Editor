@@ -2,127 +2,126 @@
 using System.Collections.Generic;
 using System.Linq;
 using Naziki_Editor.Models;
+using Naziki_Editor.State;
 
 namespace Naziki_Editor.Core.Timeline
 {
-    public class TimelineLayoutEngine
+    public static class TimelineLayoutEngine
     {
         /// <summary>
-        /// 🧙‍♂️ 核心法术：时空轨道一键智能大整理（右键菜单与导入直通车共有）
+        /// 🧙‍♂️ 俄罗斯方块智能排版引擎：基于“类型图层”与“时间碰撞”，分配无重叠的 Order！
         /// </summary>
-        /// <param name="allClips">当前宇宙中所有的方块集合</param>
-        /// <param name="centerTrackBaseline">期望的中心常驻轨道起始索引（默认设为 10，方便普通方块上下扩散）</param>
-        public static void OptimizeTrackLayout(List<TimelineClipModel> allClips, int centerTrackBaseline = 10)
+        public static void AutoAssignOrderForVisualEntities(ProjectDataContext context)
         {
-            if (allClips == null || allClips.Count == 0) return;
+            var root = context?.Storyboard;
+            if (root == null) return;
 
-            // 1. 🔍 【基因筛选】：将大军划分为“常驻永生军团”和“普通时效军团”
-            var permanentClips = new List<TimelineClipModel>();
-            var normalClips = new List<TimelineClipModel>();
+            // 1. 抓取所有具有实体画面、需要分配轨道的对象
+            var visualEntities = new List<IStoryboardEntity>();
+            if (root.sprites != null) visualEntities.AddRange(root.sprites);
+            if (root.texts != null) visualEntities.AddRange(root.texts);
+            if (root.videos != null) visualEntities.AddRange(root.videos);
+            if (root.lines != null) visualEntities.AddRange(root.lines);
 
-            foreach (var clip in allClips)
+            // 2. ✨ 大大指定的新法则：按“类型”进行硬性物理分组！并顺手改写它们的 Layer！
+            // 组0: Sprite, Video (归入 Layer 0)
+            // 组1: Line (归入 Layer 1)
+            // 组2: Text (归入 Layer 2)
+            var layerGroups = new Dictionary<int, List<EntityTimeBox>>();
+            var allNotes = context.Chart?.note_list;
+
+            foreach (var entity in visualEntities)
             {
-                // 如果 EndTime 极大，或者根本没有截止时间，判定为常驻常驻元素
-                if (clip.EndTime >= 999999 || clip.EndTime <= clip.StartTime)
+                var baseState = entity.GetBaseState();
+                if (baseState == null) continue;
+
+                // 🌟 核心逻辑 1：根据类型强制分配 Layer，并写入底层模型！
+                int targetLayer = 0;
+                if (entity is C2Sprite || entity is C2Video) targetLayer = 0;
+                else if (entity is C2Line) targetLayer = 1;
+                else if (entity is C2Text) targetLayer = 2;
+
+                WritePropertyToEntity(baseState, "Layer", targetLayer);
+
+                // 提取精确的起止时间
+                double start = 0, end = 9999;
+                if (FastReflectionHelper.TryGetValue(baseState, "Time", out object startObj))
+                    start = SafeResolveTime(startObj, context, allNotes);
+
+                var kfs = entity.GetKeyframes();
+                if (kfs != null && kfs.Count > 0)
                 {
-                    permanentClips.Add(clip);
+                    var lastFrame = kfs[kfs.Count - 1];
+                    if (FastReflectionHelper.TryGetValue(lastFrame, "Time", out object endObj))
+                        end = SafeResolveTime(endObj, context, allNotes);
                 }
-                else
-                {
-                    normalClips.Add(clip);
-                }
+                if (end <= start) end = start + 2.0;
+
+                if (!layerGroups.ContainsKey(targetLayer)) layerGroups[targetLayer] = new List<EntityTimeBox>();
+                layerGroups[targetLayer].Add(new EntityTimeBox { Entity = entity, Start = start, End = end, BaseState = baseState });
             }
 
-            // ==========================================================
-            // 👥 第一阶段：常驻永生军团的“中心合宿布局”
-            // ==========================================================
-            // 因为常驻元素会霸占后半段所有时空，如果它们在时间上有交叠，也必须分不同的轨道，否则就会重叠！
-            // 我们按照 StartTime 从小到大排序，用无碰撞贪心算法把它们排在中心轨区 (centerTrackBaseline 往上递增)
-            var permanentSorted = permanentClips.OrderBy(c => c.StartTime).ToList();
-            var permanentTrackEnds = new List<double>(); // 记录每条常驻轨道的“当前最后占用时间”
-
-            foreach (var clip in permanentSorted)
+            // 3. 核心法术：对每个 Layer 分别执行“从下往上 (Order 0, 1...) 寻找空位”的避让计算
+            foreach (var layerKvp in layerGroups)
             {
-                int assignedTrack = -1;
+                // 先出现的方块优先排座位
+                var sortedBoxes = layerKvp.Value.OrderBy(b => b.Start).ToList();
 
-                // 尝试在已开辟的常驻轨道里找一个空档（前一个常驻元素在它出生前就消失了，虽然极少见）
-                for (int i = 0; i < permanentTrackEnds.Count; i++)
+                // 记录每条轨道 (Order) 目前被占用到什么时候结束 (轨道索引 -> 结束时间)
+                var trackEnds = new Dictionary<int, double>();
+
+                foreach (var box in sortedBoxes)
                 {
-                    if (clip.StartTime >= permanentTrackEnds[i])
+                    // 🌟 核心逻辑 2：从最底部的 0 号轨道开始往上爬
+                    int bestOrder = 0;
+
+                    // 只要当前轨道已经被占用，且那个占用者的结束时间，晚于我的出生时间（也就是撞车了）
+                    while (trackEnds.ContainsKey(bestOrder) && trackEnds[bestOrder] > box.Start)
                     {
-                        assignedTrack = centerTrackBaseline + i;
-                        permanentTrackEnds[i] = double.MaxValue; // 常驻一旦出生，该轨后半段彻底锁死
-                        break;
+                        bestOrder++; // 就去上一层轨道找空位
                     }
-                }
 
-                // 如果找不到空档，开辟一条全新的中心常驻轨！
-                if (assignedTrack == -1)
-                {
-                    assignedTrack = centerTrackBaseline + permanentTrackEnds.Count;
-                    permanentTrackEnds.Add(double.MaxValue);
-                }
+                    // 找到空位啦！登记我的死亡时间，霸占这条轨道！
+                    trackEnds[bestOrder] = box.End;
 
-                clip.TrackIndex = assignedTrack;
-            }
-
-            // 算一下常驻军团最终霸占了哪些核心中央轨道
-            int minPermTrack = centerTrackBaseline;
-            int maxPermTrack = centerTrackBaseline + Math.Max(0, permanentTrackEnds.Count - 1);
-
-            // ==========================================================
-            // 🌠 第二阶段：普通时效军团的“双侧护法扩散布局”
-            // ==========================================================
-            // 普通方块绝对不能侵占中央常驻轨，它们需要以常驻轨为轴心，向上（天）或者向下（地）扩散排布！
-            var normalSorted = normalClips.OrderBy(c => c.StartTime).ToList();
-
-            // 维护普通轨道的占用情况：Key是相对于常驻轨区的偏移量，Value是该轨道的最后结束时间
-            // 偏移量 1 代表中央上方第一轨，-1 代表中央下方第一轨，2 代表上方第二轨... 依此类推
-            var normalTrackEnds = new Dictionary<int, double>();
-
-            foreach (var clip in normalSorted)
-            {
-                int bestOffset = 0;
-                double minGap = double.MaxValue;
-
-                // 贪心搜索：寻找能够塞下当前方块且离中心区最近的普通轨道
-                // 我们在 -30 到 +30 的虚拟轨道里进行全量嗅探
-                for (int offset = 1; offset <= 30; offset++)
-                {
-                    // 1. 优先探测上方轨道
-                    if (!normalTrackEnds.ContainsKey(offset) || clip.StartTime >= normalTrackEnds[offset])
-                    {
-                        bestOffset = offset;
-                        break;
-                    }
-                    // 2. 次要探测下方轨道（对称扩散）
-                    if (!normalTrackEnds.ContainsKey(-offset) || clip.StartTime >= normalTrackEnds[-offset])
-                    {
-                        bestOffset = -offset;
-                        break;
-                    }
-                }
-
-                // 如果 30 轨都爆满了（纳尼？！这谱面是有多硬核），那就强行往上叠新轨
-                if (bestOffset == 0)
-                {
-                    int maxCurrentOffset = normalTrackEnds.Keys.Count > 0 ? normalTrackEnds.Keys.Max() : 0;
-                    bestOffset = maxCurrentOffset + 1;
-                }
-
-                // 登记占用时间
-                normalTrackEnds[bestOffset] = clip.EndTime;
-
-                // 物理映射反算：将相对中心区的偏移量，换算成最终绝对的图层 Z-Index 轨道索引！
-                if (bestOffset > 0)
-                {
-                    clip.TrackIndex = maxPermTrack + bestOffset; // 在常驻军团的头顶往上叠
-                }
-                else
-                {
-                    clip.TrackIndex = Math.Max(0, minPermTrack + bestOffset); // 在常驻军团的脚底下往下延
+                    // ✨ 终极操作：将算好的 Order 写入对象的基因里！
+                    WritePropertyToEntity(box.BaseState, "Order", bestOrder);
                 }
             }
+        }
+
+        // ==========================================
+        // 🛠️ 内部小助手们
+        // ==========================================
+        private static double SafeResolveTime(object timeObj, ProjectDataContext context, List<C2Note> allNotes)
+        {
+            if (timeObj == null) return 0;
+            if (context != null && context.TimeEngine != null) return context.TimeEngine.ParseCytoidTimeExpression(timeObj, allNotes);
+            if (double.TryParse(timeObj.ToString(), out double val)) return val;
+            return 0;
+        }
+
+        private static void WritePropertyToEntity(object baseState, string propName, int newValue)
+        {
+            var propInfo = baseState.GetType().GetProperty(propName);
+            if (propInfo != null && propInfo.CanWrite)
+            {
+                Type targetType = propInfo.PropertyType;
+                if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                {
+                    targetType = Nullable.GetUnderlyingType(targetType);
+                }
+                object safeValue = Convert.ChangeType(newValue, targetType);
+                propInfo.SetValue(baseState, safeValue);
+            }
+        }
+
+        private class EntityTimeBox
+        {
+            public IStoryboardEntity Entity { get; set; }
+            public object BaseState { get; set; }
+            public double Start { get; set; }
+            public double End { get; set; }
         }
     }
 }

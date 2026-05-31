@@ -10,286 +10,160 @@
              Foreground="{DynamicResource MainTextColor}"
              PreviewMouseWheel="OnTimelineMouseWheel">
 
-    <Grid Grid.IsSharedSizeScope="True">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="35"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="4"/>
-            <RowDefinition Height="30"/>
-        </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1">
-            <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" HorizontalAlignment="Left">
-                    <TextBlock x:Name="TxtCurrentTime" Width="55" Text="0.000s" Foreground="#4DB8FF" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="5,0,15,0"/>
-                    <Button x:Name="BtnPlay" Content="▶ 播放" Click="BtnPlay_Click" Margin="0,0,5,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
-                    <Button x:Name="BtnPause" Content="⏸ 暂停" Click="BtnPause_Click" Margin="0,0,15,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
-                    <Separator Background="{DynamicResource SeparatorColor}" Margin="0,5"/>
-                    <ToggleButton Content="🧲 节拍吸附 (Snap)" Margin="15,0,5,0" Padding="8,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
-                    <ComboBox Width="70" Margin="0,0,15,0" SelectedIndex="1">
-                        <ComboBoxItem Content="1/4 拍"/>
-                        <ComboBoxItem Content="1/8 拍"/>
-                        <ComboBoxItem Content="1/16 拍"/>
-                    </ComboBox>
-                </StackPanel>
+    <Grid>
+        <TabControl x:Name="TimelineTabs" Background="Transparent" BorderThickness="0">
+            <Grid Grid.IsSharedSizeScope="True">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="35"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="60"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="30"/>
+                </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" HorizontalAlignment="Right">
-                    <TextBlock Text="刷新频率:" Foreground="{DynamicResource TipsColor}" FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <ComboBox x:Name="RefreshRateComboBox" Width="55" SelectedIndex="0" FontSize="11">
-                        <ComboBoxItem Content="低"/>
-                        <ComboBoxItem Content="高"/>
-                    </ComboBox>
-                </StackPanel>
-            </Grid>
-        </Border>
+                <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" HorizontalAlignment="Left">
+                            <TextBlock x:Name="TxtCurrentTime" Width="55" Text="0.000s" Foreground="#4DB8FF" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="5,0,15,0"/>
+                            <Button x:Name="BtnPlay" Content="▶ 播放" Click="BtnPlay_Click" Margin="0,0,5,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
+                            <Button x:Name="BtnPause" Content="⏸ 暂停" Click="BtnPause_Click" Margin="0,0,15,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
+                            <Button x:Name="BtnImportAudio" Content="🎵 导入参考音频" Click="BtnImportAudio_Click" Margin="0,0,15,0" Padding="10,3" Background="{DynamicResource HighlightBorderColor}" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                            <Button x:Name="BtnAutoLayout" Content="✨ 智能排版" Click="BtnAutoLayout_Click" Margin="0,0,15,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource HighlightColor}" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
 
-        <Grid Grid.Row="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="50"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
-                    <ColumnDefinition Width="2"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{DynamicResource BoardBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
-                    <TextBlock Text="⏱️ 时间刻度" Foreground="{DynamicResource TipsColor}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <ScrollViewer x:Name="ScrollRuler" Grid.Column="2" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" ScrollChanged="OnScrollChanged">
-                    <Border Width="5000" HorizontalAlignment="Left" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" MouseLeftButtonDown="Ruler_MouseDown">
-                        <Grid>
-                            <Canvas x:Name="RulerCanvas"/>
-                            <Canvas IsHitTestVisible="False">
-                                <Grid x:Name="PlayheadMarker" Width="15" Margin="-7.5,0,0,0" Height="30" Cursor="SizeWE" IsHitTestVisible="True"
-                                      MouseLeftButtonDown="Playhead_MouseDown" MouseMove="Playhead_MouseMove" MouseLeftButtonUp="Playhead_MouseUp" Background="Transparent" Panel.ZIndex="999">
-                                    <Grid.RenderTransform>
-                                        <TranslateTransform x:Name="TransRulerHead" X="0" Y="0"/>
-                                    </Grid.RenderTransform>
-                                    <Polygon Points="0,0 15,0 15,15 7.5,24 0,15" Fill="#E81123" Stroke="#B30000" StrokeThickness="1"/>
-                                </Grid>
-                            </Canvas>
-                        </Grid>
-                    </Border>
-                </ScrollViewer>
-            </Grid>
-
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
-                    <ColumnDefinition Width="2"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0" Background="{DynamicResource SideBgColor}">
-
-                    <ScrollViewer x:Name="ScrollSpriteHeaders" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" ScrollChanged="SyncSpriteVerticalScroll">
-                        <ItemsControl x:Name="SpriteTrackHeadersControl" VerticalAlignment="Bottom">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Height="40" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Background="Transparent" Padding="5,0">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Content="🗑️" Background="Transparent" BorderThickness="0" BorderBrush="IndianRed" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Cursor="Hand" Width="24" Tag="{Binding}" Click="BtnDeleteSpriteTrack_Click" ToolTip="单击锁定，双击删除" Margin="0,0,5,0"/>
-                                            <TextBox Grid.Column="1" Text="{Binding TrackName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" VerticalAlignment="Center" FontSize="11" IsReadOnly="True" MouseDoubleClick="TrackNameTextBox_MouseDoubleClick" LostFocus="TrackNameTextBox_LostFocus"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" Background="#A0111111" CornerRadius="5" Padding="4" Opacity="0">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.EnterActions>
-                                        <DataTrigger.ExitActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.ExitActions>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-
-                        <StackPanel Orientation="Vertical">
-                            <Button Content="↑" Click="BtnScrollSpriteTop_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="一键到顶"/>
-                            <Button Content="➕" Click="BtnAddSpriteTrack_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="新建轨道" Margin="0,6,0,6"/>
-                            <Button Content="↓" Click="BtnScrollSpriteBottom_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="一键到底"/>
                         </StackPanel>
-                    </Border>
-                </Grid>
-                
-                <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
-
-                <Border Grid.Column="2" Background="{DynamicResource BoardBgColor}">
-                    <ScrollViewer x:Name="ScrollSprites" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Auto" ScrollChanged="OnScrollChanged">
-                        <Grid>
-                            <Canvas x:Name="SpriteBgCanvas" Background="Transparent" IsHitTestVisible="False" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
-                            <Canvas x:Name="SpriteClipCanvas" VerticalAlignment="Bottom" HorizontalAlignment="Left" Background="Transparent">
-                                <Line Y1="0" Y2="5000" Stroke="#E81123" StrokeThickness="1.5" IsHitTestVisible="False" Panel.ZIndex="999">
-                                    <Line.RenderTransform>
-                                        <TranslateTransform x:Name="TransSpriteLine" X="0" Y="0"/>
-                                    </Line.RenderTransform>
-                                </Line>
-                            </Canvas>
-                        </Grid>
-                    </ScrollViewer>
+                    </Grid>
                 </Border>
-            </Grid>
 
-            <Border Grid.Row="2" Background="#111111" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1">
-                <Grid>
+                <Grid Grid.Row="1" Background="{DynamicResource MainBgColor}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
                         <ColumnDefinition Width="2"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0">
-                        <TextBlock Text="🎵 Master Audio" Foreground="White" FontWeight="Bold" VerticalAlignment="Top" Margin="10,5,0,0"/>
-                        <Button x:Name="BtnImportAudio" Content="📥 导入音频文件" Click="BtnImportAudio_Click" Foreground="#4DB8FF" BorderBrush="#4DB8FF" BorderThickness="1" Background="Transparent" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5" Padding="15,2" Cursor="Hand"/>
-                    </Grid>
+                    <ScrollViewer x:Name="ScrollTrackHeaders" Grid.Column="0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden">
+                        <StackPanel x:Name="TrackHeadersContainer" Orientation="Vertical" Background="{DynamicResource MenuBgColor}"/>
+                    </ScrollViewer>
 
                     <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
 
-                    <Grid x:Name="AudioMinimapGrid" Grid.Column="2" Background="Transparent" SizeChanged="AudioMinimapGrid_SizeChanged">
-                        <Canvas x:Name="AudioMinimapCanvas" ClipToBounds="True">
-                            <Path x:Name="WaveformPath" Stroke="{DynamicResource HighlightBorderColor}" StrokeThickness="1" Opacity="0.8" Canvas.Top="5"/>
-                            <Line x:Name="AudioPlayheadLine" Y1="0" Y2="50" Stroke="#E81123" StrokeThickness="1.5" IsHitTestVisible="False"/>
-                        </Canvas>
-
-                        <Canvas>
-                            <Thumb x:Name="AudioViewportBox" Height="50" Cursor="Hand" DragDelta="AudioViewportBox_DragDelta" ToolTip="左右拖动以平移时间轴">
-                                <Thumb.Template>
-                                    <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{DynamicResource HighlightBorderColor}" Opacity="0.25" BorderBrush="{DynamicResource HighlightBorderColor}" BorderThickness="1.5,0"/>
-                                    </ControlTemplate>
-                                </Thumb.Template>
-                            </Thumb>
-                        </Canvas>
-                    </Grid>
-                </Grid>
-            </Border>
-
-            <Grid Grid.Row="3">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
-                    <ColumnDefinition Width="2"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0" Background="{DynamicResource SideBgColor}">
-
-                    <ScrollViewer x:Name="ScrollCtrlHeaders" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" ScrollChanged="SyncCtrlVerticalScroll">
-                        <ItemsControl x:Name="CtrlTrackHeadersControl" VerticalAlignment="Top">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Height="40" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Background="Transparent" Padding="5,0">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Content="🗑️" Background="Transparent" BorderThickness="0" BorderBrush="IndianRed" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Cursor="Hand" Width="24" Tag="{Binding}" Click="BtnDeleteCtrlTrack_Click" ToolTip="单击锁定，双击删除" Margin="0,0,5,0"/>
-                                            <TextBox Grid.Column="1" Text="{Binding TrackName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" VerticalAlignment="Center" FontSize="11" IsReadOnly="True" MouseDoubleClick="TrackNameTextBox_MouseDoubleClick" LostFocus="TrackNameTextBox_LostFocus"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                    <ScrollViewer x:Name="ScrollTimelineTracks" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Hidden" ScrollChanged="OnScrollChanged">
+                        <StackPanel x:Name="TrackGroupsContainer" Orientation="Vertical" VerticalAlignment="Top"/>
                     </ScrollViewer>
-
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" Background="#A0111111" CornerRadius="5" Padding="4" Opacity="0">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.EnterActions>
-                                        <DataTrigger.ExitActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.ExitActions>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-
-                        <StackPanel Orientation="Vertical">
-                            <Button Content="↑" Click="BtnScrollCtrlTop_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="一键到顶"/>
-                            <Button Content="➕" Click="BtnAddCtrlTrack_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="新建轨道" Margin="0,6,0,6"/>
-                            <Button Content="↓" Click="BtnScrollCtrlBottom_Click" Width="20" Height="20" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand" ToolTip="一键到底"/>
-                        </StackPanel>
-                    </Border>
                 </Grid>
 
-                <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
+                <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
 
-                <Border Grid.Column="2" Background="{DynamicResource BoardBgColor}">
-                    <ScrollViewer x:Name="ScrollControllers" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Auto" ScrollChanged="OnScrollChanged">
-                        <Grid>
-                            <Canvas x:Name="CtrlBgCanvas" Background="Transparent" IsHitTestVisible="False" VerticalAlignment="Top" HorizontalAlignment="Left"/>
-                            <Canvas x:Name="ControllerClipCanvas" VerticalAlignment="Top" HorizontalAlignment="Left" Background="Transparent">
-                                <Line Y1="0" Y2="5000" Stroke="#E81123" StrokeThickness="1.5" IsHitTestVisible="False" Panel.ZIndex="999">
-                                    <Line.RenderTransform>
-                                        <TranslateTransform x:Name="TransCtrlLine" X="0" Y="0"/>
-                                    </Line.RenderTransform>
-                                </Line>
-                            </Canvas>
-                        </Grid>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-        </Grid>
 
-        <GridSplitter Grid.Row="2" Height="4" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
-
-        <Border Grid.Row="3" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
-                    <ColumnDefinition Width="2"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{DynamicResource BoardBgColor}">
-                    <TextBlock Text="🎹 音符刻度" Foreground="{DynamicResource TipsColor}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
-
-                <ScrollViewer x:Name="ScrollNotes" Grid.Column="2" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" ScrollChanged="OnScrollChanged">
+                <Border Grid.Row="3" Background="{DynamicResource MenuBgColor}">
                     <Grid>
-                        <Canvas x:Name="NotePreviewCanvas" Width="5000" Height="30" VerticalAlignment="Top" Background="Transparent"/>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
+                            <ColumnDefinition Width="2"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="🎵 音频与绝对时间" Foreground="{DynamicResource TipsColor}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
+
+                        <ScrollViewer x:Name="ScrollRuler" Grid.Column="2" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" ScrollChanged="OnScrollChanged">
+                            <Grid>
+                                <Grid x:Name="AudioMinimapGrid" SizeChanged="AudioMinimapGrid_SizeChanged">
+                                    <Canvas x:Name="AudioMinimapCanvas" ClipToBounds="True">
+                                        <Path x:Name="WaveformPath" Stroke="{DynamicResource SecTextColor}" StrokeThickness="1" Stretch="Fill" Opacity="0.5" Canvas.Top="5"/>
+                                        <Line x:Name="AudioPlayheadLine" Stroke="#4DB8FF" StrokeThickness="2" Y1="0" Y2="60" IsHitTestVisible="False"/>
+                                    </Canvas>
+                                </Grid>
+
+                                <Border Background="Transparent" MouseDown="Ruler_MouseDown" Cursor="Hand">
+                                    <Canvas x:Name="RulerCanvas" Height="30" VerticalAlignment="Bottom" IsHitTestVisible="False"/>
+                                </Border>
+
+                                <Canvas>
+                                    <Thumb x:Name="AudioViewportBox" Height="60" Cursor="Hand" DragDelta="AudioViewportBox_DragDelta" ToolTip="左右拖动以平移时间轴">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{DynamicResource HighlightBorderColor}" Opacity="0.25" BorderBrush="{DynamicResource HighlightBorderColor}" BorderThickness="1.5,0"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Canvas>
+
+                                <Path x:Name="PlayheadMarker" Fill="#FF5555" Data="M 0,0 L 6,10 L -6,10 Z" Cursor="SizeWE" MouseDown="Playhead_MouseDown" MouseMove="Playhead_MouseMove" MouseUp="Playhead_MouseUp" Panel.ZIndex="999">
+                                    <Path.RenderTransform>
+                                        <TranslateTransform x:Name="TransRulerHead" X="0" Y="20"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Grid>
+                        </ScrollViewer>
                     </Grid>
-                </ScrollViewer>
+                </Border>
+
+                <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
+
+
+                <Grid Grid.Row="5" Background="{DynamicResource MainBgColor}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150" MinWidth="100"/>
+                        <ColumnDefinition Width="2"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer x:Name="ScrollBottomTrackHeaders" Grid.Column="0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden">
+                        <StackPanel x:Name="BottomTrackHeadersContainer" Orientation="Vertical" Background="{DynamicResource MenuBgColor}"/>
+                    </ScrollViewer>
+
+                    <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
+
+                    <ScrollViewer x:Name="ScrollBottomTimelineTracks" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Hidden" ScrollChanged="OnScrollChanged">
+                        <StackPanel x:Name="BottomTrackGroupsContainer" Orientation="Vertical" VerticalAlignment="Top"/>
+                    </ScrollViewer>
+                </Grid>
+
+                <GridSplitter Grid.Row="6" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
+
+
+
+
+                <Border Grid.Row="7" Background="{DynamicResource BoardBgColor}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition SharedSizeGroup="TrackHeaderCol" Width="150"/>
+                            <ColumnDefinition Width="2"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="🎹 音符刻度" Foreground="{DynamicResource TipsColor}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
+
+                        <ScrollViewer x:Name="ScrollNotes" Grid.Column="2" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" ScrollChanged="OnScrollChanged">
+                            <Canvas x:Name="NotePreviewCanvas" Width="5000" Height="30" VerticalAlignment="Top" Background="Transparent"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
             </Grid>
-        </Border>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        </TabControl>
     </Grid>
 </UserControl>

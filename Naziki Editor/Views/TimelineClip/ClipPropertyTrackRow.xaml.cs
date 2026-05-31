@@ -32,37 +32,83 @@ namespace Naziki_Editor.Views.TimelineClip
         /// <summary>
         /// 🎨 核心重绘：严格执行大大的【补丁1法则】
         /// </summary>
+        /// 以下代码暂时替换。未来小艾会根据大大的数据模型设计，完善它的逻辑，最终实现真正的“提取属性并画小菱形♦”的功能！现在先保证它绝对安全，不崩溃！
+        //private void RenderTrackKeyframes()
+        //{
+        //    KeyframeNodeCanvas.Children.Clear();
+        //    _nodes.Clear();
+
+        //    double duration = _clipModel.EndTime - _clipModel.StartTime;
+        //    double totalWidth = duration * _pixelsPerSecond;
+        //    this.Width = totalWidth;
+
+        //    // 1. 🏰 【左侧不可拖拽的永恒神庙】：初始状态 t = 0
+        //    AddKeyframeNode(0, isLocked: true);
+
+        //    // 🔍 嗅探该属性在未来是否有被创作者临幸调整过
+        //    bool hasFutureTweaks = CheckIfPropertyHasTweaksLater();
+
+        //    if (hasFutureTweaks)
+        //    {
+        //        // 2. 🧬 读取中间所有曾经被打过点的历史帧
+        //        List<double> middleTimes = GetMiddleKeyframeTimes();
+        //        foreach (double relTime in middleTimes)
+        //        {
+        //            AddKeyframeNode(relTime * _pixelsPerSecond, isLocked: false);
+        //        }
+
+        //        // 3. 🏰 【右侧不可拖拽的永恒神庙】：最后状态 t = Duration
+        //        AddKeyframeNode(totalWidth, isLocked: true);
+        //    }
+
+        //    // 4. 🖌️ 联动呼叫曲线画笔，在 ♦ 之间勾勒缓动连线
+        //    RedrawPropertyCurves();
+        //}
+        // 🎨 核心重绘：暂时开启绝对安全模式，防止在数据不全时崩溃！
+
         private void RenderTrackKeyframes()
         {
+            if (KeyframeNodeCanvas == null || _clipModel == null || _clipModel.AssociatedObject == null)
+                return; // 🛑 核心防空指针！          
             KeyframeNodeCanvas.Children.Clear();
             _nodes.Clear();
-
             double duration = _clipModel.EndTime - _clipModel.StartTime;
-            double totalWidth = duration * _pixelsPerSecond;
-            this.Width = totalWidth;
-
-            // 1. 🏰 【左侧不可拖拽的永恒神庙】：初始状态 t = 0
-            AddKeyframeNode(0, isLocked: true);
-
-            // 🔍 嗅探该属性在未来是否有被创作者临幸调整过
-            bool hasFutureTweaks = CheckIfPropertyHasTweaksLater();
-
-            if (hasFutureTweaks)
+            if (duration <= 0) return;
+            // -----------------------------------------------------           
+            // // 🚧 这里是未来小艾为大大编写“提取属性并画小菱形♦”的施工地！           
+            // // 🚧 现在我们只做极其基础的安全排版，保证不崩溃！           
+            // // -----------------------------------------------------                      
+            // // 例如，我们先随便画一个占位的基础端点（代表初始帧）           
+            var thumb = new Thumb
             {
-                // 2. 🧬 读取中间所有曾经被打过点的历史帧
-                List<double> middleTimes = GetMiddleKeyframeTimes();
-                foreach (double relTime in middleTimes)
-                {
-                    AddKeyframeNode(relTime * _pixelsPerSecond, isLocked: false);
-                }
-
-                // 3. 🏰 【右侧不可拖拽的永恒神庙】：最后状态 t = Duration
-                AddKeyframeNode(totalWidth, isLocked: true);
-            }
-
-            // 4. 🖌️ 联动呼叫曲线画笔，在 ♦ 之间勾勒缓动连线
-            RedrawPropertyCurves();
+                Width = 12,
+                Height = 12,
+                Background = Brushes.MediumPurple,
+                Cursor = Cursors.Hand
+            };
+            // 把它钉在起点           
+            Canvas.SetLeft(thumb, 0);
+            Canvas.SetTop(thumb, 14);
+            KeyframeNodeCanvas.Children.Add(thumb);
+            _nodes.Add(thumb);
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         /// <summary>
         /// 💎 辅助探头：生成 ♦ 节点

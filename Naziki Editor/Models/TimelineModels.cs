@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.ObjectModel;
 
 namespace Naziki_Editor.Models
 {
@@ -8,8 +9,11 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class TimelineTrackModel : INotifyPropertyChanged
     {
-        public int TrackIndex { get; set; } // Z-Index 层级，0 是最底层，数字越大越在上面
-        public string TrackName { get; set; } // 比如 "Layer 1"
+        public int TrackIndex { get; set; }
+        public string TrackName { get; set; }
+
+        // ✨ 新增口袋：这条轨道上躺着的所有方块/关键帧节点
+        public ObservableCollection<TimelineClipModel> Clips { get; set; } = new ObservableCollection<TimelineClipModel>();
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -48,12 +52,30 @@ namespace Naziki_Editor.Models
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
 
 
-
-
-
-
+    // ==========================================
+    // 🌟 方案三核心：时间轴轨道组模型 (Track Group) - 宏观/微观的万能容器
+    // ==========================================
+    public class TimelineTrackGroupModel : INotifyPropertyChanged
+    {
+        public string GroupName { get; set; } // 组名，例如 "Layer 0", "控制板幽灵", "X 轴属性"
+        public int GroupIndex { get; set; }   // 🌟 辐射排序核心：用来决定上下顺序（越大越靠上或靠下）
         
+        public bool SortTracksAscending { get; set; } = false; // ✨ 轨道正序开关（如果是 True，则数字越大的轨道越靠下！）
+
+        private bool _isExpanded = true;
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { _isExpanded = value; OnPropertyChanged(); }
+        }
+
+        // 肚子里装着该组下的所有轨道
+        public ObservableCollection<TimelineTrackModel> Tracks { get; set; } = new ObservableCollection<TimelineTrackModel>();
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

@@ -208,7 +208,29 @@ namespace Naziki_Editor.Views.PropertyEditor
             Grid.SetColumn(timeCenterCtrl, 1);
             RowTime.Children.Add(timeCenterCtrl);
 
+            // 🌟 VIP 常驻特区数据接线 (Layer / Order)
+            if (_currentState.GetType().GetProperty("Layer") != null)
+            {
+                Binding bLayer = new Binding("Layer") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
+                TxtLayer.SetBinding(TextBox.TextProperty, bLayer);
+            }
+
+            if (_currentState.GetType().GetProperty("Order") != null)
+            {
+                Binding bOrder = new Binding("Order") { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
+                TxtOrder.SetBinding(TextBox.TextProperty, bOrder);
+            }
+
+            // 🔒 结界生效：如果不是主干初始帧，绝不允许修改图层秩序！(时空禁入规则)
+            TxtLayer.IsEnabled = _isRoot;
+            TxtOrder.IsEnabled = _isRoot;
+
+
             BuildDynamicPanel();
+
+
+
+
 
             // 4. 🧲 基因属性大挪移：寻找时间轴容器，清理历史残留
             StackPanel timePanel = RowTime.Parent as StackPanel;
@@ -473,6 +495,8 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             foreach (var prop in props)
             {
+                if (prop.Name == "Layer" || prop.Name == "Order") continue;
+                // ✨ 新增：VIP 常驻特权属性绝对不允许在下方的动态列表里二次生成！
                 if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "AddTime" || prop.Name == "RelativeTime") continue;
                 if (prop.Name == "Id" || prop.Name == "ParentId" || prop.Name == "TargetId" || prop.Name == "States" || prop.Name == "Keyframes") continue;
                 // 只要是这几个不可做动画的固定 DNA 属性，全宇宙无条件隐身！绝对不进动态编辑面板！
