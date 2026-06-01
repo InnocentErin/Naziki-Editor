@@ -555,9 +555,140 @@ namespace Naziki_Editor.Views
             return true;
         }
 
-        private void MenuOpenProject_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) EventList.ExecuteOpenProject(); }
+        private void MenuOpenProject_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Naziki Project (*.nzproj)|*.nzproj" };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    // 1. 读取并反序列化工程 JSON
+                    string json = System.IO.File.ReadAllText(dlg.FileName);
+                    var projectData = JsonConvert.DeserializeObject<NazikiProjectModel>(json);
+
+                    Context.ProjectFilePath = dlg.FileName;
+                    Context.ProjectData = projectData;
+
+                    // (大大原有的根据 projectData 路径加载 Chart 和 Storyboard 的逻辑写在这里...)
+                    // ...
+
+                    // ✨ 核心追加：工程读取完毕，发出强制苏醒广播！
+                    if (Context != null && Context.HasChart)
+                    {
+                        EventList.UpdateChartLockState(true); // 解除左侧结界
+                        EventList.LoadStoryboardUI();         // 刷出左侧树状列表
+
+                        if (Context.HasStoryboard)
+                        {
+                            TimelineConsole.LoadStoryboardTimeline(Context); // 唤醒时间轴宇宙
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"读取工程失败：{ex.Message}", "系统错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        // 🎬 通道三：故事板单独导入通道
+        private void MenuImportStoryboard_Click(object sender, RoutedEventArgs e)
+        {
+            // 防呆雷达：如果没有谱面，不准导入故事板！
+            if (!Context.HasChart)
+            {
+                MessageBox.Show("⚠️ 必须先导入谱面文件，才能导入故事板哦！", "拦截", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Cytoid Storyboard (*.json)|*.json" };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    // 1. 读取单体故事板
+                    string json = System.IO.File.ReadAllText(dlg.FileName);
+                    var storyboard = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.StoryboardRoot>(json);
+
+                    Context.StoryboardPath = dlg.FileName;
+                    Context.Storyboard = storyboard;
+
+                    // 2. ✨ 海关体检雷达启动
+                    bool hasAnyLayerOrOrder = CheckIfAnyEntityHasLayerOrOrder(Context.Storyboard);
+
+                    if (hasAnyLayerOrOrder)
+                    {
+                        var result = MessageBox.Show(
+                            "✨ 小艾的雷达探测到：这份故事板里部分对象已经带有 Layer/Order 的排版设定啦！\n" +
+                            "但是可能还有很多对象没有设定，在时间轴上会挤在一起哦。\n\n" +
+                            "👉 需要小艾现在帮你执行一键【智能排版】（重新梳理所有轨道）吗？\n" +
+                            "（点击“否”将尊重现有数据，直接导入）",
+                            "智能排版体检", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            Core.Timeline.TimelineLayoutEngine.AutoAssignOrderForVisualEntities(Context);
+                        }
+                    }
+                    else
+                    {
+                        // 完全没有排版痕迹，直接静默梳理
+                        Core.Timeline.TimelineLayoutEngine.AutoAssignOrderForVisualEntities(Context);
+                    }
+
+                    // 3. 标记大本营已修改，并最后刷新各大宇宙的 UI！
+                    Context.MarkAsModified();
+                    EventList.LoadStoryboardUI();
+                    TimelineConsole.LoadStoryboardTimeline(Context);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"解析故事板失败：{ex.Message}", "读取错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        // 🛠️ 内部雷达小助手：用于探测故事板中是否存在任何 Layer 或 Order 的人工设定
+        private bool CheckIfAnyEntityHasLayerOrOrder(Cytoid.Storyboard.Storyboard root)
+        {
+            if (root == null) return false;
+
+            var visualEntities = new System.Collections.Generic.List<Models.IStoryboardEntity>();
+            if (root.sprites != null) visualEntities.AddRange(root.sprites);
+            if (root.texts != null) visualEntities.AddRange(root.texts);
+            if (root.videos != null) visualEntities.AddRange(root.videos);
+            if (root.lines != null) visualEntities.AddRange(root.lines);
+
+            foreach (var entity in visualEntities)
+            {
+                var baseState = entity.GetBaseState();
+                if (baseState == null) continue;
+
+                if (Core.FastReflectionHelper.TryGetValue(baseState, "Layer", out object lObj) && lObj != null && Convert.ToInt32(lObj) != 0) return true;
+                if (Core.FastReflectionHelper.TryGetValue(baseState, "Order", out object oObj) && oObj != null && Convert.ToInt32(oObj) != 0) return true;
+            }
+            return false;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
-        private void MenuImportChart_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) ExecuteImportChart(); }
+        private void MenuImportChart_Click(object sender, RoutedEventArgs e) 
+        { 
+            if (ResolveDataConflictIfNeeded()) 
+                ExecuteImportChart(); 
+        }
 
         public void ExecuteImportChart()
         {
