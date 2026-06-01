@@ -16,6 +16,7 @@
             <Border.ContextMenu>
                 <ContextMenu x:Name="ClipContextMenu">
                     <MenuItem Header="✨ 重新锚定至最近音符" Click="MenuReanchor_Click"/>
+                    <MenuItem Header="💥 在最后一个关键帧销毁" Click="MenuDestroyAtLastFrame_Click"/>
                     <Separator/>
                     <MenuItem Header="✂️ 剪切 (Cut)" Command="ApplicationCommands.Cut"/>
                     <MenuItem Header="📋 复制 (Copy)" Command="ApplicationCommands.Copy"/>

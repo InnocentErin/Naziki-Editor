@@ -88,6 +88,23 @@ namespace Naziki_Editor.Core.Timeline
                     WritePropertyToEntity(box.BaseState, "Order", bestOrder);
                 }
             }
+
+            // ✨ 超过 15 轨同屏并发报警！
+            int maxOrderGenerated = layerGroups.Values
+                .SelectMany(list => list)
+                .Select(box =>
+                {
+                    var prop = box.BaseState.GetType().GetProperty("Order");
+                    if (prop != null) return Convert.ToInt32(prop.GetValue(box.BaseState) ?? 0);
+                    return 0;
+                }).DefaultIfEmpty(0).Max();
+
+            if (maxOrderGenerated > 15)
+            {
+                System.Windows.MessageBox.Show(
+                    $"⚠️ 纳尼？！排版检测到极端情况！\n在同一时间点内，最多出现了 {maxOrderGenerated + 1} 个重叠对象！\n建议打谱师检查是否忘记勾选 Destroy，以防游戏卡顿哦！",
+                    "性能预警", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
         }
 
         // ==========================================

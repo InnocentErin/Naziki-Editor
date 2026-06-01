@@ -38,7 +38,9 @@ namespace Naziki_Editor.Views
         public event Action<TimelineClipControl, int> OnTrackIndexChanged; // 换轨通知
         public event Action<TimelineClipControl> OnRequestNewTrack;        // 越界修路请求
         public event Action<TimelineClipModel> OnRequestDetailedEditMode;  // 双击进入微观世界
-        public event Action<TimelineClipModel> OnClipSelected;             // ✨ 追加：单点选中反射信号
+        public event Action<TimelineClipModel> OnClipSelected;             // 单点选中反射信号
+        
+        public event Action<TimelineClipModel> OnRequestPropertyEditor;    // 请求打开属性编辑器的独立信号
 
         private double _originalY; // 记录拖拽前的 Y 坐标
 
@@ -180,6 +182,19 @@ namespace Naziki_Editor.Views
                 e.Handled = true; // 吞掉事件，防止它继续冒泡
                 return; // 直接退出，绝不执行下面的单点逻辑！
             }
+
+            // 🚀 【新增】：拦截 Ctrl+单击！
+            if (e.ClickCount == 1 && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                _isDraggingClip = false;
+                ClipBackground.Opacity = 1.0;
+                OnRequestPropertyEditor?.Invoke(_model); // 发射信号！
+                e.Handled = true;
+                return; // 直接退出，不执行普通的拖拽和单机选中！
+            }
+
+
+
 
             // --- 以下是原本的单次点击选中 + 拖拽逻辑 ---
             _model.IsSelected = true;
@@ -332,6 +347,43 @@ namespace Naziki_Editor.Views
                 }
             }
         }
+
+
+        // ==========================================
+        // ✨ 右键菜单：精准锁定最后一个关键帧，并悄悄把它的 Destroy 属性设为 true
+        // ==========================================
+        private void MenuDestroyAtLastFrame_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model?.AssociatedObject == null) return;
+            var kfs = _model.AssociatedObject.GetKeyframes();
+            if (kfs == null || kfs.Count == 0) return;
+
+            // 锁定最后一帧！
+            var lastFrame = kfs[kfs.Count - 1];
+            var propInfo = lastFrame.GetType().GetProperty("Destroy");
+
+            if (propInfo != null && propInfo.CanWrite)
+            {
+                // 强制剥壳（处理 bool? 可空类型），并写入 true
+                Type t = propInfo.PropertyType;
+                if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>)) t = Nullable.GetUnderlyingType(t);
+                propInfo.SetValue(lastFrame, Convert.ChangeType(true, t));
+
+                // 刷新大本营！
+                if (Window.GetWindow(this) is MainWindow mainWin)
+                {
+                    mainWin.Context.MarkAsModified();
+                    mainWin.TimelineConsole.LoadStoryboardTimeline(mainWin.Context); // 重新渲染时间轴，让方块变短！
+                }
+            }
+        }
+
+
+
+
+
+
+
 
         // ==========================================
         // 💎 内部状态帧节点管理 (详细调整模式的基石)

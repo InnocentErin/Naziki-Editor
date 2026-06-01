@@ -76,58 +76,61 @@ namespace Naziki_Editor.Views
         }
 
         // ==========================================
+        // 📂 打开 .nep 核心工程文件！
+        // ==========================================
+        private void MenuOpenProject_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. 🛡️ 启动保护结界：先检查当前代码画板有没有未保存的冲突
+            if (!ResolveDataConflictIfNeeded()) return;
+
+            // 2. 🪄 召唤文件选择魔法阵，专门只抓取 .nep 后缀的工程账本
+            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Naziki 工程文件 (*.nep)|*.nep",
+                Title = "请选择你要打开的工程宇宙"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    // 3. 📖 读取物理文件，并用 Newtonsoft 还原出工程模型基因
+                    string jsonText = System.IO.File.ReadAllText(openFileDialog.FileName);
+                    var projectData = Newtonsoft.Json.JsonConvert.DeserializeObject<Naziki_Editor.Models.NazikiProjectModel>(jsonText);
+
+                    if (projectData != null)
+                    {
+                        // 4. 🚀 完美闭环：呼叫主战舰早已备好的港口入城式法术！
+                        LoadProject(openFileDialog.FileName, projectData);
+                    }
+                    else
+                    {
+                        MessageBox.Show("这个工程文件似乎是个空壳子哦！", "解析失败");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"解析 .nep 工程文件时发生爆炸 QAQ：\n{ex.Message}", "读取错误");
+                }
+            }
+        }
+
+
+
+
+
+
+        // ==========================================
         // ⚓ 公开港口入城式：一体化无缝扫描完全体
         // ==========================================
         public void LoadProject(string projectPath, NazikiProjectModel projectData)
         {
             if (projectData == null) return;
 
-            bool needSaveNep = false;
-
-            // 🩸 1. 心脏检查：谱面文件 (Chart) 强制寻回
-            if (!string.IsNullOrEmpty(projectData.ChartFilePath) && !File.Exists(projectData.ChartFilePath))
-            {
-                var res = MessageBox.Show("⚠️ 糟糕！项目绑定的【谱面文件】丢失或被转移了！\n没有谱面，整个宇宙都无法运行哦！\n\n是否立即重新定位谱面文件？", "核心文件丢失", MessageBoxButton.YesNo, MessageBoxImage.Error);
-                if (res == MessageBoxResult.No) return; // 🛑 拒绝抢救，直接阻断整个工程的打开！
-
-                OpenFileDialog openChartDlg = new OpenFileDialog { Filter = "Cytus II 谱面 (*.txt;*.json)|*.txt;*.json", Title = "请重新定位谱面文件" };
-                if (openChartDlg.ShowDialog() == true)
-                {
-                    projectData.ChartFilePath = openChartDlg.FileName;
-                    needSaveNep = true;
-                }
-                else return; // 🛑 打开了窗口但取消了，依然阻断！
-            }
-
-            // 👗 2. 皮肤检查：故事板文件 (Storyboard) 随缘寻回
-            if (!string.IsNullOrEmpty(projectData.StoryboardExportPath) && !File.Exists(projectData.StoryboardExportPath))
-            {
-                var res = MessageBox.Show("⚠️ 项目绑定的【故事板文件】丢失啦！\n但谱面依然可以正常加载。\n\n是否尝试重新定位故事板文件？\n(若选择否，将以空故事板状态打开工程)", "可选文件丢失", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (res == MessageBoxResult.Yes)
-                {
-                    OpenFileDialog openSbDlg = new OpenFileDialog { Filter = "故事板文件 (*.json)|*.json", Title = "请重新定位故事板文件" };
-                    if (openSbDlg.ShowDialog() == true)
-                    {
-                        projectData.StoryboardExportPath = openSbDlg.FileName;
-                        needSaveNep = true;
-                    }
-                    else projectData.StoryboardExportPath = null;
-                }
-                else projectData.StoryboardExportPath = null;
-            }
-
-            // 🌐 3. 环境挂载与自动保存
             Context.ProjectFilePath = projectPath;
             Context.ProjectData = projectData;
+
             this.Title = $"Naziki Editor - {projectData.ProjectName} ［{projectPath}］";
-
-            if (needSaveNep) SaveProjectNepFile(); // ✨ 如果发生了寻回，立刻自动保存 .nep
-
-            // 🎵 4. 强制前置：先加载谱面！（防止后续解析锚点时 TimeEngine 报空指针）
-            if (!string.IsNullOrEmpty(projectData.ChartFilePath) && File.Exists(projectData.ChartFilePath))
-            {
-                SilentImportChart(projectData.ChartFilePath);
-            }
 
             if (!string.IsNullOrEmpty(projectData.StoryboardExportPath) && File.Exists(projectData.StoryboardExportPath))
             {
@@ -163,6 +166,7 @@ namespace Naziki_Editor.Views
                 EventList.LoadStoryboardUI();
                 CanvasArea.TrackSelectedObject(null);
                 CanvasArea.RefreshJsonView();
+                TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
 
                 _undoRedoManager.Reset();
                 _undoRedoManager.RecordSnapshot(Context.Storyboard);
@@ -174,6 +178,11 @@ namespace Naziki_Editor.Views
             }
 
             RefreshAllAssets();
+            // 🌟 所有数据就位后，强行通电叫醒时间轴排版！
+            if (Context.HasStoryboard)
+            {
+                TimelineConsole.LoadStoryboardTimeline(Context);
+            }
         }
 
         // ========================================================
@@ -228,33 +237,12 @@ namespace Naziki_Editor.Views
                     if (Context.Chart.note_list.Count > 0)
                         NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
                     NoteList.RefreshNoteList();
+                    // ✨ 【小艾的终极解锁法术】：谱面加载完毕，立刻通知事件列表解除红色锁定结界！
+                    EventList.UpdateChartLockState(Context.HasChart);
                 }
             }
             catch { }
         }
-
-
-        // 🔐 全局状态更新：根据当前大本营是否有谱面，动态上锁或解锁！
-        public void UpdateGlobalUIState()
-        {
-            bool hasChart = Context != null && Context.HasChart;
-
-            // 锁死或解锁顶部的“导入 storyboard...” 按钮
-            if (MenuOpenProject != null) MenuOpenProject.IsEnabled = hasChart;
-
-            // 通知左侧事件列表升起或降下结界
-            if (EventList != null) EventList.UpdateChartLockState(hasChart);
-        }
-
-
-
-
-
-
-
-
-
-
 
         public MainWindow()
         {
@@ -280,8 +268,6 @@ namespace Naziki_Editor.Views
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
                 }
-                // ✨ 接入时间轴的脉搏！只要宇宙发生变化，时间轴立刻重新洗牌！
-                TimelineConsole.LoadStoryboardTimeline(Context);
             };
 
             // ==========================================
@@ -333,10 +319,10 @@ namespace Naziki_Editor.Views
 
                     // 4. 📢 惊醒大宇宙，标记工程变脏
                     Context.MarkAsModified();
+                    TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
                 }
-            
             };
-            // 
+
             EventList.OnStoryboardLoaded += (path, root) =>
             {
                 Context.StoryboardPath = path;
@@ -435,24 +421,22 @@ namespace Naziki_Editor.Views
             };
 
 
-            // 🧠 全局反射弧：时间轴单点对象联调！
-            TimelineConsole.OnTimelineObjectSelected += (selectedEntity) =>
+            // 🌟 1. 监听时间轴的【普通单击】：联动右侧属性面板和中间的代码高亮！
+            TimelineConsole.OnTimelineObjectSelected += (obj) =>
             {
-                if (selectedEntity == null) return;
-
-                // 1. 👉 指挥右侧属性面板：立刻加载这个对象的数据！
-                PropertyPanel.SetSelectedObject(selectedEntity);
-
-                // 2. 👉 指挥中间画板：立刻把高亮选框套在这个对象上！
-                CanvasArea.TrackSelectedObject(selectedEntity);
-
-                // 3. 👉 指挥左侧事件列表：高亮对应的树节点 (如果大大的 EventList 有这个公开方法的话，没有可不写或以后补)
-                // EventList.SelectNodeByObject(selectedEntity); 
+                PropertyPanel.SetSelectedObject(obj);
+                CanvasArea.TrackSelectedObject(obj);
             };
 
+            // 🚀 2. 监听时间轴的【Ctrl + 单击】：直接召唤高级属性编辑弹窗！
+            TimelineConsole.OnTimelineRequestPropertyEditor += (obj) =>
+            {
+                if (obj is Models.IStoryboardEntity entity)
+                {
+                    OpenPropertyEditor(entity);
+                }
+            };
 
-
-            UpdateGlobalUIState();
 
 
 
@@ -555,140 +539,28 @@ namespace Naziki_Editor.Views
             return true;
         }
 
-        private void MenuOpenProject_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Naziki Project (*.nzproj)|*.nzproj" };
-            if (dlg.ShowDialog() == true)
-            {
-                try
-                {
-                    // 1. 读取并反序列化工程 JSON
-                    string json = System.IO.File.ReadAllText(dlg.FileName);
-                    var projectData = JsonConvert.DeserializeObject<NazikiProjectModel>(json);
-
-                    Context.ProjectFilePath = dlg.FileName;
-                    Context.ProjectData = projectData;
-
-                    // (大大原有的根据 projectData 路径加载 Chart 和 Storyboard 的逻辑写在这里...)
-                    // ...
-
-                    // ✨ 核心追加：工程读取完毕，发出强制苏醒广播！
-                    if (Context != null && Context.HasChart)
-                    {
-                        EventList.UpdateChartLockState(true); // 解除左侧结界
-                        EventList.LoadStoryboardUI();         // 刷出左侧树状列表
-
-                        if (Context.HasStoryboard)
-                        {
-                            TimelineConsole.LoadStoryboardTimeline(Context); // 唤醒时间轴宇宙
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"读取工程失败：{ex.Message}", "系统错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        // 🎬 通道三：故事板单独导入通道
+        // ==========================================
+        // 🎬 导入独立的故事板文件 (.json)
+        // ==========================================
         private void MenuImportStoryboard_Click(object sender, RoutedEventArgs e)
         {
-            // 防呆雷达：如果没有谱面，不准导入故事板！
+            // 🛑 【小艾的物理拦截结界】：如果还没导入谱面，直接拦截弹窗，拒绝执行！
             if (!Context.HasChart)
             {
-                MessageBox.Show("⚠️ 必须先导入谱面文件，才能导入故事板哦！", "拦截", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("纳尼？必须先导入谱面文件，才能导入故事板哦！(｀•ω•´)ゞ", "逻辑锁拦截", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Cytoid Storyboard (*.json)|*.json" };
-            if (dlg.ShowDialog() == true)
+            // 1. 启动保护结界：检查源码编辑器是否有未保存的冲突
+            if (ResolveDataConflictIfNeeded())
             {
-                try
-                {
-                    // 1. 读取单体故事板
-                    string json = System.IO.File.ReadAllText(dlg.FileName);
-                    var storyboard = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.StoryboardRoot>(json);
-
-                    Context.StoryboardPath = dlg.FileName;
-                    Context.Storyboard = storyboard;
-
-                    // 2. ✨ 海关体检雷达启动
-                    bool hasAnyLayerOrOrder = CheckIfAnyEntityHasLayerOrOrder(Context.Storyboard);
-
-                    if (hasAnyLayerOrOrder)
-                    {
-                        var result = MessageBox.Show(
-                            "✨ 小艾的雷达探测到：这份故事板里部分对象已经带有 Layer/Order 的排版设定啦！\n" +
-                            "但是可能还有很多对象没有设定，在时间轴上会挤在一起哦。\n\n" +
-                            "👉 需要小艾现在帮你执行一键【智能排版】（重新梳理所有轨道）吗？\n" +
-                            "（点击“否”将尊重现有数据，直接导入）",
-                            "智能排版体检", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                        if (result == MessageBoxResult.Yes)
-                        {
-                            Core.Timeline.TimelineLayoutEngine.AutoAssignOrderForVisualEntities(Context);
-                        }
-                    }
-                    else
-                    {
-                        // 完全没有排版痕迹，直接静默梳理
-                        Core.Timeline.TimelineLayoutEngine.AutoAssignOrderForVisualEntities(Context);
-                    }
-
-                    // 3. 标记大本营已修改，并最后刷新各大宇宙的 UI！
-                    Context.MarkAsModified();
-                    EventList.LoadStoryboardUI();
-                    TimelineConsole.LoadStoryboardTimeline(Context);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"解析故事板失败：{ex.Message}", "读取错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                // 2. 呼叫事件列表里改名后的全新专属法术！
+                EventList.ExecuteImportStoryboard();
             }
         }
-
-        // 🛠️ 内部雷达小助手：用于探测故事板中是否存在任何 Layer 或 Order 的人工设定
-        private bool CheckIfAnyEntityHasLayerOrOrder(Cytoid.Storyboard.Storyboard root)
-        {
-            if (root == null) return false;
-
-            var visualEntities = new System.Collections.Generic.List<Models.IStoryboardEntity>();
-            if (root.sprites != null) visualEntities.AddRange(root.sprites);
-            if (root.texts != null) visualEntities.AddRange(root.texts);
-            if (root.videos != null) visualEntities.AddRange(root.videos);
-            if (root.lines != null) visualEntities.AddRange(root.lines);
-
-            foreach (var entity in visualEntities)
-            {
-                var baseState = entity.GetBaseState();
-                if (baseState == null) continue;
-
-                if (Core.FastReflectionHelper.TryGetValue(baseState, "Layer", out object lObj) && lObj != null && Convert.ToInt32(lObj) != 0) return true;
-                if (Core.FastReflectionHelper.TryGetValue(baseState, "Order", out object oObj) && oObj != null && Convert.ToInt32(oObj) != 0) return true;
-            }
-            return false;
-        }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
-        private void MenuImportChart_Click(object sender, RoutedEventArgs e) 
-        { 
-            if (ResolveDataConflictIfNeeded()) 
-                ExecuteImportChart(); 
-        }
+        private void MenuImportChart_Click(object sender, RoutedEventArgs e) { if (ResolveDataConflictIfNeeded()) ExecuteImportChart(); }
 
         public void ExecuteImportChart()
         {
@@ -709,6 +581,9 @@ namespace Naziki_Editor.Views
                         NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
                     NoteList.RefreshNoteList();
 
+                    // ✨ 【小艾的终极解锁法术】：谱面加载完毕，立刻通知事件列表解除红色锁定结界！
+                    EventList.UpdateChartLockState(Context.HasChart);
+
                     if (Context.ProjectData != null)
                     {
                         Context.ProjectData.ChartFilePath = openFileDialog.FileName;
@@ -721,8 +596,6 @@ namespace Naziki_Editor.Views
                 catch (Exception ex) { MessageBox.Show($"解析发生爆炸 QAQ：\n{ex.Message}"); }
             }
             TriggerAutoLinkIfReady();
-            // 🌟 核心追加：谱面导入完毕，立刻刷新全局 UI（解锁故事板导入权限）
-            UpdateGlobalUIState();
         }
 
         // ✨ 核心修正：将残留的旧工厂创建方法升级，全面适配 IStoryboardEntity 通用接口！
@@ -760,6 +633,7 @@ namespace Naziki_Editor.Views
             Context.Storyboard.texts.Add(text);
             EventList.LoadStoryboardUI();
             Context.MarkAsModified();
+            TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
         }
 
         // 🌟 2. 动态添加线条
@@ -780,6 +654,7 @@ namespace Naziki_Editor.Views
             Context.Storyboard.lines.Add(line);
             EventList.LoadStoryboardUI();
             Context.MarkAsModified();
+            TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
         }
 
         // 🌟 3. 动态添加场景控制器
@@ -796,6 +671,7 @@ namespace Naziki_Editor.Views
             Context.Storyboard.controllers.Add(controller);
             EventList.LoadStoryboardUI();
             Context.MarkAsModified();
+            TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
         }
 
         // =========================================================================
@@ -832,6 +708,7 @@ namespace Naziki_Editor.Views
 
             // 🌟 6. 【极度丝滑交互】：造出来的瞬间，直接弹出属性编辑器，不用打谱师再去双击！
             OpenTemplatePropertyEditor(newKey, newTemplate);
+            TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
         }
 
         private void MenuSave_Click(object sender, RoutedEventArgs e)
@@ -966,6 +843,7 @@ namespace Naziki_Editor.Views
                     PropertyPanel.SetSelectedObject(modifiedObj);
                     EventList.LoadStoryboardUI();
                     Context.MarkAsModified();
+                    TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
                 }
             }
         }
@@ -985,6 +863,7 @@ namespace Naziki_Editor.Views
                 EventList.LoadStoryboardUI();
                 PropertyPanel.SetSelectedObject(null);
                 Context.MarkAsModified();
+                TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
             }
         }
 
@@ -1014,6 +893,7 @@ namespace Naziki_Editor.Views
                 EventList.LoadStoryboardUI();
                 PropertyPanel.SetSelectedObject(modifiedObj);
                 Context.MarkAsModified();
+                TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
             }
         }
 

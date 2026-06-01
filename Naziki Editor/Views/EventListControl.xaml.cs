@@ -46,7 +46,7 @@ namespace Naziki_Editor.Views
         // ==========================================
         // 🔮 一键智能读档基站
         // ==========================================
-        public void ExecuteOpenProject()
+        public void ExecuteImportStoryboard()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog { Filter = "Cytoid 故事板 (*.json)|*.json|所有文件 (*.*)|*.*", Title = "请选择你的故事板文件" };
 

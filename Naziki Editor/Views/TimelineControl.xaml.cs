@@ -26,6 +26,7 @@ namespace Naziki_Editor.Views
 
         // 🎬 详细调整模式（微观时光屋）状态锁
         private TimelineClip.ClipDetailedEditor _detailedEditor = null;
+
         private bool _isDetailedEditMode = false;
         private Models.TimelineClipModel _editingClipModel = null;
 
@@ -37,6 +38,8 @@ namespace Naziki_Editor.Views
         public ObservableCollection<Models.TimelineTrackGroupModel> TrackGroups { get; private set; } = new ObservableCollection<Models.TimelineTrackGroupModel>();
         // ✨ 追加：向大本营汇报“某对象被选中”的神经接口
         public event Action<object> OnTimelineObjectSelected;
+        // 🚀 追加：向大本营汇报“请求打开属性编辑器”的神经接口 (Ctrl+单击)
+        public event Action<object> OnTimelineRequestPropertyEditor;
         public TimelineControl()
         {
             InitializeComponent();
@@ -144,6 +147,13 @@ namespace Naziki_Editor.Views
                             OnTimelineObjectSelected?.Invoke(targetModel.AssociatedObject);
                         };
 
+                        // 🚀 追加：接通 Ctrl+Click 的高级召唤法术！
+                        clipCtrl.OnRequestPropertyEditor += (targetModel) => {
+                            OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject);
+                        };
+
+
+
                         Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
                         Canvas.SetTop(clipCtrl, 6); // 轨道高度 40，居中留白
 
@@ -165,10 +175,13 @@ namespace Naziki_Editor.Views
         // 🚀 多标签宇宙：微观变身引擎重写
         private void EnterDetailedEditMode(Models.TimelineClipModel targetModel)
         {
-            // 1. 查户口：如果这个方块的详情页已经开着了，直接跳过去，不重复开！
-            foreach (TabItem item in TimelineTabs.Items)
+
+
+
+            // 1. 查户口：✨ 【完美修复穿模】：温柔地检查类型，不要强转！
+            foreach (var element in TimelineTabs.Items)
             {
-                if (item.Tag == targetModel.AssociatedObject)
+                if (element is TabItem item && item.Tag == targetModel.AssociatedObject)
                 {
                     TimelineTabs.SelectedItem = item;
                     return;
