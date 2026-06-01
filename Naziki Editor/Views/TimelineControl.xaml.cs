@@ -66,6 +66,7 @@ namespace Naziki_Editor.Views
 
             // 5. 让画笔动起来！
             RefreshTimelineUI();
+            DrawNoteRuler();
         }
 
         // =========================================================================
@@ -132,6 +133,7 @@ namespace Naziki_Editor.Views
                     foreach (var clip in track.Clips)
                     {
                         var clipCtrl = new TimelineClipControl();
+                        clipCtrl.Tag = clip; // ✨ 小艾新增：给方块贴上名片，方便极速缩放！
 
                         // 预留接口：将大本营上下文传进去
                         if (Window.GetWindow(this) is MainWindow mainWin)
@@ -245,7 +247,9 @@ namespace Naziki_Editor.Views
                     _totalDurationSeconds = Core.AudioSyncEngine.Instance.Duration + 2.0;
                     UpdateTimelineWidth();
                 }
-                else DrawWaveform();
+                Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    DrawWaveform();
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
             };
         }
 
@@ -255,17 +259,51 @@ namespace Naziki_Editor.Views
             if (xPos < 0) xPos = 0;
             if (xPos > maxWidth) xPos = maxWidth;
 
-            if (TransRulerHead != null) TransRulerHead.X = xPos;
+            // 1. 🌟 获取主轴当前的真实物理滚动偏移量（摄像机位置）
+            double currentOffset = ScrollTimelineTracks != null ? ScrollTimelineTracks.HorizontalOffset : 0;
+
+            // 2. ✨ 【时空相对论】：红线游标的物理 X 减去摄像机的偏移，才是它在屏幕上真正的正确位置！
+            if (TransRulerHead != null) TransRulerHead.X = xPos - currentOffset;
+
+            // 3. 蓝线（全局缩略图游标）照旧
             if (AudioMinimapGrid != null && AudioPlayheadLine != null && _totalDurationSeconds > 0)
             {
-                double ratio = _currentPlayheadSeconds / _totalDurationSeconds;
+                double ratio = xPos / maxWidth; // 修复：直接用 xPos，更精准
                 AudioPlayheadLine.X1 = ratio * AudioMinimapGrid.ActualWidth;
                 AudioPlayheadLine.X2 = AudioPlayheadLine.X1;
             }
 
             _currentPlayheadSeconds = xPos / _pixelsPerSecond;
             UpdatePlaybackTimeDisplay(_currentPlayheadSeconds);
+
+            // 4. ✨ 智能跟随摄像机（居中推流）
+            if (Core.AudioSyncEngine.Instance.IsPlaying && !_isDraggingPlayhead && ScrollTimelineTracks != null)
+            {
+                double viewWidth = ScrollTimelineTracks.ViewportWidth;
+                if (viewWidth > 0)
+                {
+                    // 🌟 核心：判断游标在屏幕上的实际视觉位置！
+                    double visualX = xPos - currentOffset;
+
+                    // ➡️ 向右越界：当游标距离右侧边缘不足 20 像素时，触发居中推流
+                    if (visualX > viewWidth - 20)
+                    {
+                        double targetOffset = xPos - (viewWidth / 2.0);
+                        ScrollTimelineTracks.ScrollToHorizontalOffset(targetOffset);
+                    }
+                    // ⬅️ 向左越界：当游标跑到屏幕左侧外面时，同样触发居中
+                    else if (visualX < 0)
+                    {
+                        double targetOffset = Math.Max(0, xPos - (viewWidth / 2.0));
+                        ScrollTimelineTracks.ScrollToHorizontalOffset(targetOffset);
+                    }
+                }
+            }
         }
+
+
+
+
 
         public void UpdatePlaybackTimeDisplay(double currentSeconds)
         {
@@ -281,14 +319,44 @@ namespace Naziki_Editor.Views
         {
             if (sender is Border rulerBorder)
             {
-                UpdatePlayheadPosition(e.GetPosition(rulerBorder).X);
+                // ✨ 我们点到的只是屏幕坐标，必须加上底下的真实滚动距离，才是绝对时间坐标！
+                double visualX = e.GetPosition(rulerBorder).X;
+                double offset = ScrollTimelineTracks != null ? ScrollTimelineTracks.HorizontalOffset : 0;
+
+                UpdatePlayheadPosition(visualX + offset);
                 Core.AudioSyncEngine.Instance.Seek(_currentPlayheadSeconds);
             }
         }
 
-        private void Playhead_MouseDown(object sender, MouseButtonEventArgs e) { _isDraggingPlayhead = true; PlayheadMarker.CaptureMouse(); e.Handled = true; }
-        private void Playhead_MouseMove(object sender, MouseEventArgs e) { if (_isDraggingPlayhead && ScrollRuler?.Content is Border rBorder) UpdatePlayheadPosition(e.GetPosition(rBorder).X); }
-        private void Playhead_MouseUp(object sender, MouseButtonEventArgs e) { if (_isDraggingPlayhead) { _isDraggingPlayhead = false; PlayheadMarker.ReleaseMouseCapture(); Core.AudioSyncEngine.Instance.Seek(_currentPlayheadSeconds); } }
+        private void Playhead_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isDraggingPlayhead = true;
+            PlayheadMarker.CaptureMouse();
+            e.Handled = true;
+        }
+
+        private void Playhead_MouseMove(object sender, MouseEventArgs e)
+        {
+            // ✨ 修复：原本这里写的是 is Border rBorder，但其实 XAML 里装它的是 Grid，导致拖拽彻底失效！
+            if (_isDraggingPlayhead && ScrollRuler != null)
+            {
+                // 同理，鼠标拖拽的是屏幕坐标，必须换算成绝对坐标！
+                double visualX = e.GetPosition(ScrollRuler).X;
+                double offset = ScrollTimelineTracks != null ? ScrollTimelineTracks.HorizontalOffset : 0;
+
+                UpdatePlayheadPosition(visualX + offset);
+            }
+        }
+
+        private void Playhead_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingPlayhead)
+            {
+                _isDraggingPlayhead = false;
+                PlayheadMarker.ReleaseMouseCapture();
+                Core.AudioSyncEngine.Instance.Seek(_currentPlayheadSeconds);
+            }
+        }
 
         private void BtnPlay_Click(object sender, RoutedEventArgs e) => Core.AudioSyncEngine.Instance.Play();
         private void BtnPause_Click(object sender, RoutedEventArgs e) => Core.AudioSyncEngine.Instance.Pause();
@@ -334,6 +402,22 @@ namespace Naziki_Editor.Views
 
             // ✨ 同步下半部分的横向滚动
             if (sender != ScrollBottomTimelineTracks && ScrollBottomTimelineTracks != null) ScrollBottomTimelineTracks.ScrollToHorizontalOffset(e.HorizontalOffset);
+
+            // 让顶部的刻度尺 (RulerCanvas) 也跟着反向平移，保证上方时间线和下方轨道永远对齐！
+            if (RulerCanvas != null)
+            {
+                if (!(RulerCanvas.RenderTransform is TranslateTransform))
+                    RulerCanvas.RenderTransform = new TranslateTransform();
+
+                ((TranslateTransform)RulerCanvas.RenderTransform).X = -ScrollTimelineTracks.HorizontalOffset;
+            }
+
+            // 确保在您拖动底部滚动条时，红游标也能死死地钉在正确的相对位置上！
+            if (TransRulerHead != null)
+            {
+                TransRulerHead.X = _currentPlayheadSeconds * _pixelsPerSecond - ScrollTimelineTracks.HorizontalOffset;
+            }
+
 
             _isSyncingScroll = false;
             UpdateAudioViewportBox();
@@ -386,11 +470,12 @@ namespace Naziki_Editor.Views
         {
             double newWidth = _totalDurationSeconds * _pixelsPerSecond + 200;
             if (ScrollRuler?.Content is Border rBorder) rBorder.Width = newWidth;
-
-            // 重新刷新轨道的长度
-            RefreshTimelineUI();
+            // 极速坐标位移法术！
+            FastUpdateZoomVisuals();
+            // 标尺里面的白线不多，暂时保留它的重绘，不会卡顿
             DrawTimelineRuler();
-            DrawWaveform();
+
+            // 仅更新上方迷你缩略图的“红色视野框”位置
             UpdateAudioViewportBox();
         }
 
@@ -411,7 +496,53 @@ namespace Naziki_Editor.Views
         }
 
 
+        // ==========================================
+        // 🎹 音符雷达尺：在底部画布精准画出谱面音符！
+        // ==========================================
+        public void DrawNoteRuler()
+        {
+            // 1. 防空指针与废墟清理
+            if (NotePreviewCanvas == null) return;
+            NotePreviewCanvas.Children.Clear();
 
+            // 2. 检查大本营是否已经接入了神圣的谱面数据
+            if (_context == null || !_context.HasChart || _context.Chart.note_list == null) return;
+
+            // 3. 动态对齐底部 Canvas 的物理长度
+            double totalWidth = _totalDurationSeconds * _pixelsPerSecond + 200;
+            NotePreviewCanvas.Width = totalWidth;
+
+            // 4. 开始疯狂画点！
+            foreach (var note in _context.Chart.note_list)
+            {
+                // 用大本营的时空引擎，把 tick 精准换算成秒数
+                double seconds = _context.TimeEngine.TickToSeconds(note.tick);
+                double xPos = seconds * _pixelsPerSecond;
+
+                // 捏出一个可爱的小竖条来代表音符
+                var noteRect = new Rectangle
+                {
+                    Tag = note, // ✨ 小艾新增：给音符也贴上名片！
+                    Width = 4,
+                    Height = 16,
+                    RadiusX = 2,
+                    RadiusY = 2,
+                    ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s", // 贴心的防呆提示
+                    Cursor = Cursors.Hand
+                };
+
+                // 🎨 【色彩区分】：根据音符类型分发不同的颜色
+                if (note.type == 1) noteRect.Fill = Brushes.LightGreen;      // Click (绿)
+                else if (note.type == 2) noteRect.Fill = Brushes.LightSkyBlue; // Hold (蓝)
+                else if (note.type == 3 || note.type == 6) noteRect.Fill = Brushes.Gold; // Drag/CDrag (黄)
+                else if (note.type == 4) noteRect.Fill = Brushes.Plum;         // Flick (紫)
+                else noteRect.Fill = Brushes.White;                            // 其他
+
+                NotePreviewCanvas.Children.Add(noteRect);
+                Canvas.SetLeft(noteRect, xPos);
+                Canvas.SetTop(noteRect, 7); // 居中稍微靠下
+            }
+        }
 
 
 
@@ -451,6 +582,60 @@ namespace Naziki_Editor.Views
             double newOffset = ScrollTimelineTracks.HorizontalOffset + e.HorizontalChange * (totalWidth / AudioMinimapGrid.ActualWidth);
 
             ScrollTimelineTracks.ScrollToHorizontalOffset(Math.Max(0, Math.Min(newOffset, totalWidth - ScrollTimelineTracks.ViewportWidth)));
+        }
+
+
+
+
+
+        // ==========================================
+        // 🚀 ✨ 极速缩放引擎：拒绝摧毁重建，仅更新物理坐标！
+        // ==========================================
+        private void FastUpdateZoomVisuals()
+        {
+            double newWidth = _totalDurationSeconds * _pixelsPerSecond + 200;
+
+            // 1. 内部特工法术：穿梭各个轨道，光速修改方块位置
+            Action<StackPanel> updateTracks = (container) =>
+            {
+                if (container == null) return;
+                foreach (UIElement child in container.Children)
+                {
+                    if (child is Border border && border.Child is Canvas trackCanvas)
+                    {
+                        trackCanvas.Width = newWidth; // 延长轨道
+                        foreach (UIElement clipObj in trackCanvas.Children)
+                        {
+                            if (clipObj is TimelineClipControl clipCtrl && clipCtrl.Tag is Models.TimelineClipModel clip)
+                            {
+                                // 重新计算物理坐标
+                                Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
+                                double clipDuration = clip.EndTime - clip.StartTime;
+                                if (clipDuration > 300) clipDuration = 300;
+                                clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                            }
+                        }
+                    }
+                }
+            };
+
+            // 分发给上下两层宇宙
+            updateTracks(TrackGroupsContainer);
+            updateTracks(BottomTrackGroupsContainer);
+
+            // 2. 光速更新底部音符尺
+            if (NotePreviewCanvas != null)
+            {
+                NotePreviewCanvas.Width = newWidth;
+                foreach (UIElement child in NotePreviewCanvas.Children)
+                {
+                    if (child is Rectangle rect && rect.Tag is Models.C2Note note)
+                    {
+                        double seconds = _context.TimeEngine.TickToSeconds(note.tick);
+                        Canvas.SetLeft(rect, seconds * _pixelsPerSecond);
+                    }
+                }
+            }
         }
     }
 }

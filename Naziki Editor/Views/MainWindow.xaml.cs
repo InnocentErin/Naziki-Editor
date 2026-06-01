@@ -584,6 +584,10 @@ namespace Naziki_Editor.Views
                     // ✨ 【小艾的终极解锁法术】：谱面加载完毕，立刻通知事件列表解除红色锁定结界！
                     EventList.UpdateChartLockState(Context.HasChart);
 
+                    // ✨ 请确保这里有下面这行代码！如果没有就补上！
+                    // 这样导入谱面的一瞬间，底部的音符就会唰地一下全部冒出来啦！
+                    TimelineConsole.DrawNoteRuler();
+
                     if (Context.ProjectData != null)
                     {
                         Context.ProjectData.ChartFilePath = openFileDialog.FileName;
