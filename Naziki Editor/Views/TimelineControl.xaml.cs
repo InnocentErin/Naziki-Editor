@@ -247,6 +247,8 @@ namespace Naziki_Editor.Views
                     _totalDurationSeconds = Core.AudioSyncEngine.Instance.Duration + 2.0;
                     UpdateTimelineWidth();
                 }
+                // ✨ 小艾的终极补丁：不论是否拉长了时间轴，音乐加载完必须强制画波形！
+                // 并且使用 BeginInvoke 延迟一丢丢，确保 UI 的宽度已经完全舒展成型，防止宽度为 0 画不出东西~
                 Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                     DrawWaveform();
                 }), System.Windows.Threading.DispatcherPriority.Loaded);

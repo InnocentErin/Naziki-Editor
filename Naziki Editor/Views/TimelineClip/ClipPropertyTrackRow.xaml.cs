@@ -19,6 +19,25 @@ namespace Naziki_Editor.Views.TimelineClip
         private double _pixelsPerSecond = 100.0;
         private List<Thumb> _nodes = new List<Thumb>();
 
+
+        // 📋 全局时空剪贴板 (存放复制的关键帧状态)
+        private static Models.ObjectState _clipboardState = null;
+        private static string _clipboardSourcePropertyName = ""; // 记录复制来源的属性名
+
+
+        public ClipPropertyTrackRow()
+        {
+            InitializeComponent();
+            // ✨ 1. 防穿透涂层：必须给画板一个颜色（哪怕是透明的），它才能拥有实体，拦住鼠标点击！
+            KeyframeNodeCanvas.Background = Brushes.Transparent;
+
+            // ✨ 2. 接通神经：解除注释封印，把右键点击事件正式绑定到画板上！
+            KeyframeNodeCanvas.MouseRightButtonDown += TrackRow_MouseRightButtonDown;
+        }
+
+
+
+
         public void Init(string propertyName, Models.TimelineClipModel clipModel, ProjectDataContext context, double pixelsPerSecond)
         {
             _propertyName = propertyName;
@@ -29,185 +48,430 @@ namespace Naziki_Editor.Views.TimelineClip
             RenderTrackKeyframes();
         }
 
-        /// <summary>
-        /// 🎨 核心重绘：严格执行大大的【补丁1法则】
-        /// </summary>
-        /// 以下代码暂时替换。未来小艾会根据大大的数据模型设计，完善它的逻辑，最终实现真正的“提取属性并画小菱形♦”的功能！现在先保证它绝对安全，不崩溃！
-        //private void RenderTrackKeyframes()
-        //{
-        //    KeyframeNodeCanvas.Children.Clear();
-        //    _nodes.Clear();
 
-        //    double duration = _clipModel.EndTime - _clipModel.StartTime;
-        //    double totalWidth = duration * _pixelsPerSecond;
-        //    this.Width = totalWidth;
 
-        //    // 1. 🏰 【左侧不可拖拽的永恒神庙】：初始状态 t = 0
-        //    AddKeyframeNode(0, isLocked: true);
-
-        //    // 🔍 嗅探该属性在未来是否有被创作者临幸调整过
-        //    bool hasFutureTweaks = CheckIfPropertyHasTweaksLater();
-
-        //    if (hasFutureTweaks)
-        //    {
-        //        // 2. 🧬 读取中间所有曾经被打过点的历史帧
-        //        List<double> middleTimes = GetMiddleKeyframeTimes();
-        //        foreach (double relTime in middleTimes)
-        //        {
-        //            AddKeyframeNode(relTime * _pixelsPerSecond, isLocked: false);
-        //        }
-
-        //        // 3. 🏰 【右侧不可拖拽的永恒神庙】：最后状态 t = Duration
-        //        AddKeyframeNode(totalWidth, isLocked: true);
-        //    }
-
-        //    // 4. 🖌️ 联动呼叫曲线画笔，在 ♦ 之间勾勒缓动连线
-        //    RedrawPropertyCurves();
-        //}
-        // 🎨 核心重绘：暂时开启绝对安全模式，防止在数据不全时崩溃！
-
-        private void RenderTrackKeyframes()
+        // ==========================================
+        // 🎨 核心重绘引擎：初始属性与关键帧完美独立！
+        // ==========================================
+        public void RenderTrackKeyframes()
         {
-            if (KeyframeNodeCanvas == null || _clipModel == null || _clipModel.AssociatedObject == null)
-                return; // 🛑 核心防空指针！          
             KeyframeNodeCanvas.Children.Clear();
             _nodes.Clear();
-            double duration = _clipModel.EndTime - _clipModel.StartTime;
-            if (duration <= 0) return;
-            // -----------------------------------------------------           
-            // // 🚧 这里是未来小艾为大大编写“提取属性并画小菱形♦”的施工地！           
-            // // 🚧 现在我们只做极其基础的安全排版，保证不崩溃！           
-            // // -----------------------------------------------------                      
-            // // 例如，我们先随便画一个占位的基础端点（代表初始帧）           
-            var thumb = new Thumb
+
+            if (_clipModel?.AssociatedObject == null) return;
+
+            // 1. 🛡️ 询问大管家：这个属性是不是 Slider（有极值限制的数值型）？
+            var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
+            bool isSlider = rule != null && rule.UIType == Core.PropertyUIType.Slider;
+
+            // ==========================================
+            // ✨ 核心修正：无条件独立渲染最左侧的【初始属性钮扣】
+            // ==========================================
+            var baseState = _clipModel.AssociatedObject.GetBaseState();
+            if (baseState != null && Core.FastReflectionHelper.TryGetValue(baseState, _propertyName, out object baseVal) && baseVal != null)
             {
-                Width = 12,
-                Height = 12,
-                Background = Brushes.MediumPurple,
-                Cursor = Cursors.Hand
-            };
-            // 把它钉在起点           
-            Canvas.SetLeft(thumb, 0);
-            Canvas.SetTop(thumb, 14);
-            KeyframeNodeCanvas.Children.Add(thumb);
-            _nodes.Add(thumb);
-        }
+                // ⏱️ 时空锚定：初始属性的 X 轴永远钉死在方块的 StartTime 起点！
+                double initialAbsX = _clipModel.StartTime * _pixelsPerSecond;
 
+                // 📐 Y 轴映射
+                double initialY = 14;
+                if (isSlider)
+                {
+                    double numVal = Convert.ToDouble(baseVal);
+                    if (numVal < rule.Min) numVal = rule.Min;
+                    if (numVal > rule.Max) numVal = rule.Max;
+                    double ratio = (numVal - rule.Min) / (rule.Max - rule.Min);
+                    initialY = 28 * (1.0 - ratio);
+                }
 
+                // 🌟 生成初始专属钮扣 (给它打上专属的标签)
+                Thumb initialNode = new Thumb
+                {
+                    Tag = "BASE_STATE_NODE", // 【核心暗号】代表它是神圣初始状态，非普通关键帧！
+                    Style = Application.Current.TryFindResource(isSlider ? "OpacityThumbStyle" : "KeyframeThumbStyle") as Style
+                };
 
+                initialNode.DragDelta += Node_DragDelta;
+                initialNode.MouseRightButtonDown += Node_MouseRightButtonDown;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        /// <summary>
-        /// 💎 辅助探头：生成 ♦ 节点
-        /// </summary>
-        private void AddKeyframeNode(double xPos, bool isLocked)
-        {
-            Thumb node = new Thumb
-            {
-                Width = 12,
-                Height = 12,
-                // 如果锁死，用低调的灰色；如果可动，用高亮主题色
-                Style = (Style)Application.Current.FindResource(isLocked ? "LockedKeyframeStyle" : "ActiveKeyframeStyle")
-            };
-
-            if (!isLocked)
-            {
-                node.DragDelta += Node_DragDelta;
+                KeyframeNodeCanvas.Children.Add(initialNode);
+                Canvas.SetLeft(initialNode, initialAbsX);
+                Canvas.SetTop(initialNode, initialY);
+                _nodes.Add(initialNode);
             }
 
-            // ✨ 【补丁2落地】：为节点注册双击事件，弹出精调面板
-            node.MouseDoubleClick += (s, e) =>
+            // ==========================================
+            // 🧬 ⚡ 呼叫独立时间转换引擎：一次性安全压平获取所有可见帧
+            // ==========================================
+            var decodedFrames = Core.Timeline.StoryboardTimeConverter.DecodeTimelineKeyframes(
+    _clipModel.AssociatedObject, 
+    _propertyName, 
+    _context.TimeEngine,           // 喂入大大的 ChartTimeEngine！
+    _context.Chart?.note_list,     // 喂入 C2Chart 的强类型音符列表！
+    _clipModel.StartTime           // 喂入方块自己的宏观起点
+);
+
+            foreach (var box in decodedFrames)
             {
-                // TODO: PopupPropertyEditorWindow(_propertyName, node.Tag);
-                MessageBox.Show($"🔮 召唤属性编辑器弹窗！\n正在精准调校属性 [{_propertyName}] 这一帧的数值。", "微观属性精调");
-                e.Handled = true;
-            };
+                // 如果有关键帧不小心堆在了出生点，为了视觉不冲突，跳过渲染
+                if (box.VisualRelTime <= 0.001) continue;
 
-            Canvas.SetLeft(node, xPos - 6);
-            Canvas.SetTop(node, 14); // 轨道高度 40，使其在 Y 轴中心对齐
+                double absoluteTime = _clipModel.StartTime + box.VisualRelTime;
+                double xPos = absoluteTime * _pixelsPerSecond;
 
-            KeyframeNodeCanvas.Children.Add(node);
-            _nodes.Add(node);
+                double yPos = 14;
+                if (isSlider)
+                {
+                    double numVal = Convert.ToDouble(box.Value);
+                    if (numVal < rule.Min) numVal = rule.Min;
+                    if (numVal > rule.Max) numVal = rule.Max;
+                    double ratio = (numVal - rule.Min) / (rule.Max - rule.Min);
+                    yPos = 28 * (1.0 - ratio);
+                }
+
+                Thumb node = new Thumb
+                {
+                    Tag = box.State, // 真实关键帧的 Tag 依然装着它自己的状态对象
+                    Style = Application.Current.TryFindResource(isSlider ? "OpacityThumbStyle" : "KeyframeThumbStyle") as Style
+                };
+
+                node.DragDelta += Node_DragDelta;
+                node.MouseRightButtonDown += Node_MouseRightButtonDown;
+
+                KeyframeNodeCanvas.Children.Add(node);
+                Canvas.SetLeft(node, xPos);
+                Canvas.SetTop(node, yPos);
+                _nodes.Add(node);
+            }
+
+            // 6. 🧶 画出命运的连线！
+            RedrawPropertyCurves();
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         /// <summary>
         /// 🚀 【补丁2核心】：点击轨道空白处，直接继承并创建新关键帧
         /// </summary>
         private void TrackRow_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount == 1)
-            {
-                Point clickPoint = e.GetPosition(KeyframeNodeCanvas);
-                double clickX = clickPoint.X;
-
-                // 边界叹息之墙保护
-                if (clickX <= 0 || clickX >= this.Width) return;
-
-                // 🔍 寻找它在物理时空上的“前序关键帧”
-                Thumb preNode = FindPreviousNode(clickX);
-
-                // 🚀 核心：无缝继承前一个关键帧的所有参数！
-                object inheritedValue = preNode?.Tag;
-
-                // 降临新节点！
-                AddKeyframeNode(clickX, isLocked: false);
-
-                // 更新底层 Cytoid 数据模型切片，并在当前时间点强行打洞注入新状态
-                double relTime = clickX / _pixelsPerSecond;
-                InjectNewStateIntoCytoidModel(relTime, inheritedValue);
-
-                // 重新洗盘连线
-                _nodes.Sort((a, b) => Canvas.GetLeft(a).CompareTo(Canvas.GetLeft(b)));
-                RedrawPropertyCurves();
-            }
+            
         }
 
         private void Node_DragDelta(object sender, DragDeltaEventArgs e)
         {
             if (sender is Thumb node)
             {
-                double currentX = Canvas.GetLeft(node) + 6;
-                double newX = currentX + e.HorizontalChange;
+                int index = _nodes.IndexOf(node);
+                if (index < 0) return;
 
-                // 🛑 叹息之墙：微观关键帧绝对无法超越方块的首尾端点
-                if (newX < 0) newX = 0;
-                if (newX > this.Width) newX = this.Width;
+                // 🛡️ 判定：它是不是我们独立出来的初始属性钮扣？
+                bool isBaseStateNode = (node.Tag is string str && str == "BASE_STATE_NODE");
 
-                Canvas.SetLeft(node, newX - 6);
+                // 1. ⏱️ X 轴水平绝对移动控制（绝对领域防盾升级版）
+                if (isBaseStateNode)
+                {
+                    // 🌟 A. 初始属性精准安全反写
+                    var baseState = _clipModel.AssociatedObject.GetBaseState();
+                    var propInfo = baseState?.GetType().GetProperty(_propertyName);
+                    if (propInfo != null && propInfo.CanWrite)
+                    {
+                        // 🔮 核心剥壳法术：检查目标类型是不是 Nullable<T> 可空包装盒
+                        Type t = propInfo.PropertyType;
+                        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        {
+                            t = Nullable.GetUnderlyingType(t); // 成功剥壳，拿到里面的真实核心类型（如 float）
+                        }
+                    }
+                }
+                else if (node.Tag is Models.ObjectState state)
+                {
+                    // 🌟 B. 普通关键帧精准安全反写
+                    var propInfo = state.GetType().GetProperty(_propertyName);
+                    if (propInfo != null && propInfo.CanWrite)
+                    {
+                        // 🔮 同样执行防爆剥壳法术，专治 Nullable<float> 不服
+                        Type t = propInfo.PropertyType;
+                        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        {
+                            t = Nullable.GetUnderlyingType(t);
+                        }
+                    }
+                }
 
-                // 同步更新底层 Cytoid 对应的 time 字段
-                double newRelTime = newX / _pixelsPerSecond;
-                UpdateCytoidStateTime(node, newRelTime);
+                // 2. 🚦 Y 轴纵向拉扯（Slider 属性两路分流反写）
+                var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
+                if (rule != null && rule.UIType == Core.PropertyUIType.Slider)
+                {
+                    double currentY = Canvas.GetTop(node);
+                    double newY = currentY + e.VerticalChange;
 
+                    if (newY < 0) newY = 0;
+                    if (newY > this.Height - 12) newY = this.Height - 12;
+                    Canvas.SetTop(node, newY);
+
+                    double ratio = 1.0 - (newY / (this.Height - 12));
+
+                    // 🌟 1. 源头提纯：直接在出生的瞬间，将计算结果定性为纯净的 float！
+                    float newValue = (float)(rule.Min + (rule.Max - rule.Min) * ratio);
+
+                    if (isBaseStateNode)
+                    {
+                        // 🌟 2. 扔掉 ChangeType，直接安全反写！反射会自动完成 float -> float? 的高能装箱！
+                        var baseState = _clipModel.AssociatedObject.GetBaseState();
+                        baseState?.GetType().GetProperty(_propertyName)?.SetValue(baseState, newValue);
+                    }
+                    else if (node.Tag is Models.ObjectState state)
+                    {
+                        // 🌟 普通关键帧同理，直接一步到位！
+                        state.GetType().GetProperty(_propertyName)?.SetValue(state, newValue);
+                    }
+                }
+
+                _context?.MarkAsModified();
+
+                // 🛡️ 源头净化：如果是初始属性节点动了，我们不仅要重绘曲线，更要强行呼叫 RenderTrackKeyframes 彻底刷新一次轨道！
+                // 这样能百分之百掐断任何视图层把初始点“误判/缓存”成普通关键帧的可能，绝对确保初始属性不丢失！
                 RedrawPropertyCurves();
+            
             }
         }
+
+
+
+        // 给小菱形绑定右键事件
+        // node.MouseRightButtonDown += Node_MouseRightButtonDown;
+
+        // 右键菜单：编辑属性 / 复制属性 / 粘贴属性（带冲突检测）
+        private void Node_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is Thumb node)
+            {
+                var menu = new ContextMenu();
+
+
+                // ✨ 【就是这里！】补上这行暗号解码线，红线瞬间消失！
+                bool isBaseStateNode = (node.Tag is string str && str == "BASE_STATE_NODE");
+
+                // 1. 打开属性编辑器
+                var editItem = new MenuItem { Header = "⚙️ 打开属性编辑器" };
+                editItem.Click += (s, ev) => {
+                    if (Window.GetWindow(this) is MainWindow main && _clipModel?.AssociatedObject != null)
+                    {
+                        main.OpenPropertyEditor(_clipModel.AssociatedObject);
+                    }
+                };
+                menu.Items.Add(editItem);
+
+                // ✨ 核心保护：初始点（BASE_STATE_NODE）不允许复制和粘贴关键帧属性
+                if (!isBaseStateNode)
+                {
+                    // 2. 复制属性
+                    var copyItem = new MenuItem { Header = "📋 复制关键帧属性" };
+                    copyItem.Click += (s, ev) => {
+                        if (node.Tag is Models.ObjectState state)
+                        {
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(state);
+                            _clipboardState = Newtonsoft.Json.JsonConvert.DeserializeObject(json, state.GetType()) as Models.ObjectState;
+                            _clipboardSourcePropertyName = _propertyName;
+                            MessageBox.Show("卡哇伊！属性信息复制成功啦！", "复制成功");
+                        }
+                    };
+                    menu.Items.Add(copyItem);
+
+                    // 3. 粘贴属性（冲突检测）
+                    var pasteItem = new MenuItem { Header = "📥 粘贴属性", IsEnabled = _clipboardState != null };
+                    pasteItem.Click += (s, ev) => {
+                        if (_clipboardState != null && node.Tag is Models.ObjectState targetState)
+                        {
+                            CheckAndPasteProperties(targetState);
+                        }
+                    };
+                    menu.Items.Add(pasteItem);
+                }
+
+                node.ContextMenu = menu;
+            }
+        }
+
+        // 给小菱形绑定右键事件
+        // node.MouseRightButtonDown += Node_MouseRightButtonDown;
+
+
+
+
+
+
+        // ==========================================
+        // ⚔️ 核心冲突检测与粘贴法术
+        // ==========================================
+        private void CheckAndPasteProperties(Models.ObjectState targetState)
+        {
+            // 尝试读取剪贴板里这个属性的值
+            if (Core.FastReflectionHelper.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
+            {
+                // 检查目标帧是不是已经有这个属性了
+                if (Core.FastReflectionHelper.TryGetValue(targetState, _propertyName, out object existingVal) && existingVal != null)
+                {
+                    var result = MessageBox.Show(
+                        $"纳尼？当前关键帧的 [{_propertyName}] 属性已经有值 ({existingVal}) 啦！\n是否要用复制的值 ({copiedVal}) 替换它？",
+                        "时空冲突确认", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.No) return;
+                }
+
+                // 强行写入新值！
+                var propInfo = targetState.GetType().GetProperty(_propertyName);
+                if (propInfo != null && propInfo.CanWrite)
+                {
+                    propInfo.SetValue(targetState, copiedVal);
+                    // 呼叫大本营的 MarkAsModified 并重绘当前行
+                    _context?.MarkAsModified();
+                    RenderTrackKeyframes();
+                }
+            }
+        }
+
+
+
+
+        // 绑定在 Canvas 上的右键事件
+        // KeyframeNodeCanvas.MouseRightButtonDown += TrackRow_MouseRightButtonDown;
+
+        private void TrackRow_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var menu = new ContextMenu();
+
+            // 核心修复：允许在空白处新建，并自动继承事件的初始属性
+            var newItem = new MenuItem { Header = "➕ 在此处新建关键帧" };
+            newItem.Click += (s, ev) => {
+                double clickX = e.GetPosition(KeyframeNodeCanvas).X;
+                double newAbsTime = clickX / _pixelsPerSecond;
+                double newRelTime = newAbsTime - _clipModel.StartTime;
+                if (newRelTime < 0) newRelTime = 0;
+
+                Type stateType = _clipModel.AssociatedObject.GetBaseState().GetType();
+                var newFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
+                newFrame.RelativeTime = (float)newRelTime;
+
+                // 继承事件的初始属性 (BaseState)
+                if (Core.FastReflectionHelper.TryGetValue(_clipModel.AssociatedObject.GetBaseState(), _propertyName, out object baseVal) && baseVal != null)
+                {
+                    stateType.GetProperty(_propertyName)?.SetValue(newFrame, baseVal);
+                }
+
+                _clipModel.AssociatedObject.GetKeyframes().Add(newFrame);
+                _context?.MarkAsModified();
+                RenderTrackKeyframes();
+            };
+            menu.Items.Add(newItem);
+
+
+
+
+            // 2. 智能分支：只有剪贴板里有东西时，才追加“新建并粘贴”按钮，绝对不让 return 熔断整个菜单！
+            if (_clipboardState != null)
+            {
+                var pasteNewItem = new MenuItem { Header = "📥 在此处新建关键帧并粘贴" };
+                pasteNewItem.Click += (s, ev) => {
+                    double clickX = e.GetPosition(KeyframeNodeCanvas).X;
+                    double newAbsTime = clickX / _pixelsPerSecond;
+                    double newRelTime = newAbsTime - _clipModel.StartTime;
+                    if (newRelTime < 0) return;
+
+                    Type stateType = _clipModel.AssociatedObject.GetBaseState().GetType();
+                    var newFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
+                    newFrame.RelativeTime = (float)newRelTime;
+
+                    if (Core.FastReflectionHelper.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
+                    {
+                        stateType.GetProperty(_propertyName)?.SetValue(newFrame, copiedVal);
+                    }
+
+                    _clipModel.AssociatedObject.GetKeyframes().Add(newFrame);
+                    _context?.MarkAsModified();
+                    RenderTrackKeyframes();
+                };
+                menu.Items.Add(pasteNewItem);
+            }
+
+            // 3. 强行在当前行控件的中心召唤结界
+            KeyframeNodeCanvas.ContextMenu = menu;
+            menu.IsOpen = true;
+
+            // 阻断冒泡，让这行轨道独自享有这个右键特权！
+            e.Handled = true;
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+
 
         // =========================================================================
         // 🔮 辅助数学桩（真实开发中对接 Cytoid_StoryboardModel 的 States 列表）
         // =========================================================================
-        private bool CheckIfPropertyHasTweaksLater() => _clipModel.AssociatedObject?.GetKeyframes()?.Count > 1;
-        private List<double> GetMiddleKeyframeTimes() => new List<double>();
-        private Thumb FindPreviousNode(double x) => _nodes[0]; // 默认拿第 0 个初始帧兜底
-        private void InjectNewStateIntoCytoidModel(double relTime, object val)
+        
+        private void RedrawPropertyCurves()
         {
-            // ✨ 缝合修复：直接呼叫局部上下文基站！
-            _context?.MarkAsModified();
+            CurveRenderCanvas.Children.Clear();
+            if (_nodes.Count < 2) return;
+
+            // 按时间 (X坐标) 从左到右严格排序
+            var sortedNodes = System.Linq.Enumerable.OrderBy(_nodes, n => Canvas.GetLeft(n)).ToList();
+
+            // 暂且使用高亮直线把它们串联起来
+            System.Windows.Shapes.Polyline curve = new System.Windows.Shapes.Polyline
+            {
+                Stroke = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.DodgerBlue,
+                StrokeThickness = 2,
+                IsHitTestVisible = false
+            };
+
+            foreach (var node in sortedNodes)
+            {
+                // 连接节点的正中心 (加上半径偏移)
+                double x = Canvas.GetLeft(node) + 6;
+                double y = Canvas.GetTop(node) + 6;
+                curve.Points.Add(new Point(x, y));
+            }
+
+            CurveRenderCanvas.Children.Add(curve);
         }
-        private void UpdateCytoidStateTime(Thumb node, double newTime) { }
-        private void RedrawPropertyCurves() { /* 使用 StreamGeometry 绘制缓动线 */ }
+
+
+
+
+
+        // 🚀 响应滚轮缩放，光速重新摆放小菱形的位置！
+        // 🚀 响应滚轮缩放，调用引擎彻底重绘，安全又省心！
+        public void UpdateZoom(double newPixelsPerSecond)
+        {
+            _pixelsPerSecond = newPixelsPerSecond;
+            RenderTrackKeyframes();
+        }
     }
 }

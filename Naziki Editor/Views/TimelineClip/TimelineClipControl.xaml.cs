@@ -199,19 +199,19 @@ namespace Naziki_Editor.Views
             // --- 以下是原本的单次点击选中 + 拖拽逻辑 ---
             _model.IsSelected = true;
             DeselectAllNodes();
-
-            // ✨ 触觉触发！向外发射选中信号！
             OnClipSelected?.Invoke(_model);
 
             _isDraggingClip = true;
             _clipDragStartPoint = e.GetPosition(this.Parent as UIElement);
             _originalStartTime = _model.StartTime;
+
             _originalY = Canvas.GetTop(this);
+            if (double.IsNaN(_originalY)) _originalY = CurrentTrackIndex * 40.0; // 防御 NaN 穿模
+
+            Panel.SetZIndex(this, 999); // ✨ 选中瞬间赋予最高特权，浮在最上层绝不消失！
 
             RootGrid.CaptureMouse();
             e.Handled = true;
-
-            // 点选高亮
             ClipBackground.Opacity = 0.7;
         }
 
@@ -220,6 +220,9 @@ namespace Naziki_Editor.Views
             if (_isDraggingClip)
             {
                 Point currentPos = e.GetPosition(this.Parent as UIElement);
+                // ✨ 物理防抖结界：如果鼠标移动距离小于 3 像素，判定为普通单击的微小手抖，绝不触发换轨和时间平移！
+                if (Math.Abs(currentPos.X - _clipDragStartPoint.X) < 3 && Math.Abs(currentPos.Y - _clipDragStartPoint.Y) < 3)
+                    return;
 
                 // 1. ⏱️ X 轴时间平移
                 double deltaX = currentPos.X - _clipDragStartPoint.X;
@@ -261,6 +264,7 @@ namespace Naziki_Editor.Views
                 _isDraggingClip = false;
                 RootGrid.ReleaseMouseCapture();
                 ClipBackground.Opacity = 1.0;
+                Panel.SetZIndex(this, 0); // ✨ 放下鼠标时，乖乖交出特权，回到普通层级
 
                 // 3. ✨ 关键帧时间融合法术：带着内部的所有子节点一起相对平移！
                 double finalDeltaTime = _model.StartTime - _originalStartTime;
@@ -286,7 +290,11 @@ namespace Naziki_Editor.Views
                 try
                 {
                     dynamic baseState = _model.AssociatedObject.GetBaseState();
-                    if (baseState != null) baseState.Order = CurrentTrackIndex;
+                    if (baseState != null && baseState.Order != CurrentTrackIndex)
+                    {
+                        baseState.Order = CurrentTrackIndex;
+                        _context?.MarkAsModified();
+                    }
                 }
                 catch { }
 

@@ -3,11 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Height="40" HorizontalAlignment="Stretch">
 
-    <Grid Background="Transparent" MouseLeftButtonDown="TrackRow_MouseDown">
+    <Grid Background="Transparent" MouseLeftButtonDown="TrackRow_MouseDown" MouseRightButtonDown="TrackRow_MouseRightButtonDown">
         <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1"/>
-
         <Canvas x:Name="CurveRenderCanvas" IsHitTestVisible="False"/>
-
         <Canvas x:Name="KeyframeNodeCanvas" Background="Transparent"/>
     </Grid>
 </UserControl>

@@ -44,21 +44,63 @@ namespace Naziki_Editor.Core.Timeline
                 WritePropertyToEntity(baseState, "Layer", targetLayer);
 
                 // 提取精确的起止时间
-                double start = 0, end = 9999;
-                if (FastReflectionHelper.TryGetValue(baseState, "Time", out object startObj))
+                double start = 0;
+                if (Core.FastReflectionHelper.TryGetValue(baseState, "Time", out object startObj))
                     start = SafeResolveTime(startObj, context, allNotes);
 
-                var kfs = entity.GetKeyframes();
-                if (kfs != null && kfs.Count > 0)
-                {
-                    var lastFrame = kfs[kfs.Count - 1];
-                    if (FastReflectionHelper.TryGetValue(lastFrame, "Time", out object endObj))
-                        end = SafeResolveTime(endObj, context, allNotes);
-                }
-                if (end <= start) end = start + 2.0;
+                double endForLayout = double.MaxValue;
+                bool isDestroyed = false;
 
-                if (!layerGroups.ContainsKey(targetLayer)) layerGroups[targetLayer] = new List<EntityTimeBox>();
-                layerGroups[targetLayer].Add(new EntityTimeBox { Entity = entity, Start = start, End = end, BaseState = baseState });
+                // 1. 查户口：出生印记 (兼容 bool 和 字符串 "true"/"1")
+                if (Core.FastReflectionHelper.TryGetValue(baseState, "Destroy", out object baseDestObj) && baseDestObj != null)
+                {
+                    string dStr = baseDestObj.ToString().ToLower();
+                    if (dStr == "true" || dStr == "1")
+                    {
+                        isDestroyed = true;
+                        endForLayout = start + 0.1;
+                    }
+                }
+
+                // 2. 查关键帧：寻找销毁指令，并兼容 C# 里的 RelativeTime 命名！
+                var kfs = entity.GetKeyframes();
+                if (!isDestroyed && kfs != null && kfs.Count > 0)
+                {
+                    foreach (var frame in kfs)
+                    {
+                        if (Core.FastReflectionHelper.TryGetValue(frame, "Destroy", out object destObj) && destObj != null)
+                        {
+                            string dStr = destObj.ToString().ToLower();
+                            if (dStr == "true" || dStr == "1")
+                            {
+                                // ✨ 核心修复：不但要找 Time，还要找 RelativeTime 兜底！
+                                object endObj = null;
+                                if (Core.FastReflectionHelper.TryGetValue(frame, "RelativeTime", out object rt)) endObj = rt;
+                                else if (Core.FastReflectionHelper.TryGetValue(frame, "Time", out object t)) endObj = t;
+
+                                if (endObj != null)
+                                {
+                                    endForLayout = SafeResolveTime(endObj, context, allNotes);
+                                    isDestroyed = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                // 算完寿命后，一定要把它塞进对应的 Layer 盒子里呀！
+                if (!layerGroups.ContainsKey(targetLayer))
+                {
+                    layerGroups[targetLayer] = new List<EntityTimeBox>();
+                }
+
+                layerGroups[targetLayer].Add(new EntityTimeBox
+                {
+                    Entity = entity,
+                    BaseState = baseState,
+                    Start = start,
+                    End = endForLayout
+                });
             }
 
             // 3. 核心法术：对每个 Layer 分别执行“从下往上 (Order 0, 1...) 寻找空位”的避让计算
