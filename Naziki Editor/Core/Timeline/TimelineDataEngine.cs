@@ -191,7 +191,6 @@ namespace Naziki_Editor.Core.Timeline
         private static TimelineClipModel CreateClipFromEntity(IStoryboardEntity entity, int trackIndex, ProjectDataContext context)
         {
             double start = 0;
-            double end = 9999;
 
             var baseState = entity.GetBaseState();
             var allNotes = context?.Chart?.note_list; // 拿到大本营的音符本子
@@ -204,19 +203,8 @@ namespace Naziki_Editor.Core.Timeline
             }
 
             // ✨ 修复：完美解析结束时间
-            var kfs = entity.GetKeyframes();
-            if (kfs != null && kfs.Count > 0)
-            {
-                var lastFrame = kfs[kfs.Count - 1];
-                // 使用 lastFrame 提取，并赋值给 end！
-                if (lastFrame != null && FastReflectionHelper.TryGetValue(lastFrame, "Time", out object endTimeObj) && endTimeObj != null)
-                {
-                    if (context != null && context.TimeEngine != null) end = context.TimeEngine.ParseCytoidTimeExpression(endTimeObj, allNotes);
-                    else double.TryParse(endTimeObj.ToString(), out end); // 兜底
-                }
-            }
-
-            if (end <= start) end = start + 2.0;
+            // ✨ 核心换血：扔掉固执的旧算法，无条件呼叫 Core 时空转换引擎，一步到位算出完美寿命（自动处理Destroy与级联锚点）！
+            double end = StoryboardTimeConverter.CalculateEntityEndTime(entity, start, context?.TimeEngine, allNotes);
 
             return new TimelineClipModel
             {

@@ -65,6 +65,8 @@ namespace Naziki_Editor.Views
             if (JsonEditor == null) return;
             var currentModel = Context?.Storyboard;
             if (currentModel == null) return;
+            // 🛡️ 核心追加看门狗防线：如果当前根本没看代码页，直接拦截，拒绝在后台偷电序列化！
+            if (CanvasTabControl == null || CanvasTabControl.SelectedIndex != 1) return;
 
             try
             {
@@ -151,8 +153,12 @@ namespace Naziki_Editor.Views
             _lastSelectedObject = obj;
             _isGlobalPreviewMode = false;
 
-            if (CanvasTabControl != null && CanvasTabControl.SelectedIndex == 1) RefreshJsonView();
-            else if (JsonEditor.IsVisible) ExecuteRadarJump(obj);
+            // 只有当打谱师真正切换到 JSON 源码标签页（Index == 1）时，才激活序列化与雷达！
+            // 在常规可视化设计模式下，不执行任何后台大文本计算，单点延迟直接归零，双击判定瞬间复活！
+            if (CanvasTabControl != null && CanvasTabControl.SelectedIndex == 1)
+            {
+                RefreshJsonView();
+            }
         }
 
         // ==========================================
@@ -160,6 +166,10 @@ namespace Naziki_Editor.Views
         // ==========================================
         private void ExecuteRadarJump(object obj)
         {
+            if (JsonEditor == null || string.IsNullOrEmpty(JsonEditor.Text)) return;
+            // 🧠 核心提速：将巨型文本一次性锁死在局部内存变量里，防止每次调用 .Text 都触发底层的段树大字符串组装！
+            string editorText = JsonEditor.Text;
+
             string searchKey = null;
             int searchStartIndex = 0;
 

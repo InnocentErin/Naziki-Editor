@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Naziki_Editor.Core;
+using Naziki_Editor.Core.Timeline;
+using Naziki_Editor.Models;
+using Naziki_Editor.State;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -6,9 +10,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using Naziki_Editor.Models;
-using Naziki_Editor.State;
-using Naziki_Editor.Core;
 
 namespace Naziki_Editor.Views
 {
@@ -29,6 +30,11 @@ namespace Naziki_Editor.Views
         private bool _isDraggingClip = false;
         private Point _clipDragStartPoint;
         private double _originalStartTime;
+        private double _originalEndTime; // ✨ 就是这里！给时光机补上终点记忆槽，彻底喂饱构造函数！
+
+        // ✨ 追加：宏观跨轨道换层多态通信协议
+        public enum MacroDragStage { Started, Moving, Completed }
+        public event Action<TimelineClipControl, MouseEventArgs, MacroDragStage> OnMacroGridDrag;
 
 
         // ✨ 追加：轨道感知与父级通讯枢纽
@@ -48,6 +54,54 @@ namespace Naziki_Editor.Views
         public TimelineClipControl()
         {
             InitializeComponent();
+
+            // ==========================================================
+            // ✨ 核心加装：接通左/右拉伸 Thumbs 的数据记忆网关与等比例缩放引擎
+            // ==========================================================
+            ResizeLeftThumb.DragStarted += (s, ev) => {
+                _originalStartTime = _model.StartTime;
+                _originalEndTime = _model.EndTime;
+            };
+            ResizeLeftThumb.DragCompleted += (s, ev) => {
+                // 1. 调整方块自身的 BaseState.Time 表达式
+                var baseState = _model.AssociatedObject?.GetBaseState();
+                if (baseState != null)
+                {
+                    var timeProp = baseState.GetType().GetProperty("Time");
+                    if (timeProp != null)
+                    {
+                        double deltaStart = _model.StartTime - _originalStartTime;
+                        object oldTime = timeProp.GetValue(baseState);
+                        object newTime = Core.Timeline.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaStart);
+                        timeProp.SetValue(baseState, newTime);
+                    }
+                }
+
+                // 2. 🌌 触发空间折叠级联缩放：完美实现左边缘拉伸、内部所有关键帧等比例缩放缩放！
+                Core.Timeline.StoryboardTimeConverter.ScaleInternalKeyframes(
+                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
+
+                _context?.MarkAsModified();
+                EvaluateValidationWarning();
+            };
+
+            ResizeRightThumb.DragStarted += (s, ev) => {
+                _originalStartTime = _model.StartTime;
+                _originalEndTime = _model.EndTime;
+            };
+            ResizeRightThumb.DragCompleted += (s, ev) => {
+                // 🌌 触发空间折叠级联缩放：右边缘拉伸时，StartTime没变，EndTime变了，内部关键帧自动等比例拉伸！
+                Core.Timeline.StoryboardTimeConverter.ScaleInternalKeyframes(
+                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
+
+                _context?.MarkAsModified();
+                EvaluateValidationWarning();
+            };
+
+
+
+
+
         }
 
         /// <summary>
@@ -87,7 +141,7 @@ namespace Naziki_Editor.Views
             Canvas.SetLeft(this, left);
 
             // ✨ 轨道高度吸附：方块自我校准 Y 坐标
-            Canvas.SetTop(this, CurrentTrackIndex * 40);
+            Canvas.SetTop(this, 6);
 
             // 如果是永生常驻元素
             if (_model.EndTime >= 999999 || _model.EndTime <= _model.StartTime)
@@ -206,13 +260,16 @@ namespace Naziki_Editor.Views
             _originalStartTime = _model.StartTime;
 
             _originalY = Canvas.GetTop(this);
-            if (double.IsNaN(_originalY)) _originalY = CurrentTrackIndex * 40.0; // 防御 NaN 穿模
+            if (double.IsNaN(_originalY) || _originalY > 40.0) _originalY = 6.0; // 🛡️ 强制防抖，超出个轨边界自动归位 6
 
             Panel.SetZIndex(this, 999); // ✨ 选中瞬间赋予最高特权，浮在最上层绝不消失！
 
             RootGrid.CaptureMouse();
             e.Handled = true;
             ClipBackground.Opacity = 0.7;
+            // 解除父级 Canvas 的裁剪结界，并向大本营发射“拖拽开始”信号！
+            if (this.Parent is Canvas parentCanvas) parentCanvas.ClipToBounds = false;
+            OnMacroGridDrag?.Invoke(this, e, MacroDragStage.Started);
         }
 
         private void ClipBackground_MouseMove(object sender, MouseEventArgs e)
@@ -227,33 +284,22 @@ namespace Naziki_Editor.Views
                 // 1. ⏱️ X 轴时间平移
                 double deltaX = currentPos.X - _clipDragStartPoint.X;
                 double deltaTime = deltaX / _pixelsPerSecond;
+
+                double oldDuration = _model.EndTime - _model.StartTime; // 记录原有跨度
                 _model.StartTime = _originalStartTime + deltaTime;
                 if (_model.StartTime < 0) _model.StartTime = 0;
+
+                // 🌟 核心对齐：保持方块宏观总长度绝对不发生穿模形变！
+                _model.EndTime = _model.StartTime + oldDuration;
+
                 Canvas.SetLeft(this, _model.StartTime * _pixelsPerSecond);
 
-                // 2. ↕️ Y 轴轨道吸附与越界嗅探
+                // 2. ↕️ Y 轴自由时空拉扯：允许方块外壳跟随鼠标在垂直方向任意漂移
                 double deltaY = currentPos.Y - _clipDragStartPoint.Y;
-                double newY = _originalY + deltaY;
+                Canvas.SetTop(this, _originalY + deltaY);
 
-                // 计算目标轨道的 Index (每轨高度 40)
-                int targetTrack = (int)Math.Round(newY / 40.0);
-                if (targetTrack < 0) targetTrack = 0;
-
-                // 🚨 越界修路判定：最多只能比当前最大轨道多 1（一次新建一条）
-                if (targetTrack > MaxTrackIndex)
-                {
-                    targetTrack = MaxTrackIndex + 1;
-                    // 向大本营发送信号，请求铺设新轨道！
-                    OnRequestNewTrack?.Invoke(this);
-                }
-
-                // 物理位置强制吸附
-                if (targetTrack != CurrentTrackIndex)
-                {
-                    CurrentTrackIndex = targetTrack;
-                    Canvas.SetTop(this, CurrentTrackIndex * 40);
-                    OnTrackIndexChanged?.Invoke(this, CurrentTrackIndex);
-                }
+                // 📡 实时向大本营发射移动坐标，由大本营来执行全景隔离碰撞雷达！
+                OnMacroGridDrag?.Invoke(this, e, MacroDragStage.Moving);
             }
         }
 
@@ -261,32 +307,41 @@ namespace Naziki_Editor.Views
         {
             if (_isDraggingClip)
             {
+                if (this.Parent is Canvas parentCanvas) parentCanvas.ClipToBounds = true;
+
                 _isDraggingClip = false;
                 RootGrid.ReleaseMouseCapture();
                 ClipBackground.Opacity = 1.0;
                 Panel.SetZIndex(this, 0); // ✨ 放下鼠标时，乖乖交出特权，回到普通层级
 
-                // 3. ✨ 关键帧时间融合法术：带着内部的所有子节点一起相对平移！
+                // 🌟 1. 时空结算优先：先在方块体内，将所有的水平移动、内部关键帧等比平移全量安全落盘写回实体！
                 double finalDeltaTime = _model.StartTime - _originalStartTime;
                 if (Math.Abs(finalDeltaTime) > 0.001 && _model.AssociatedObject != null)
                 {
-                    try
+                    var baseState = _model.AssociatedObject.GetBaseState();
+                    if (baseState != null)
                     {
-                        // 动态反射深入 Cytoid 数据模型，修改所有非 max 的绝对时间
-                        dynamic obj = _model.AssociatedObject;
-                        foreach (var state in obj.States)
+                        var timeProp = baseState.GetType().GetProperty("Time");
+                        if (timeProp != null)
                         {
-                            // 浮点数时间且不是不可见占位符时才进行偏移
-                            if (state.Time != null && state.Time is float && (float)state.Time != float.MaxValue)
-                            {
-                                state.Time = (float)state.Time + (float)finalDeltaTime;
-                            }
+                            object oldTime = timeProp.GetValue(baseState);
+                            object newTime = StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, finalDeltaTime);
+                            timeProp.SetValue(baseState, newTime);
                         }
                     }
-                    catch { /* 如果包含 $note 等非数字宏指令，则不破坏原有结构 */ }
+
+                    StoryboardTimeConverter.ScaleInternalKeyframes(
+                        _model.AssociatedObject,
+                        _originalStartTime,
+                        _originalStartTime + (_model.EndTime - _model.StartTime), // 准确的旧终点快照
+                        _model.StartTime,
+                        _model.EndTime,
+                        _context.TimeEngine,
+                        _context.Chart?.note_list
+                    );
                 }
 
-                // 4. ✨ 图层深度绑定：将轨道编号映射给 order
+                // 🌟 2. 图层深度绑定：将最新的轨道编号顺序同步写入底层数据模型的 Order 属性中
                 try
                 {
                     dynamic baseState = _model.AssociatedObject.GetBaseState();
@@ -300,6 +355,9 @@ namespace Naziki_Editor.Views
 
                 _context?.MarkAsModified();
                 EvaluateValidationWarning();
+
+                // 🌟 3. 完美的时空接力：当所有水平位移、垂直顺位、关键帧缩放数据 100% 确定写干净之后，才正式向大本营发射 Completed 信号！
+                OnMacroGridDrag?.Invoke(this, e, MacroDragStage.Completed);
             }
         }
 

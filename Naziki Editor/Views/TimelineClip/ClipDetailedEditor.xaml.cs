@@ -1,4 +1,5 @@
-﻿using Naziki_Editor.Models;
+﻿using Naziki_Editor.Core.Timeline;
+using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using System;
 using System.Collections.Generic;
@@ -52,16 +53,15 @@ namespace Naziki_Editor.Views.TimelineClip
             if (_context.Chart?.note_list != null && _context.Chart.note_list.Count > 0)
                 maxTime = _context.TimeEngine.TickToSeconds(_context.Chart.note_list[context.Chart.note_list.Count - 1].tick) + 5;
 
-            double lastFrameAbs = _clipModel.EndTime;
-            var kfs = _clipModel.AssociatedObject.GetKeyframes();
-            if (kfs != null)
-            {
-                foreach (var kf in kfs)
-                {
-                    double t = _clipModel.StartTime + ((kf as Models.ObjectState)?.RelativeTime ?? 0);
-                    if (t > lastFrameAbs) lastFrameAbs = t;
-                }
-            }
+            double lastFrameAbs = StoryboardTimeConverter.CalculateEntityEndTime(
+                _clipModel.AssociatedObject,
+                _clipModel.StartTime,
+                _context.TimeEngine,
+                _context.Chart?.note_list
+            );
+
+            // 联动修正：确保方块模型内存里的 EndTime 与核心同步刷新
+            _clipModel.EndTime = lastFrameAbs;
             if (lastFrameAbs + 5 > maxTime) maxTime = lastFrameAbs + 5;
 
             _lastCalculatedMaxTime = maxTime;

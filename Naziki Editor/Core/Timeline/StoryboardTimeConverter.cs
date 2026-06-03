@@ -197,6 +197,368 @@ namespace Naziki_Editor.Core.Timeline
                 else if (nextPropRelative != null) nextPropRelative.SetValue(nextState, (float)nextNewDelta);
             }
         }
+        /// <summary>
+        /// ⏳ 核心测算雷达：全量解码级联时间，计算任意故事板实体的【绝对结束时间秒数 (考虑Destroy拦截)】
+        /// </summary>
+        public static double CalculateEntityEndTime(
+            IStoryboardEntity entity,
+            double startTime,
+            ChartTimeEngine timeEngine,
+            List<C2Note> allNotes)
+        {
+            double end = startTime + 2.0; // 默认给 2 秒保底寿命
+            var kfs = entity?.GetKeyframes();
+
+            if (kfs != null && kfs.Count > 0)
+            {
+                double lastFrameVisualRelTime = 0.0;
+                double maxVisualTime = 0.0;
+                bool foundDestroy = false;
+
+                // 占位符反查基因准备
+                string currentNoteIdStr = "";
+                try
+                {
+                    if (FastReflectionHelper.TryGetValue(entity, "Note", out object noteTarget) && noteTarget != null)
+                        currentNoteIdStr = noteTarget.ToString().Trim();
+                }
+                catch { }
+
+                foreach (var frame in kfs)
+                {
+                    if (frame is ObjectState state)
+                    {
+                        double thisFrameDelta = 0.0;
+                        bool hasTimeProp = false;
+
+                        // 智能化嗅探全维度时间字段
+                        object rawTimeObj = null;
+                        if (FastReflectionHelper.TryGetValue(state, "RelativeTime", out object rt) && rt != null) rawTimeObj = rt;
+                        else if (FastReflectionHelper.TryGetValue(state, "AddTime", out object at) && at != null) rawTimeObj = at;
+                        else if (FastReflectionHelper.TryGetValue(state, "Time", out object t) && t != null) rawTimeObj = t;
+
+                        if (rawTimeObj != null)
+                        {
+                            string timeStr = rawTimeObj.ToString().Trim();
+                            if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                            {
+                                timeStr = timeStr.Replace("$note", currentNoteIdStr);
+                            }
+
+                            if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
+                            {
+                                hasTimeProp = true;
+                                if (timeEngine != null)
+                                {
+                                    double frameAbsSeconds = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
+                                    thisFrameDelta = frameAbsSeconds - startTime - lastFrameVisualRelTime;
+                                }
+                            }
+                            else if (double.TryParse(timeStr, out double numericDelta))
+                            {
+                                hasTimeProp = true;
+                                thisFrameDelta = numericDelta;
+                            }
+
+                            if (hasTimeProp)
+                            {
+                                // 级联累计滚动
+                                double visualRelTime = lastFrameVisualRelTime + thisFrameDelta;
+                                lastFrameVisualRelTime = visualRelTime;
+
+                                if (visualRelTime > maxVisualTime) maxVisualTime = visualRelTime;
+
+                                // 🔍 核心拦截：发现销毁帧！方块寿命在此处戛然而止！
+                                if (FastReflectionHelper.TryGetValue(state, "Destroy", out object destObj) && destObj is bool b && b)
+                                {
+                                    end = startTime + visualRelTime;
+                                    foundDestroy = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!foundDestroy)
+                {
+                    end = startTime + Math.Max(2.0, maxVisualTime);
+                }
+            }
+
+            return end;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+        /// <summary>
+        /// 🔮 核心黑科技 A：智能时空表达式微分器
+        /// 能够完美识别纯数字或 "start:noteId:offset" 字符串，并精准对其应用 deltaTime 增量
+        /// </summary>
+        public static object UpdateTimeExpressionByDelta(object originalTime, double deltaTime)
+        {
+            if (originalTime == null) return (float)deltaTime;
+            string str = originalTime.ToString().Trim();
+
+            // 1. 如果是纯绝对秒数，直接做加减，保持 float 属性注入
+            if (double.TryParse(str, out double directVal))
+            {
+                return (float)Math.Round(directVal + deltaTime, 4);
+            }
+
+            // 2. 如果是复杂的音符锚点表达式 (例如 "start:1134:2" 或 "start:1134")
+            string[] parts = str.Split(':');
+            if (parts.Length >= 2)
+            {
+                string type = parts[0]; // start / end / intro
+                string noteId = parts[1]; // 音符ID 或 $note
+                double currentOffset = 0;
+
+                if (parts.Length >= 3)
+                {
+                    double.TryParse(parts[2], out currentOffset);
+                }
+
+                double newOffset = Math.Round(currentOffset + deltaTime, 4);
+                return $"{type}:{noteId}:{newOffset}";
+            }
+
+            return originalTime; // 兜底
+        }
+
+        /// <summary>
+        /// 🧬 核心黑科技 B：空间折叠级联缩放器（100% 完美落地需求 4）
+        /// 当宏观方块整体位移或拉伸缩窄时，内部所有关键帧自动等比例缩放或平移
+        /// </summary>
+        public static void ScaleInternalKeyframes(
+            IStoryboardEntity entity,
+            double oldStart,
+            double oldEnd,
+            double newStart,
+            double newEnd,
+            ChartTimeEngine timeEngine,
+            List<C2Note> allNotes)
+        {
+            if (entity == null) return;
+            var kfs = entity.GetKeyframes();
+            if (kfs == null || kfs.Count == 0) return;
+
+            double oldDuration = oldEnd - oldStart;
+            double newDuration = newEnd - newStart;
+            if (oldDuration <= 0.001 || newDuration <= 0.001) return;
+
+            // 计算时间轴膨胀/收缩系数
+            double scaleFactor = newDuration / oldDuration;
+
+            string currentNoteIdStr = "";
+            try
+            {
+                if (FastReflectionHelper.TryGetValue(entity, "Note", out object noteTarget) && noteTarget != null)
+                    currentNoteIdStr = noteTarget.ToString().Trim();
+            }
+            catch { }
+
+            foreach (var frame in kfs)
+            {
+                if (frame is ObjectState state)
+                {
+                    var propRel = state.GetType().GetProperty("RelativeTime");
+                    var propAdd = state.GetType().GetProperty("AddTime");
+                    var propTime = state.GetType().GetProperty("Time");
+
+                    // A. 如果关键帧采用的是相对时间，其时间步长直接乘以缩放系数
+                    if (propRel != null && propRel.GetValue(state) != null)
+                    {
+                        if (double.TryParse(propRel.GetValue(state).ToString(), out double relVal))
+                            propRel.SetValue(state, (float)(relVal * scaleFactor));
+                    }
+                    // B. 如果采用的是级联附加时间，步长同样乘以缩放系数
+                    else if (propAdd != null && propAdd.GetValue(state) != null)
+                    {
+                        if (double.TryParse(propAdd.GetValue(state).ToString(), out double addVal))
+                            propAdd.SetValue(state, (float)(addVal * scaleFactor));
+                    }
+                    // C. 若采用的是绝对/锚点 Time 属性（大大的需求 1 & 2）
+                    else if (propTime != null && propTime.GetValue(state) != null)
+                    {
+                        object rawTimeObj = propTime.GetValue(state);
+                        string timeStr = rawTimeObj.ToString().Trim();
+                        if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                        {
+                            timeStr = timeStr.Replace("$note", currentNoteIdStr);
+                        }
+
+                        double oldAbsTime = 0;
+                        if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
+                        {
+                            if (timeEngine != null) oldAbsTime = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
+                        }
+                        else double.TryParse(timeStr, out oldAbsTime);
+
+                        // 🧙‍♂️ 空间几何映射方程：算出该帧原先在方块内的百分比位置，映射到新时空边界中
+                        double ratio = (oldAbsTime - oldStart) / oldDuration;
+                        double newAbsTime = newStart + ratio * newDuration;
+                        double deltaAbsTime = newAbsTime - oldAbsTime;
+
+                        // 应用智能微分增量更新
+                        object updatedTimeObj = UpdateTimeExpressionByDelta(rawTimeObj, deltaAbsTime);
+                        propTime.SetValue(state, updatedTimeObj);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 🧬 升级版逆向精准反写引擎：全面解禁详细模式关键帧拖拽（支持 Time / RelativeTime / AddTime 三路流）
+        /// </summary>
+        public static void WriteBackVisualTime(
+            IStoryboardEntity entity,
+            ObjectState targetState,
+            double newVisualRelTime,
+            ChartTimeEngine timeEngine,
+            List<C2Note> allNotes,
+            double clipStartTime)
+        {
+            if (entity == null || targetState == null) return;
+
+            var kfs = entity.GetKeyframes();
+            if (kfs == null || kfs.Count == 0) return;
+
+            double lastTimeAccumulator = 0.0;
+            var sortedTimelineBoxes = new List<DecodedKeyframeBox>();
+
+            string currentNoteIdStr = "";
+            try
+            {
+                if (FastReflectionHelper.TryGetValue(entity, "Note", out object noteTarget) && noteTarget != null)
+                    currentNoteIdStr = noteTarget.ToString().Trim();
+            }
+            catch { }
+
+            // 1. 全量扫盘重建当前拖拽瞬间的时空骨架
+            foreach (var frame in kfs)
+            {
+                if (frame is ObjectState state)
+                {
+                    double delta = 0.0;
+                    object rawTimeObj = null;
+                    bool isAbsoluteStyle = false;
+
+                    if (FastReflectionHelper.TryGetValue(state, "RelativeTime", out object rt) && rt != null) rawTimeObj = rt;
+                    else if (FastReflectionHelper.TryGetValue(state, "AddTime", out object at) && at != null) rawTimeObj = at;
+                    else if (FastReflectionHelper.TryGetValue(state, "Time", out object t) && t != null)
+                    {
+                        rawTimeObj = t;
+                        isAbsoluteStyle = true;
+                    }
+
+                    double visualTime = 0.0;
+                    if (rawTimeObj != null)
+                    {
+                        string timeStr = rawTimeObj.ToString().Trim();
+                        if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                        {
+                            timeStr = timeStr.Replace("$note", currentNoteIdStr);
+                        }
+
+                        if (isAbsoluteStyle)
+                        {
+                            double absSeconds = 0;
+                            if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
+                            {
+                                if (timeEngine != null) absSeconds = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
+                            }
+                            else double.TryParse(timeStr, out absSeconds);
+
+                            visualTime = absSeconds - clipStartTime;
+                            lastTimeAccumulator = visualTime;
+                        }
+                        else
+                        {
+                            double.TryParse(timeStr, out delta);
+                            visualTime = lastTimeAccumulator + delta;
+                            lastTimeAccumulator = visualTime;
+                        }
+                    }
+
+                    sortedTimelineBoxes.Add(new DecodedKeyframeBox { State = state, VisualRelTime = visualTime });
+                }
+            }
+
+            int targetIndex = sortedTimelineBoxes.FindIndex(b => b.State == targetState);
+            if (targetIndex < 0) return;
+
+            double originalVisualRelTime = sortedTimelineBoxes[targetIndex].VisualRelTime;
+            double deltaSeconds = newVisualRelTime - originalVisualRelTime;
+
+            var propRelative = targetState.GetType().GetProperty("RelativeTime");
+            var propAdd = targetState.GetType().GetProperty("AddTime");
+            var propTime = targetState.GetType().GetProperty("Time");
+
+            // 🌟 判定处理：如果该帧身上直接有 Time 属性（大大的需求 1 & 2）
+            if (propTime != null && propTime.GetValue(targetState) != null)
+            {
+                object oldTimeObj = propTime.GetValue(targetState);
+                object updatedTimeObj = UpdateTimeExpressionByDelta(oldTimeObj, deltaSeconds);
+                propTime.SetValue(targetState, updatedTimeObj);
+            }
+            // 🌟 如果该帧用的是传统的 RelativeTime / AddTime（大大的需求 3）
+            else
+            {
+                double prevNodeVisualRelTime = 0.0;
+                if (targetIndex > 0) prevNodeVisualRelTime = sortedTimelineBoxes[targetIndex - 1].VisualRelTime;
+                double newDeltaValue = newVisualRelTime - prevNodeVisualRelTime;
+
+                if (propAdd != null && propAdd.GetValue(targetState) != null) propAdd.SetValue(targetState, (float)newDeltaValue);
+                else if (propRelative != null) propRelative.SetValue(targetState, (float)newDeltaValue);
+
+                // 级联修复紧随其后的相对帧间距
+                if (targetIndex < sortedTimelineBoxes.Count - 1)
+                {
+                    var nextState = sortedTimelineBoxes[targetIndex + 1].State;
+                    var nextPropRelative = nextState.GetType().GetProperty("RelativeTime");
+                    var nextPropAdd = nextState.GetType().GetProperty("AddTime");
+
+                    double nextNodeOriginalVisualTime = sortedTimelineBoxes[targetIndex + 1].VisualRelTime;
+                    double nextNewDelta = nextNodeOriginalVisualTime - newVisualRelTime;
+
+                    if (nextPropAdd != null && nextPropAdd.GetValue(nextState) != null) nextPropAdd.SetValue(nextState, (float)nextNewDelta);
+                    else if (nextPropRelative != null) nextPropRelative.SetValue(nextState, (float)nextNewDelta);
+                }
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     }
 
     /// <summary>

@@ -26,15 +26,21 @@ namespace Naziki_Editor.Views
 
         // 🎬 详细调整模式（微观时光屋）状态锁
         private TimelineClip.ClipDetailedEditor _detailedEditor = null;
-
         private bool _isDetailedEditMode = false;
         private Models.TimelineClipModel _editingClipModel = null;
-
         private State.ProjectDataContext _context = null; // 记住当前的大本营上下文！
 
-        // =========================================================================
+        // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
+        private class TrackRegistryItem
+        {
+            public Border TrackBorder { get; set; }
+            public Models.TimelineTrackGroupModel Group { get; set; }
+            public Models.TimelineTrackModel Track { get; set; }
+        }
+        private List<TrackRegistryItem> _upperTrackRegistry = new List<TrackRegistryItem>(); // 上半宇宙（画面实体）
+        private List<TrackRegistryItem> _lowerTrackRegistry = new List<TrackRegistryItem>(); // 下半宇宙（控制器）
+
         // 🌍 宇宙数据源：全景与微观的所有轨道，全靠它驱动！
-        // =========================================================================
         public ObservableCollection<Models.TimelineTrackGroupModel> TrackGroups { get; private set; } = new ObservableCollection<Models.TimelineTrackGroupModel>();
         // ✨ 追加：向大本营汇报“某对象被选中”的神经接口
         public event Action<object> OnTimelineObjectSelected;
@@ -75,6 +81,10 @@ namespace Naziki_Editor.Views
         public void RefreshTimelineUI()
         {
             if (TrackHeadersContainer == null || TrackGroupsContainer == null) return;
+
+            // ✨ 【精准追加】：每次重新盖楼前，清空旧的辖区注册表
+            _upperTrackRegistry.Clear();
+            _lowerTrackRegistry.Clear();
 
             // 1. 净化废墟
             TrackHeadersContainer.Children.Clear();
@@ -125,6 +135,11 @@ namespace Naziki_Editor.Views
                     // 右侧：万能 Canvas 画板
                     var trackCanvas = new Canvas { Height = 40, Background = Brushes.Transparent, ClipToBounds = true, Width = _totalDurationSeconds * _pixelsPerSecond + 200 };
                     var trackRight = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Child = trackCanvas };
+                    
+                    // ✨ 【精准追加】：在塞入 StackPanel 之前，将轨道真名和物理容器登记进对应的隔离注册表中！
+                    var registryItem = new TrackRegistryItem { TrackBorder = trackRight, Group = group, Track = track };
+                    if (group.GroupIndex >= 0) _upperTrackRegistry.Add(registryItem);
+                    else _lowerTrackRegistry.Add(registryItem);
 
                     // ✨ 修复：使用动态分配的 targetTrack，而不是写死的 TrackGroupsContainer！
                     targetTrack.Children.Add(trackRight);
@@ -154,6 +169,8 @@ namespace Naziki_Editor.Views
                             OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject);
                         };
 
+                        // ✨ 【核心追加接线】：接通方块的宏观跨轨上下揉搓、拉扯运动信号！
+                        clipCtrl.OnMacroGridDrag += ClipCtrl_OnMacroGridDrag;
 
 
                         Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
@@ -170,6 +187,188 @@ namespace Naziki_Editor.Views
 
             }
         }
+
+
+
+        // =========================================================================
+        // 📡 ✨ 满配完全体：全景宏观换轨隔离雷达（核心换层与隔离防穿透盾落地！）
+        // =========================================================================
+        private void ClipCtrl_OnMacroGridDrag(TimelineClipControl clipCtrl, MouseEventArgs e, TimelineClipControl.MacroDragStage stage)
+        {
+            if (_context == null || clipCtrl.Tag is not Models.TimelineClipModel clipModel) return;
+
+            var entity = clipModel.AssociatedObject;
+            if (entity == null) return;
+
+            // 🛡️ 1. 启动基因身份识别：区分当前方块是【画面视觉实体】还是【逻辑控制器】
+            bool isUpperZone = (entity is Models.C2Sprite || entity is Models.C2Text || entity is Models.C2Video || entity is Models.C2Line);
+
+            // 根据身份，将雷达指针分流到对应的安全宇宙，异种图层绝不交叉，实现绝对防穿透！
+            var registry = isUpperZone ? _upperTrackRegistry : _lowerTrackRegistry;
+            var container = isUpperZone ? TrackGroupsContainer : BottomTrackGroupsContainer;
+
+            if (container == null || registry.Count == 0) return;
+
+            // 2. 🎯 获取当前鼠标相对于对应 StackPanel 容器的实时物理 Y 坐标
+            Point mousePos = e.GetPosition(container);
+
+            // 3. 🔮 顺位力场测算：全量扫盘当前可见的所有合法轨道，找出垂直距离最近的那条“真命轨道”
+            TrackRegistryItem closestItem = null;
+            double minDistance = double.MaxValue;
+
+            foreach (var item in registry)
+            {
+                try
+                {
+                    if (item.TrackBorder == null) continue;
+                    // 换算出该轨道相对于父级容器的绝对 Y 原点
+                    var transform = item.TrackBorder.TransformToAncestor(container);
+                    Point trackTopLeft = transform.Transform(new Point(0, 0));
+
+                    double trackMidY = trackTopLeft.Y + (item.TrackBorder.ActualHeight / 2.0);
+                    double distance = Math.Abs(mousePos.Y - trackMidY);
+
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        closestItem = item;
+                    }
+                }
+                catch { }
+            }
+
+            // 4. 🚀 根据拖拽阶段，执行动态换轨或最终时空落盘
+            if (stage == TimelineClipControl.MacroDragStage.Started)
+            {
+                return; // 预留开始拖拽特效空间
+            }
+            if (stage == TimelineClipControl.MacroDragStage.Moving)
+            {
+                return; // 预留中途拖拽悬停高亮轨道特效空间
+            }
+            if (stage == TimelineClipControl.MacroDragStage.Completed)
+            {
+                // 如果松开鼠标时完全没有命中任何有效边界（理论上 closestItem 必然有保底），则安全重回原点
+                if (closestItem == null)
+                {
+                    if (closestItem == null)
+                    {
+                        Canvas.SetLeft(clipCtrl, clipModel.StartTime * _pixelsPerSecond);
+                        Canvas.SetTop(clipCtrl, 6);
+                        return;
+                    }
+                }
+
+                bool dataChanged = false;
+
+                // 🌌 场景 A：画面实体跨越轨道组穿梭（改写 Layer 和 Order）
+                if (isUpperZone)
+                {
+                    // 核心几何公式：根据 GroupIndex 完美反算出底层的 Layer (10->0, 20->1, 30->2)
+                    int targetLayer = (closestItem.Group.GroupIndex / 10) - 1;
+                    int targetOrder = closestItem.Track.TrackIndex;
+
+                    var baseState = entity.GetBaseState();
+                    if (baseState != null)
+                    {
+                        int currentLayer = 0;
+                        int currentOrder = clipModel.TrackIndex;
+                        if (Core.FastReflectionHelper.TryGetValue(baseState, "Layer", out object lObj))
+                            currentLayer = Convert.ToInt32(lObj);
+
+                        // 只有当打谱师真的跨越了物理边界，才触发时空改写
+                        if (currentLayer != targetLayer || currentOrder != targetOrder)
+                        {
+                            var propLayer = baseState.GetType().GetProperty("Layer");
+                            var propOrder = baseState.GetType().GetProperty("Order");
+
+                            if (propLayer != null && propLayer.CanWrite)
+                            {
+                                Type t = Nullable.GetUnderlyingType(propLayer.PropertyType) ?? propLayer.PropertyType;
+                                propLayer.SetValue(baseState, Convert.ChangeType(targetLayer, t));
+                            }
+                            if (propOrder != null && propOrder.CanWrite)
+                            {
+                                Type t = Nullable.GetUnderlyingType(propOrder.PropertyType) ?? propOrder.PropertyType;
+                                propOrder.SetValue(baseState, Convert.ChangeType(targetOrder, t));
+                            }
+
+                            dataChanged = true;
+                        }
+                    }
+                }
+                // 🎛️ 场景 B：控制器在专属隔离区上下调换顺位轨道
+                else
+                {
+                    var root = _context?.Storyboard;
+                    int targetIndex = closestItem.Track.TrackIndex;
+                    int currentIndex = clipModel.TrackIndex;
+
+                    if (root != null && currentIndex != targetIndex)
+                    {
+                        if (entity is Models.C2SceneController ctrl && root.controllers != null)
+                        {
+                            if (currentIndex >= 0 && currentIndex < root.controllers.Count && targetIndex >= 0 && targetIndex < root.controllers.Count)
+                            {
+                                root.controllers.Remove(ctrl);
+                                root.controllers.Insert(targetIndex, ctrl);
+                                dataChanged = true;
+                            }
+                        }
+                        else if (entity is Models.C2NoteController noteCtrl && root.note_controllers != null)
+                        {
+                            if (currentIndex >= 0 && currentIndex < root.note_controllers.Count && targetIndex >= 0 && targetIndex < root.note_controllers.Count)
+                            {
+                                root.note_controllers.Remove(noteCtrl);
+                                root.note_controllers.Insert(targetIndex, noteCtrl);
+                                dataChanged = true;
+                            }
+                        }
+                    }
+                }
+
+                // 5. 💫 数据洗净重生闭环
+                if (dataChanged)
+                {
+                    _context?.MarkAsModified();
+
+                    // 🧙‍♂️ 0ms 跨轨物理搬家法术：直接在 UI 树上完成局部宿舍迁移，彻底消灭换轨大卡顿！
+                    if (clipCtrl.Parent is Canvas oldCanvas)
+                    {
+                        oldCanvas.Children.Remove(clipCtrl); // 搬出旧宿舍 Canvas
+                    }
+
+                    if (closestItem.TrackBorder.Child is Canvas newCanvas)
+                    {
+                        newCanvas.Children.Add(clipCtrl); // 丝滑拎包入住新宿舍 Canvas！
+                    }
+
+                    // 1:1 同步刷新模型内存里的当前轨道索引绑定
+                    clipModel.TrackIndex = closestItem.Track.TrackIndex;
+
+                    // 🚀 核心状态同步：重新呼叫 Init 让方块自己刷新物理跨度、基因嗅探并完美适应新宿舍！
+                    clipCtrl.Init(clipModel, _context, _pixelsPerSecond, closestItem.Track.TrackIndex, 999);
+
+                    // 轨道高度固定居中留白修正，防止被 Init 内部的旧有绝对波及带偏
+                    Canvas.SetTop(clipCtrl, 6);
+                }
+                else
+                {
+                    // 同轨平移或纯单点，优雅在原地立正对齐
+                    Canvas.SetLeft(clipCtrl, clipModel.StartTime * _pixelsPerSecond);
+                    Canvas.SetTop(clipCtrl, 6);
+
+                    double clipDuration = clipModel.EndTime - clipModel.StartTime;
+                    if (clipDuration > 300) clipDuration = 300;
+                    clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                }
+            }
+        }
+
+
+
+
+
 
         // ==========================================
         // 🔬 微观变身与退出

@@ -93,6 +93,8 @@ namespace Naziki_Editor.Views.TimelineClip
 
                 initialNode.DragDelta += Node_DragDelta;
                 initialNode.MouseRightButtonDown += Node_MouseRightButtonDown;
+                // ✨ 当拖拽松开时，强制进行一次身份刷新与主权隔离！
+                initialNode.DragCompleted += (s, ev) => { RenderTrackKeyframes(); };
 
                 KeyframeNodeCanvas.Children.Add(initialNode);
                 Canvas.SetLeft(initialNode, initialAbsX);
@@ -137,6 +139,8 @@ namespace Naziki_Editor.Views.TimelineClip
 
                 node.DragDelta += Node_DragDelta;
                 node.MouseRightButtonDown += Node_MouseRightButtonDown;
+                // 拖拽结束后，让小菱形在轨道上根据最新时间重新洗牌、对齐站好！
+                node.DragCompleted += (s, ev) => { RenderTrackKeyframes(); };
 
                 KeyframeNodeCanvas.Children.Add(node);
                 Canvas.SetLeft(node, xPos);
@@ -182,38 +186,51 @@ namespace Naziki_Editor.Views.TimelineClip
                 // 🛡️ 判定：它是不是我们独立出来的初始属性钮扣？
                 bool isBaseStateNode = (node.Tag is string str && str == "BASE_STATE_NODE");
 
-                // 1. ⏱️ X 轴水平绝对移动控制（绝对领域防盾升级版）
+                // ==========================================
+                // 1. ⏱️ X 轴水平绝对移动控制（全面满足大大的多态时间滑动需求！）
+                // ==========================================
                 if (isBaseStateNode)
                 {
-                    // 🌟 A. 初始属性精准安全反写
-                    var baseState = _clipModel.AssociatedObject.GetBaseState();
-                    var propInfo = baseState?.GetType().GetProperty(_propertyName);
-                    if (propInfo != null && propInfo.CanWrite)
-                    {
-                        // 🔮 核心剥壳法术：检查目标类型是不是 Nullable<T> 可空包装盒
-                        Type t = propInfo.PropertyType;
-                        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
-                        {
-                            t = Nullable.GetUnderlyingType(t); // 成功剥壳，拿到里面的真实核心类型（如 float）
-                        }
-                    }
+                    // 初始核心纽扣：绝对领域防线，强行钉死在方块微观起点，完全封印左右位移
+                    double initialAbsX = _clipModel.StartTime * _pixelsPerSecond;
+                    Canvas.SetLeft(node, initialAbsX);
                 }
                 else if (node.Tag is Models.ObjectState state)
                 {
-                    // 🌟 B. 普通关键帧精准安全反写
-                    var propInfo = state.GetType().GetProperty(_propertyName);
-                    if (propInfo != null && propInfo.CanWrite)
-                    {
-                        // 🔮 同样执行防爆剥壳法术，专治 Nullable<float> 不服
-                        Type t = propInfo.PropertyType;
-                        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
-                        {
-                            t = Nullable.GetUnderlyingType(t);
-                        }
-                    }
+                    // 普通关键帧：执行严格的“绝对不超车防线（叹息之墙 2.0）”
+                    double currentX = Canvas.GetLeft(node);
+                    double newX = currentX + e.HorizontalChange;
+
+                    double minX = _clipModel.StartTime * _pixelsPerSecond;
+                    double maxX = double.MaxValue;
+
+                    // 碰撞界限：严禁超越左边的物理节点或右边的物理节点
+                    if (index > 0) minX = Canvas.GetLeft(_nodes[index - 1]) + 1;
+                    if (index < _nodes.Count - 1) maxX = Canvas.GetLeft(_nodes[index + 1]) - 1;
+
+                    if (newX < minX) newX = minX;
+                    if (newX > maxX) newX = maxX;
+
+                    Canvas.SetLeft(node, newX);
+
+                    // 🧙‍♂️ 计算调整后的绝对秒数与视觉相对时间
+                    double newAbsTime = newX / _pixelsPerSecond;
+                    double newVisualRelTime = newAbsTime - _clipModel.StartTime;
+
+                    // 🚀 呼叫满配核心反写引擎：内部自动识别【绝对秒数/音符锚点延迟/相对级联】，精准重写！
+                    Core.Timeline.StoryboardTimeConverter.WriteBackVisualTime(
+                        _clipModel.AssociatedObject,
+                        state,
+                        newVisualRelTime,
+                        _context.TimeEngine,        // 喂入音符换算引擎
+                        _context.Chart?.note_list,  // 喂入全量音符列表
+                        _clipModel.StartTime        // 喂入方块起点秒数
+                    );
                 }
 
+                // ==========================================
                 // 2. 🚦 Y 轴纵向拉扯（Slider 属性两路分流反写）
+                // ==========================================
                 var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
                 if (rule != null && rule.UIType == Core.PropertyUIType.Slider)
                 {
@@ -225,29 +242,23 @@ namespace Naziki_Editor.Views.TimelineClip
                     Canvas.SetTop(node, newY);
 
                     double ratio = 1.0 - (newY / (this.Height - 12));
-
-                    // 🌟 1. 源头提纯：直接在出生的瞬间，将计算结果定性为纯净的 float！
                     float newValue = (float)(rule.Min + (rule.Max - rule.Min) * ratio);
 
                     if (isBaseStateNode)
                     {
-                        // 🌟 2. 扔掉 ChangeType，直接安全反写！反射会自动完成 float -> float? 的高能装箱！
                         var baseState = _clipModel.AssociatedObject.GetBaseState();
                         baseState?.GetType().GetProperty(_propertyName)?.SetValue(baseState, newValue);
                     }
                     else if (node.Tag is Models.ObjectState state)
                     {
-                        // 🌟 普通关键帧同理，直接一步到位！
                         state.GetType().GetProperty(_propertyName)?.SetValue(state, newValue);
                     }
                 }
 
                 _context?.MarkAsModified();
 
-                // 🛡️ 源头净化：如果是初始属性节点动了，我们不仅要重绘曲线，更要强行呼叫 RenderTrackKeyframes 彻底刷新一次轨道！
-                // 这样能百分之百掐断任何视图层把初始点“误判/缓存”成普通关键帧的可能，绝对确保初始属性不丢失！
+                // ✨ 拖拽中途只刷新贝塞尔折线，绝不过河拆桥销毁控件，保证丝滑抓取手感
                 RedrawPropertyCurves();
-            
             }
         }
 

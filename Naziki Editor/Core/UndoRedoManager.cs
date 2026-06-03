@@ -23,8 +23,8 @@ namespace Naziki_Editor.Core
         {
             if (currentState == null) return;
 
-            // 将对象化为纯粹的 JSON 字符串，彻底斩断引用纠葛！
-            string jsonSnapshot = JsonConvert.SerializeObject(currentState);
+            // ✨ 核心修正：使用大本营定制的 GetSettings()，强行粉碎 [JsonIgnore] 带来的时空遗忘信息，完整保留核心资产！
+            string jsonSnapshot = JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings());
 
             // 如果和上一步一模一样，就不记录（防止无意义的重复存档）
             if (_undoStack.Count > 0 && _undoStack[_undoStack.Count - 1] == jsonSnapshot)
@@ -54,16 +54,17 @@ namespace Naziki_Editor.Core
                 return null;
             }
 
-            // 把当前状态压入重做栈
-            _redoStack.Add(JsonConvert.SerializeObject(currentState));
+            // ✨ 核心修正：重做压栈也要携带高级时空透视镜
+            _redoStack.Add(JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings()));
 
             // 提取上一个状态的 JSON 并移除
             string previousStateJson = _undoStack[_undoStack.Count - 1];
             _undoStack.RemoveAt(_undoStack.Count - 1);
 
             success = true;
-            // 魔法：自动把 JSON 变回设计师想要的类型（比如 StoryboardRoot）
-            return JsonConvert.DeserializeObject<T>(previousStateJson);
+
+            // ✨ 核心修正：使用高级反序列化配置，完美复活 BaseState 和每一帧动画！
+            return JsonConvert.DeserializeObject<T>(previousStateJson, StoryboardSerializer.GetSettings());
         }
 
         /// <summary>
@@ -77,15 +78,17 @@ namespace Naziki_Editor.Core
                 return null;
             }
 
-            // 把当前状态压入撤销栈
-            _undoStack.Add(JsonConvert.SerializeObject(currentState));
+            // ✨ 核心修正：撤销压栈同步携带高级配置
+            _undoStack.Add(JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings()));
 
             // 提取下一个状态的 JSON 并移除
             string nextStateJson = _redoStack[_redoStack.Count - 1];
             _redoStack.RemoveAt(_redoStack.Count - 1);
 
             success = true;
-            return JsonConvert.DeserializeObject<T>(nextStateJson);
+
+            // ✨ 核心修正：完美复活未来世界线的全量数据
+            return JsonConvert.DeserializeObject<T>(nextStateJson, StoryboardSerializer.GetSettings());
         }
 
         /// <summary>
