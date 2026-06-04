@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Naziki_Editor.Models;
 
-namespace Naziki_Editor.Core.Timeline
+namespace Naziki_Editor.Core
 {
     /// <summary>
     /// 🌌 时空核心转换引擎：负责底层级联时间（RelativeTime/AddTime）与统一视觉时间（VisualRelTime）的双向翻译

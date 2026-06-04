@@ -72,13 +72,13 @@ namespace Naziki_Editor.Views
                     {
                         double deltaStart = _model.StartTime - _originalStartTime;
                         object oldTime = timeProp.GetValue(baseState);
-                        object newTime = Core.Timeline.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaStart);
+                        object newTime = Core.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaStart);
                         timeProp.SetValue(baseState, newTime);
                     }
                 }
 
                 // 2. 🌌 触发空间折叠级联缩放：完美实现左边缘拉伸、内部所有关键帧等比例缩放缩放！
-                Core.Timeline.StoryboardTimeConverter.ScaleInternalKeyframes(
+                Core.StoryboardTimeConverter.ScaleInternalKeyframes(
                     _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
 
                 _context?.MarkAsModified();
@@ -91,7 +91,7 @@ namespace Naziki_Editor.Views
             };
             ResizeRightThumb.DragCompleted += (s, ev) => {
                 // 🌌 触发空间折叠级联缩放：右边缘拉伸时，StartTime没变，EndTime变了，内部关键帧自动等比例拉伸！
-                Core.Timeline.StoryboardTimeConverter.ScaleInternalKeyframes(
+                Core.StoryboardTimeConverter.ScaleInternalKeyframes(
                     _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
 
                 _context?.MarkAsModified();

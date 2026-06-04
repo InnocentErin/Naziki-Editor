@@ -44,6 +44,14 @@ namespace Naziki_Editor.Views.PropertyEditor
             _templateData = template;
             _context = context;
             _editingObject = null;
+
+            // ✨ 女娲补天：万一传进来的模板连关键帧列表都没有（比如异常的旧项目），立刻初始化一个！
+            if (template != null)
+            {
+                if (template.Keyframes == null) template.Keyframes = new System.Collections.Generic.List<TemplateState>();
+                if (template.BaseState == null) template.BaseState = new TemplateState();
+            }
+
             _keyframesList = template?.Keyframes;
             if (template != null)
             {

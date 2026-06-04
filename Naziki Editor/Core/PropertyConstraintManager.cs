@@ -104,18 +104,30 @@ namespace Naziki_Editor.Core
             if (Rules.TryGetValue(propName, out var rule))
                 return rule;
 
-            // 🤖 智能兜底推断机制：如果没登记，就按名字特征智能分配！
-            if (propName.Contains("Override") || propName == "Loop" || propName.Contains("Filter") || propName.Contains("Blur") || propName.Contains("Bloom") || propName.Contains("Glitch") || propName.Contains("Dream") || propName.Contains("Sepia") || propName.Contains("Noise"))
-                return new PropertyConstraint { UIType = PropertyUIType.Toggle, DefaultValue = false };
-
-            if (propName.Contains("Intensity") || propName.Contains("Opacity") || propName.Contains("Fade"))
-                return new PropertyConstraint { UIType = PropertyUIType.Slider, Min = 0f, Max = 1f, DefaultValue = 0.5f };
-
-            if (propName.Contains("Color"))
+            // 🌟 1. 绝对精准匹配：强迫症级别的颜色探针
+            if (propName == "Color" || propName == "ScanlineColor" || propName == "NoteRingColor" ||
+                propName == "ColorFilterColor" || propName == "FocusColor" || propName == "VignetteColor")
                 return new PropertyConstraint { UIType = PropertyUIType.ColorPicker, DefaultValue = "#FFFFFF" };
 
-            // 最终混沌形态：默认给个普通数值框
-            return new PropertyConstraint { UIType = PropertyUIType.FloatBox };
+            // 🌟 2. 绝对精准匹配：强迫症级别的文本探针
+            if (propName == "TextContent" || propName == "Path" || propName == "NoteTarget" || propName == "Font" || propName == "FontStyle")
+                return new PropertyConstraint { UIType = PropertyUIType.StringBox, DefaultValue = "" };
+
+            // 🌟 3. 先拦截所有滑块类 (包含 Intensity, Opacity, Fade)
+            // 必须放在 Bool 拦截之前，否则 BloomIntensity 会被后面的 Bloom 拦截当成开关！
+            if (propName.Contains("Intensity") || propName.Contains("Opacity") || propName.Contains("Fade") || propName == "BackgroundDim")
+                return new PropertyConstraint { UIType = PropertyUIType.Slider, Min = 0f, Max = 1f, DefaultValue = 0.5f };
+
+            // 🌟 4. 再拦截所有开关类 (绝对不能使用含糊的 Contains 匹配容易误伤，改为后缀检查或精准列举)
+            if (propName.StartsWith("Override") || propName == "Loop" || propName == "PreserveAspect" || propName == "Perspective" ||
+                propName == "Chromatical" || propName == "Bloom" || propName == "RadialBlur" || propName == "ColorAdjustment" ||
+                propName == "ColorFilter" || propName == "GrayScale" || propName == "Noise" || propName == "Sepia" ||
+                propName == "Dream" || propName == "Fisheye" || propName == "Shockwave" || propName == "Focus" ||
+                propName == "Glitch" || propName == "Arcade" || propName == "Tape" || propName == "Vignette")
+                return new PropertyConstraint { UIType = PropertyUIType.Toggle, DefaultValue = false };
+
+            // 🌟 5. 其他浮点数 (如 Fov, Speed, X, Y)
+            return new PropertyConstraint { UIType = PropertyUIType.FloatBox, DefaultValue = 0f };
         }
     }
 }

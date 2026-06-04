@@ -105,7 +105,7 @@ namespace Naziki_Editor.Views.TimelineClip
             // ==========================================
             // 🧬 ⚡ 呼叫独立时间转换引擎：一次性安全压平获取所有可见帧
             // ==========================================
-            var decodedFrames = Core.Timeline.StoryboardTimeConverter.DecodeTimelineKeyframes(
+            var decodedFrames = Core.StoryboardTimeConverter.DecodeTimelineKeyframes(
     _clipModel.AssociatedObject, 
     _propertyName, 
     _context.TimeEngine,           // 喂入大大的 ChartTimeEngine！
@@ -218,7 +218,7 @@ namespace Naziki_Editor.Views.TimelineClip
                     double newVisualRelTime = newAbsTime - _clipModel.StartTime;
 
                     // 🚀 呼叫满配核心反写引擎：内部自动识别【绝对秒数/音符锚点延迟/相对级联】，精准重写！
-                    Core.Timeline.StoryboardTimeConverter.WriteBackVisualTime(
+                    Core.StoryboardTimeConverter.WriteBackVisualTime(
                         _clipModel.AssociatedObject,
                         state,
                         newVisualRelTime,

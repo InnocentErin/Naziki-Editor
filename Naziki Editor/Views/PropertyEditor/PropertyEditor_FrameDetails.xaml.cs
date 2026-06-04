@@ -136,10 +136,11 @@ namespace Naziki_Editor.Views.PropertyEditor
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
             // PopulateTemplateDropdown(); 顶部已隐身，不再重复刷新它
 
-            // ✨ 核心修正：不管是普通对象还是状态类，只要属于场景控制器，全部分流
-            bool isController = (_rootState is ControllerState || _currentState is ControllerState);
-            PanelSceneCards.Visibility = isController ? Visibility.Collapsed : Visibility.Visible;
-            PanelControllerCards.Visibility = isController ? Visibility.Visible : Visibility.Collapsed;
+            // 🚀 核心强打通：彻底废除一刀切的物理屏蔽屏障！
+            // 因为 TemplateState 作为上帝类，必须能同时渲染 Scene 和 Controller 两大面板。
+            // 且就算是普通的 Controller，也需要用到 Scene 面板里的 X、Y、Z 坐标，统统放开权限！
+            PanelSceneCards.Visibility = Visibility.Visible;
+            PanelControllerCards.Visibility = Visibility.Visible;
 
             // ✨ 核心强打通：绑定常驻时间轴参数
             // BindStaticProperty(TxtEasing, "Easing"); // 🚫 彻底抛弃旧的文本框数据绑定！
@@ -264,6 +265,9 @@ namespace Naziki_Editor.Views.PropertyEditor
                         }
                     }
 
+                    // 🌟 1.5 【神圣雷达】：嗅探当前是否处于模板编辑模式！
+                    bool isTemplateMode = _currentState != null && _currentState.GetType().Name == "TemplateState";
+
                     // 🌟 2. 给予用户贴心的提示，替换掉原有的输入框
                     if (_isControlBoard)
                     {
@@ -271,6 +275,17 @@ namespace Naziki_Editor.Views.PropertyEditor
                         {
                             Text = "👻 控制板隐身模式：此对象仅传递动画，初始视觉核心（Path/Text/Pos）已禁用。",
                             Foreground = Brushes.Gray,
+                            Margin = new Thickness(0, 0, 0, 10),
+                            FontStyle = FontStyles.Italic
+                        });
+                    }
+                    else if (isTemplateMode)
+                    {
+                        // 模板模式专属高雅提示
+                        fixedPropsContainer.Children.Add(new TextBlock
+                        {
+                            Text = "🪄 模板纯净模式：模板仅用于存储动画状态。为了防止基因污染，初始实体属性已被屏蔽。",
+                            Foreground = Brushes.Gold,
                             Margin = new Thickness(0, 0, 0, 10),
                             FontStyle = FontStyles.Italic
                         });
@@ -284,6 +299,9 @@ namespace Naziki_Editor.Views.PropertyEditor
                         {
                             // 🛑 【终极拦截】：如果是控制板，直接跳过生成，统统失去实体！
                             if (_isControlBoard) continue;
+
+                            // 🛑 【神圣隔离】：如果是模板模式，绝对禁止暴露实体 DNA，直接跳过！
+                            if (isTemplateMode) continue;
 
                             var row = CreateFixedPropertyRow(prop);
                             fixedPropsContainer.Children.Add(row);
@@ -465,9 +483,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             }
         }
 
+        // 
         private bool IsStaticDnaProperty(string propName) =>
             propName == "Path" || propName == "Text" || propName == "TextContent" ||
-            propName == "Pos" || propName == "Template" || propName == "Layer" ||
+            propName == "Pos" || propName == "Layer" ||
             propName == "Font" || propName == "Align" || propName == "Note";
 
 
@@ -516,9 +535,22 @@ namespace Naziki_Editor.Views.PropertyEditor
                 }
 
                 object val = prop.GetValue(_currentState);
+                // ==========================================
+                // 🚀 核心修复：给 Template 发放永久 VIP 通行证！
+                // 因为默认它是 null，会被系统无情地扔进“未激活”的下拉菜单里。
+                // 我们直接拦截它，把它强行置顶钉死在界面最上方！
+                // ==========================================
+                if (prop.Name == "Template")
+                {
+                    if (_isRoot) continue;
+                    var tplRow = CreateDynamicRow(prop, val);
+                    PanelSpatialContainer.Children.Insert(0, tplRow); // 强行插在空间(Spatial)面板的最顶部！
+                    continue; // 处理完毕，跳过后续的普通分拣
+                }
+
                 bool isActive = (val != null);
 
-                
+
 
                 // ==========================================
                 // 🌟 小艾的完美分拣法术：确保没有任何一个属性流浪！

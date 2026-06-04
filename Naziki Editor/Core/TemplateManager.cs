@@ -175,7 +175,12 @@ namespace Naziki_Editor.Core
                         "Chromatical", "ChromaticalFade", "ChromaticalIntensity", "ChromaticalSpeed",
                         "Bloom", "BloomIntensity", "RadialBlur", "RadialBlurIntensity",
                         "ColorFilter", "ColorFilterColor", "GrayScale", "GrayScaleIntensity",
-                        "Noise", "NoiseIntensity", "Sepia", "SepiaIntensity", "Dream", "DreamIntensity"
+                        "Noise", "NoiseIntensity", "Sepia", "SepiaIntensity", "Dream", "DreamIntensity",
+                        "ColorAdjustment", "Brightness", "Saturation", "Contrast",
+                        "Fisheye", "FisheyeIntensity", "Shockwave", "ShockwaveSpeed",
+                        "Focus", "FocusSize", "FocusColor", "FocusSpeed", "FocusIntensity",
+                        "Glitch", "GlitchIntensity", "Arcade", "ArcadeIntensity", "ArcadeInterferenceSize", "ArcadeInterferenceSpeed", "ArcadeContrast",
+                        "Tape", "Vignette", "VignetteColor", "VignetteEnd", "VignetteIntensity", "VignetteStart"
                     });
                     break;
 

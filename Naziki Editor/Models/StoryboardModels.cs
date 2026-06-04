@@ -149,15 +149,25 @@ namespace Naziki_Editor.Models
         public float? ScaleY { get; set; }
         public UnitFloat Width { get; set; }
         public UnitFloat Height { get; set; }
-        public float? W { get; set; } // 兼容你提到的 w, h
-        public float? H { get; set; }
+        [JsonProperty("w")] public UnitFloat W { get; set; } // 🌟 修复类型为 UnitFloat
+        [JsonProperty("h")] public UnitFloat H { get; set; }
         public float? PivotX { get; set; }
         public float? PivotY { get; set; }
         [JsonProperty("pos")] public List<LinePosition> Pos { get; set; }
+        // 🌟 小艾补全：最致命的物理与视觉基础属性
+        [JsonProperty("x")] public UnitFloat X { get; set; }
+        [JsonProperty("y")] public UnitFloat Y { get; set; }
+        [JsonProperty("z")] public UnitFloat Z { get; set; }
+        [JsonProperty("rot_x")] public float? RotX { get; set; }
+        [JsonProperty("rot_y")] public float? RotY { get; set; }
+        [JsonProperty("rot_z")] public float? RotZ { get; set; }
+        [JsonProperty("opacity")] public float? Opacity { get; set; }
+        [JsonProperty("layer")] public int? Layer { get; set; }
+        [JsonProperty("order")] public int? Order { get; set; }
 
         // 2. 文本与精灵 (Text & Sprite)
-        public string TextContent { get; set; }
-        public int? Size { get; set; }
+        [JsonProperty("text")] public string TextContent { get; set; } // 🌟 强制牵线别名
+        [JsonProperty("size")] public float? Size { get; set; } // 🌟 修复为浮点型防崩溃
         public string Align { get; set; }
         public float? LetterSpacing { get; set; }
         public float? LineSpacing { get; set; }
@@ -204,6 +214,34 @@ namespace Naziki_Editor.Models
         public float? SepiaIntensity { get; set; }
         public bool? Dream { get; set; }
         public float? DreamIntensity { get; set; }
+        // 🌟 小艾补全：被腰斩的后半段高级滤镜特效
+        [JsonProperty("color_adjustment")] public bool? ColorAdjustment { get; set; }
+        [JsonProperty("brightness")] public float? Brightness { get; set; }
+        [JsonProperty("saturation")] public float? Saturation { get; set; }
+        [JsonProperty("contrast")] public float? Contrast { get; set; }
+        [JsonProperty("fisheye")] public bool? Fisheye { get; set; }
+        [JsonProperty("fisheye_intensity")] public float? FisheyeIntensity { get; set; }
+        [JsonProperty("shockwave")] public bool? Shockwave { get; set; }
+        [JsonProperty("shockwave_speed")] public float? ShockwaveSpeed { get; set; }
+        [JsonProperty("focus")] public bool? Focus { get; set; }
+        [JsonProperty("focus_size")] public float? FocusSize { get; set; }
+        [JsonProperty("focus_color")] public string FocusColor { get; set; }
+        [JsonProperty("focus_speed")] public float? FocusSpeed { get; set; }
+        [JsonProperty("focus_intensity")] public float? FocusIntensity { get; set; }
+        [JsonProperty("glitch")] public bool? Glitch { get; set; }
+        [JsonProperty("glitch_intensity")] public float? GlitchIntensity { get; set; }
+        [JsonProperty("arcade")] public bool? Arcade { get; set; }
+        [JsonProperty("arcade_intensity")] public float? ArcadeIntensity { get; set; }
+        [JsonProperty("arcade_interference_size")] public float? ArcadeInterferenceSize { get; set; }
+        [JsonProperty("arcade_interference_speed")] public float? ArcadeInterferenceSpeed { get; set; }
+        [JsonProperty("arcade_contrast")] public float? ArcadeContrast { get; set; }
+        [JsonProperty("tape")] public bool? Tape { get; set; }
+        [JsonProperty("vignette")] public bool? Vignette { get; set; }
+        [JsonProperty("vignette_color")] public string VignetteColor { get; set; }
+        [JsonProperty("vignette_end")] public float? VignetteEnd { get; set; }
+        [JsonProperty("vignette_intensity")] public float? VignetteIntensity { get; set; }
+        [JsonProperty("vignette_start")] public float? VignetteStart { get; set; }
+        [JsonProperty("note_fill_colors")] public List<string> NoteFillColors { get; set; } // 补上遗漏的音符色彩阵列
 
         // 6. 音符控制器 (Note Controller)
         public bool? OverrideX { get; set; }
@@ -212,7 +250,7 @@ namespace Naziki_Editor.Models
         public bool? OverrideRotX { get; set; }
         public bool? OverrideRotY { get; set; }
         public bool? OverrideRotZ { get; set; }
-        public string NoteTarget { get; set; }
+        [JsonProperty("note")] public object NoteTarget { get; set; } // 🌟 强制牵线别名，并改为 object 兼容占位符
         public float? NoteSizeMultiplier { get; set; }
         public float? HitboxMultiplier { get; set; }
     }

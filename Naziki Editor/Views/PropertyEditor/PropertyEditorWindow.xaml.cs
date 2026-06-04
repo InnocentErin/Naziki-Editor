@@ -92,6 +92,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             string jsonClone = JsonConvert.SerializeObject(targetTemplate, Core.StoryboardSerializer.GetSettings());
             _editingTemplate = JsonConvert.DeserializeObject<C2Template>(jsonClone, Core.StoryboardSerializer.GetSettings());
 
+            // ✨ 修复 1：兜底防线。如果新建的模板没有肉体，强行给它注入灵魂！
+            if (_editingTemplate.BaseState == null) _editingTemplate.BaseState = new TemplateState();
+            if (_editingTemplate.Keyframes == null) _editingTemplate.Keyframes = new List<TemplateState>();
+
             ModFrameList.OnFrameSelected += (state, title, bindingProps, isRoot) =>
             {
                 ModFrameDetails.LoadState(state, title, bindingProps, isRoot, _context);
@@ -108,6 +112,13 @@ namespace Naziki_Editor.Views.PropertyEditor
                 if (_context.ProjectData.TemplateTypes != null) _context.ProjectData.TemplateTypes[ModIdentity.TxtObjectId.Text] = type;
             };
             ModIdentity.LoadTemplateData(_templateName, _context);
+            // ✨ 修复 2：接通大动脉！把数据喂给中间的关键帧列表控件，让按钮复活！
+            ModFrameList.LoadTemplateData(_editingTemplate, _context);
+            // ✨ 修复 3：顺手同步初始门派。防止第一次点进来时右侧属性页一片空白！
+            if (_context.ProjectData.TemplateTypes != null && _context.ProjectData.TemplateTypes.TryGetValue(_templateName, out var tType))
+            {
+                ModFrameDetails.SetTemplateTypeLimit(tType);
+            }
         }
 
         private IList GetTargetListByType(StoryboardRoot root, Type t)
@@ -140,7 +151,16 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 string newName = ModIdentity.TxtObjectId.Text.Trim();
                 if (string.IsNullOrEmpty(newName)) { MessageBox.Show("模板名称不能为空！", "拦截"); return; }
-                if (newName != _templateName) Core.TemplateManager.RenameTemplateGlobally(_context.Storyboard, _templateName, newName);
+
+                if (newName != _templateName)
+                {
+                    Core.TemplateManager.RenameTemplateGlobally(_context.Storyboard, _templateName, newName);
+                    // ✨ 修复 4：拔除幽灵炸弹！更名后必须把大本营字典里的旧名字剔除！
+                    if (_context.Storyboard.templates.ContainsKey(_templateName))
+                    {
+                        _context.Storyboard.templates.Remove(_templateName);
+                    }
+                }
 
                 _context.Storyboard.templates[newName] = _editingTemplate;
                 _context.MarkAsModified();
