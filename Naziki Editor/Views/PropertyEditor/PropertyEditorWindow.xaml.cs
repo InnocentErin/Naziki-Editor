@@ -106,18 +106,24 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             ModIdentity.OnTemplateTypeChanged += (type) =>
             {
-                // 通知右侧详情页动态刷新白名单
                 ModFrameDetails.SetTemplateTypeLimit(type);
-                // 实时记入小账本
-                if (_context.ProjectData.TemplateTypes != null) _context.ProjectData.TemplateTypes[ModIdentity.TxtObjectId.Text] = type;
+                // 实时记入新账本
+                if (_context.StoryboardMeta?.TemplateMetas != null)
+                {
+                    string tName = ModIdentity.TxtObjectId.Text;
+                    if (!_context.StoryboardMeta.TemplateMetas.ContainsKey(tName))
+                        _context.StoryboardMeta.TemplateMetas[tName] = new EditorTemplateMeta();
+                    _context.StoryboardMeta.TemplateMetas[tName].Type = type;
+                }
             };
             ModIdentity.LoadTemplateData(_templateName, _context);
-            // ✨ 修复 2：接通大动脉！把数据喂给中间的关键帧列表控件，让按钮复活！
+
             ModFrameList.LoadTemplateData(_editingTemplate, _context);
-            // ✨ 修复 3：顺手同步初始门派。防止第一次点进来时右侧属性页一片空白！
-            if (_context.ProjectData.TemplateTypes != null && _context.ProjectData.TemplateTypes.TryGetValue(_templateName, out var tType))
+
+            // 顺手同步初始门派，接通新字典
+            if (_context.StoryboardMeta?.TemplateMetas != null && _context.StoryboardMeta.TemplateMetas.TryGetValue(_templateName, out var tMeta))
             {
-                ModFrameDetails.SetTemplateTypeLimit(tType);
+                ModFrameDetails.SetTemplateTypeLimit(tMeta.Type);
             }
         }
 

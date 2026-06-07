@@ -103,6 +103,84 @@ namespace Naziki_Editor.Views
 
 
         }
+        // 🌊 绘制高频阵列的离散波纹
+        // 🌊 绘制高频阵列的离散波纹
+        public void DrawDiscreteRipples()
+        {
+            if (_model?.AssociatedObject == null || _context == null) return;
+
+            // 1. 先清空旧波纹 (通过 Tag 识别，防止误删其他节点)
+            var oldRipples = NodeCanvas.Children.OfType<UIElement>().Where(e => e is System.Windows.Shapes.Line l && l.Tag?.ToString() == "Ripple").ToList();
+            foreach (var r in oldRipples) NodeCanvas.Children.Remove(r);
+
+            var keyframes = _model.AssociatedObject.GetKeyframes();
+            if (keyframes == null) return;
+
+            // 占位符反查准备，确保 $note 能被正确翻译
+            string currentNoteIdStr = "";
+            try
+            {
+                if (FastReflectionHelper.TryGetValue(_model.AssociatedObject, "Note", out object noteTarget) && noteTarget != null)
+                    currentNoteIdStr = noteTarget.ToString().Trim();
+            }
+            catch { }
+
+            foreach (var frame in keyframes)
+            {
+                var timeProp = frame.GetType().GetProperty("Time");
+                if (timeProp == null) continue;
+
+                var timeVal = timeProp.GetValue(frame);
+                if (timeVal is Newtonsoft.Json.Linq.JArray jArr)
+                {
+                    foreach (var tToken in jArr)
+                    {
+                        string timeStr = tToken.ToString().Trim();
+                        if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                            timeStr = timeStr.Replace("$note", currentNoteIdStr);
+
+                        double absTime = 0.0;
+
+                        // 🚀 核心修复：使用项目现有的原生雷达解析绝对时间！
+                        if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
+                        {
+                            if (_context.TimeEngine != null)
+                            {
+                                absTime = _context.TimeEngine.ParseCytoidTimeExpression(timeStr, _context.Chart?.note_list);
+                            }
+                        }
+                        else
+                        {
+                            double.TryParse(timeStr, out absTime);
+                        }
+
+                        // 计算相对于这个方块左边缘的 X 像素坐标
+                        double localX = (absTime - _model.StartTime) * _pixelsPerSecond;
+
+                        // 只要它在方块内部，就画一条幽灵虚线！
+                        if (localX >= 0)
+                        {
+                            System.Windows.Shapes.Line ripple = new System.Windows.Shapes.Line
+                            {
+                                X1 = localX,
+                                X2 = localX,
+                                Y1 = 0,
+                                Y2 = this.Height > 0 ? this.Height : 40, // 撑满方块高度
+                                Stroke = Brushes.White,
+                                StrokeThickness = 1.5,
+                                Opacity = 0.3, // 半透明的高雅幽灵感
+                                StrokeDashArray = new DoubleCollection { 2, 2 },
+                                Tag = "Ripple",
+                                IsHitTestVisible = false // 绝对不能挡住鼠标点击！
+                            };
+                            NodeCanvas.Children.Add(ripple);
+                        }
+                    }
+                }
+            }
+        }
+
+
 
         /// <summary>
         /// 📥 唯一交接关口：由父轨道将强类型模型、上下文基站以及缩放比例喂给方块

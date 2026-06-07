@@ -40,7 +40,23 @@ namespace Naziki_Editor.Models
 
         public object GetBaseState() => BaseState;
         public System.Collections.IList GetKeyframes() => Keyframes;
+        public bool ShouldSerializeId()
+        {
+            // 1. 如果它是全局场景控制器或音符控制器，它是无名氏，绝对隐藏 ID！
+            if (this.GetType().Name == "C2SceneController" || this.GetType().Name == "C2NoteController")
+                return false;
+
+            // 2. 如果它有 TargetId（说明它是吸附在别人身上的控制板），它也是无名氏，绝对隐藏 ID！
+            if (!string.IsNullOrEmpty(TargetId))
+                return false;
+
+            // 3. 其他正常跳舞的 Sprite、Text 等，乖乖把 ID 打印进 JSON 里
+            return true;
+        }
     }
+
+
+
 
     // 具体的七大造物！
     public class C2Sprite : StoryboardEntity<SpriteState> { }

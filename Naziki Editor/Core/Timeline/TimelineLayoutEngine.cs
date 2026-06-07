@@ -147,6 +147,29 @@ namespace Naziki_Editor.Core.Timeline
                     $"⚠️ 纳尼？！排版检测到极端情况！\n在同一时间点内，最多出现了 {maxOrderGenerated + 1} 个重叠对象！\n建议打谱师检查是否忘记勾选 Destroy，以防游戏卡顿哦！",
                     "性能预警", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
+
+
+
+
+            // 🚀 核心补全：场景控制器与音符控制器的“一人一轨独裁排版”
+            // 它们不需要参与空间碰撞，直接按列表顺序分配独占的 Order！
+            if (root.controllers != null)
+            {
+                for (int i = 0; i < root.controllers.Count; i++)
+                {
+                    WritePropertyToEntity(root.controllers[i].GetBaseState(), "Order", i);
+                }
+            }
+
+            if (root.note_controllers != null)
+            {
+                for (int i = 0; i < root.note_controllers.Count; i++)
+                {
+                    WritePropertyToEntity(root.note_controllers[i].GetBaseState(), "Order", i);
+                }
+            }
+
+
         }
 
         // ==========================================

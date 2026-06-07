@@ -21,6 +21,10 @@ namespace Naziki_Editor.Core
         /// <param name="allNotes">全量音符列表缓存</param>
         /// <param name="clipStartTime">当前事件方块在主轴上的 StartTime 起点秒数</param>
         /// <returns>解码后的纯净视觉节点包裹集合</returns>
+        /// 
+        /// <summary>
+        /// 🔬 1. 全能时空解码流水线：将整个 Keyframes 列表安全压平成【相对于方块起点的视觉秒数】
+        /// </summary>
         public static List<DecodedKeyframeBox> DecodeTimelineKeyframes(
             IStoryboardEntity entity,
             string propertyName,
@@ -38,7 +42,6 @@ namespace Naziki_Editor.Core
             string currentNoteIdStr = "";
             try
             {
-                // 利用反射从 AssociatedObject 肚子里挖出绑定的 note 属性（可以是具体数字或选择器对象）
                 if (FastReflectionHelper.TryGetValue(entity, "Note", out object noteTarget) && noteTarget != null)
                 {
                     currentNoteIdStr = noteTarget.ToString().Trim();
@@ -53,70 +56,93 @@ namespace Naziki_Editor.Core
             {
                 if (frame is ObjectState state)
                 {
-                    double thisFrameDelta = 0.0;
-                    bool hasTimeProp = false;
-
-                    // 🔍 ✨ 升级版全能时空雷达：无缝支持 RelativeTime、AddTime 以及原生字符串锚点的 Time 字段！
+                    // 🔍 ✨ 升级版全能时空雷达：无缝支持 RelativeTime、AddTime 以及原生字符串锚点/数组！
                     object rawTimeObj = null;
 
-                    if (FastReflectionHelper.TryGetValue(state, "RelativeTime", out object rt) && rt != null)
-                    {
-                        rawTimeObj = rt;
-                    }
-                    else if (FastReflectionHelper.TryGetValue(state, "AddTime", out object at) && at != null)
-                    {
-                        rawTimeObj = at;
-                    }
-                    else if (FastReflectionHelper.TryGetValue(state, "Time", out object t) && t != null)
-                    {
-                        // 🌟 抓到你啦！当使用音符锚点时，时间直接存在 Time 字段中！
-                        rawTimeObj = t;
-                    }
+                    if (FastReflectionHelper.TryGetValue(state, "RelativeTime", out object rt) && rt != null) rawTimeObj = rt;
+                    else if (FastReflectionHelper.TryGetValue(state, "AddTime", out object at) && at != null) rawTimeObj = at;
+                    else if (FastReflectionHelper.TryGetValue(state, "Time", out object t) && t != null) rawTimeObj = t;
 
                     if (rawTimeObj != null)
                     {
-                        string timeStr = rawTimeObj.ToString().Trim();
-
-                        // 🚀 基因替代雷达：如果包含 $note 占位符，强行替换为当前控制器的真实音符 ID！
-                        if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                        // 🚀 核心升维：截获 JSON 数组！发动影分身裂变！
+                        if (rawTimeObj is Newtonsoft.Json.Linq.JArray jArr)
                         {
-                            timeStr = timeStr.Replace("$note", currentNoteIdStr);
-                        }
-
-                        // 判断它是复杂的【音符锚点表达式】还是单纯的【数字增量】
-                        if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
-                        {
-                            hasTimeProp = true;
-                            // 呼叫大大的高级翻译官 ParseCytoidTimeExpression，直接算出该锚点的【绝对时间秒数】！
-                            double frameAbsSeconds = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
-
-                            // 换算公式：该锚点关键帧相对于事件方块起点的【视觉相对时间】 = 绝对秒数 - 方块起点
-                            double visualRelTime = frameAbsSeconds - clipStartTime;
-
-                            // 修正滚动累加器，确保后续若有连续用 add_time 挂靠在它后面的帧能够正确级联
-                            thisFrameDelta = visualRelTime - lastFrameVisualRelTime;
-                        }
-                        else if (double.TryParse(timeStr, out double numericDelta))
-                        {
-                            hasTimeProp = true;
-                            thisFrameDelta = numericDelta;
-                        }
-
-                        if (hasTimeProp)
-                        {
-                            // 级联滚动：当前视觉时间 = 上一帧累计视觉时间 + 本帧的时空步长
-                            double visualRelTime = lastFrameVisualRelTime + thisFrameDelta;
-                            lastFrameVisualRelTime = visualRelTime;
-
-                            // 过滤机制：只有当这一帧真的修改了当前轨道关心的属性时，才将其捕获到时间轴渲染中
-                            if (FastReflectionHelper.TryGetValue(state, propertyName, out object val) && val != null)
+                            foreach (var tToken in jArr)
                             {
-                                result.Add(new DecodedKeyframeBox
+                                string timeStr = tToken.ToString().Trim();
+                                if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                                    timeStr = timeStr.Replace("$note", currentNoteIdStr);
+
+                                double frameAbsSeconds = 0.0;
+
+                                if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
                                 {
-                                    State = state,
-                                    VisualRelTime = visualRelTime,
-                                    Value = val
-                                });
+                                    if (timeEngine != null) frameAbsSeconds = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
+                                }
+                                else if (double.TryParse(timeStr, out double numericVal))
+                                {
+                                    frameAbsSeconds = numericVal; // 如果数组里写的是纯数字秒数
+                                }
+
+                                double visualRelTime = frameAbsSeconds - clipStartTime;
+
+                                // 更新滚动累加器，使得这组时间的最大值成为后续 add_time 的基准
+                                if (visualRelTime > lastFrameVisualRelTime) lastFrameVisualRelTime = visualRelTime;
+
+                                if (FastReflectionHelper.TryGetValue(state, propertyName, out object val) && val != null)
+                                {
+                                    result.Add(new DecodedKeyframeBox
+                                    {
+                                        State = state,
+                                        VisualRelTime = visualRelTime,
+                                        Value = val,
+                                        IsArrayElement = true,
+                                        OriginalArrayStateRef = state
+                                    });
+                                }
+                            }
+                        }
+                        else // 🔮 原本的单体时间解析逻辑
+                        {
+                            double thisFrameDelta = 0.0;
+                            bool hasTimeProp = false;
+                            string timeStr = rawTimeObj.ToString().Trim();
+
+                            if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
+                                timeStr = timeStr.Replace("$note", currentNoteIdStr);
+
+                            if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
+                            {
+                                hasTimeProp = true;
+                                if (timeEngine != null)
+                                {
+                                    double frameAbsSeconds = timeEngine.ParseCytoidTimeExpression(timeStr, allNotes);
+                                    double visualRelTime = frameAbsSeconds - clipStartTime;
+                                    thisFrameDelta = visualRelTime - lastFrameVisualRelTime;
+                                }
+                            }
+                            else if (double.TryParse(timeStr, out double numericDelta))
+                            {
+                                hasTimeProp = true;
+                                thisFrameDelta = numericDelta;
+                            }
+
+                            if (hasTimeProp)
+                            {
+                                double visualRelTime = lastFrameVisualRelTime + thisFrameDelta;
+                                lastFrameVisualRelTime = visualRelTime;
+
+                                if (FastReflectionHelper.TryGetValue(state, propertyName, out object val) && val != null)
+                                {
+                                    result.Add(new DecodedKeyframeBox
+                                    {
+                                        State = state,
+                                        VisualRelTime = visualRelTime,
+                                        Value = val,
+                                        IsArrayElement = false
+                                    });
+                                }
                             }
                         }
                     }
@@ -569,5 +595,8 @@ namespace Naziki_Editor.Core
         public ObjectState State { get; set; }
         public double VisualRelTime { get; set; } // 统一转换后：相对于方块出生点（0.0s）的视觉相对秒数
         public object Value { get; set; }           // 属性的当前数值
+        // 🌟 新增：量子阵列纠缠标记！
+        public bool IsArrayElement { get; set; } = false;
+        public object OriginalArrayStateRef { get; set; } = null; // 指向最初那个包含数组的共享状态 (用于联动修改)
     }
 }

@@ -698,10 +698,11 @@ namespace Naziki_Editor.Views
             var newTemplate = new Naziki_Editor.Models.C2Template();
             root.templates[newKey] = newTemplate;
 
-            // 3. 在大本营的顺位账本上登记造册
-            if (Context.ProjectData != null && Context.ProjectData.TemplateTypes != null)
+            // 3. 在大本营的顺位账本上登记造册 (升级为全新的私有元数据包裹)
+            if (Context.StoryboardMeta != null)
             {
-                Context.ProjectData.TemplateTypes[newKey] = Naziki_Editor.Models.TemplateType.Generic;
+                if (Context.StoryboardMeta.TemplateMetas == null) Context.StoryboardMeta.TemplateMetas = new Dictionary<string, EditorTemplateMeta>();
+                Context.StoryboardMeta.TemplateMetas[newKey] = new EditorTemplateMeta { Type = TemplateType.Generic };
             }
 
             // 4. 惊醒时光机！让包括时间轴在内的所有全局视图准备刷新！
@@ -779,8 +780,8 @@ namespace Naziki_Editor.Views
                 // ========================================================
                 if (Context.StoryboardMeta == null) Context.StoryboardMeta = new StoryboardMeta();
 
-                // 预清洗旧账本，防止残留已经被删掉的模板名称
-                Context.StoryboardMeta.TemplateOverrides.Clear();
+                // 预清洗旧账本：不用粗暴 Clear，防止丢失打谱师自己写的别名和备注！
+                if (Context.StoryboardMeta.TemplateMetas == null) Context.StoryboardMeta.TemplateMetas = new Dictionary<string, EditorTemplateMeta>();
 
                 if (Context.Storyboard.templates != null)
                 {
@@ -788,11 +789,19 @@ namespace Naziki_Editor.Views
                     {
                         if (kvp.Value != null && kvp.Value.BaseState != null)
                         {
-                            // 呼叫雷达测绘当前的流派
                             var deducedType = Core.Compiler.TemplateClassifier.AnalyzeTemplate(kvp.Value.BaseState);
-                            Context.StoryboardMeta.TemplateOverrides[kvp.Key] = deducedType;
+                            // 如果账本里没有这个模板，就新建一个包裹；如果有，只更新门派类型！
+                            if (!Context.StoryboardMeta.TemplateMetas.ContainsKey(kvp.Key))
+                            {
+                                Context.StoryboardMeta.TemplateMetas[kvp.Key] = new EditorTemplateMeta();
+                            }
+                            Context.StoryboardMeta.TemplateMetas[kvp.Key].Type = deducedType;
                         }
                     }
+
+                    // 清理掉那些已经被打谱师删掉的幽灵模板记录
+                    var keysToRemove = Context.StoryboardMeta.TemplateMetas.Keys.Where(k => !Context.Storyboard.templates.ContainsKey(k)).ToList();
+                    foreach (var k in keysToRemove) Context.StoryboardMeta.TemplateMetas.Remove(k);
                 }
 
                 // 计算小账本应该躺的物理路径（跟主 json 文件在同一个文件夹下，后缀为 .storyboard_meta.json）

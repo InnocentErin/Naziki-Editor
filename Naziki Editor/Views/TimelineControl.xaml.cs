@@ -698,7 +698,7 @@ namespace Naziki_Editor.Views
 
 
         // ==========================================
-        // 🎹 音符雷达尺：在底部画布精准画出谱面音符！
+        // 🎹 音符雷达尺：在底部画布精准画出谱面音符！(全息图标资源管家版)
         // ==========================================
         public void DrawNoteRuler()
         {
@@ -720,28 +720,67 @@ namespace Naziki_Editor.Views
                 double seconds = _context.TimeEngine.TickToSeconds(note.tick);
                 double xPos = seconds * _pixelsPerSecond;
 
-                // 捏出一个可爱的小竖条来代表音符
-                var noteRect = new Rectangle
+                // 🧙‍♂️ 【核心升级】：从全局资源大管家那里，召唤对应门派的图标！
+                var iconBmp = Core.EditorResourceManager.GetNoteIcon(note.type);
+                UIElement noteUI;
+
+                if (iconBmp != null)
                 {
-                    Tag = note, // ✨ 小艾新增：给音符也贴上名片！
-                    Width = 4,
-                    Height = 16,
-                    RadiusX = 2,
-                    RadiusY = 2,
-                    ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s", // 贴心的防呆提示
-                    Cursor = Cursors.Hand
-                };
+                    // 🌟 成功获取图标，生成全息 Image 控件
+                    noteUI = new Image
+                    {
+                        Source = iconBmp,
+                        Width = 16,  // 📐 尺寸可以按大大需求调整（比如16x16或20x20）
+                        Height = 16,
+                        Tag = note,
+                        ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s",
+                        Cursor = Cursors.Hand
+                    };
+                    // 居中偏移量：宽度 16，向左偏 8，保持图标正中心严格对齐时间轴！
+                    Canvas.SetLeft(noteUI, xPos - 8);
+                    Canvas.SetTop(noteUI, 13);
+                }
+                else
+                {
+                    // 🛡️ 兜底方案：如果没放图片，优雅降级为以前的小方块，绝不崩溃！
+                    var rect = new Rectangle
+                    {
+                        Tag = note,
+                        Width = 4,
+                        Height = 16,
+                        RadiusX = 2,
+                        RadiusY = 2,
+                        ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s",
+                        Cursor = Cursors.Hand
+                    };
+                    if (note.type == 1) rect.Fill = Brushes.LightGreen;
+                    else if (note.type == 2) rect.Fill = Brushes.LightSkyBlue;
+                    else if (note.type == 3 || note.type == 6) rect.Fill = Brushes.Gold;
+                    else if (note.type == 4) rect.Fill = Brushes.Plum;
+                    else rect.Fill = Brushes.White;
 
-                // 🎨 【色彩区分】：根据音符类型分发不同的颜色
-                if (note.type == 1) noteRect.Fill = Brushes.LightGreen;      // Click (绿)
-                else if (note.type == 2) noteRect.Fill = Brushes.LightSkyBlue; // Hold (蓝)
-                else if (note.type == 3 || note.type == 6) noteRect.Fill = Brushes.Gold; // Drag/CDrag (黄)
-                else if (note.type == 4) noteRect.Fill = Brushes.Plum;         // Flick (紫)
-                else noteRect.Fill = Brushes.White;                            // 其他
+                    noteUI = rect;
+                    Canvas.SetLeft(noteUI, xPos - 2);
+                    Canvas.SetTop(noteUI, 13);
+                }
 
-                NotePreviewCanvas.Children.Add(noteRect);
-                Canvas.SetLeft(noteRect, xPos);
-                Canvas.SetTop(noteRect, 7); // 居中稍微靠下
+                // 🚀 【ID周期高显雷达】：每隔4个音符（ID是5的倍数），在上方优雅注明 ID！
+                if (note.id % 5 == 0)
+                {
+                    TextBlock txtId = new TextBlock
+                    {
+                        Text = note.id.ToString(),
+                        FontSize = 9,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = (Brush)Application.Current.FindResource("TipsColor") ?? Brushes.Gray,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    Canvas.SetLeft(txtId, xPos - 5); // 居中微调
+                    Canvas.SetTop(txtId, 0);         // 牢牢贴在顶部 0 轨
+                    NotePreviewCanvas.Children.Add(txtId);
+                }
+
+                NotePreviewCanvas.Children.Add(noteUI);
             }
         }
 
@@ -830,10 +869,15 @@ namespace Naziki_Editor.Views
                 NotePreviewCanvas.Width = newWidth;
                 foreach (UIElement child in NotePreviewCanvas.Children)
                 {
-                    if (child is Rectangle rect && rect.Tag is Models.C2Note note)
+                    // ✨ 核心升维：统一用 FrameworkElement 接管，完美包容 Image 和 Rectangle！
+                    if (child is FrameworkElement fe && fe.Tag is Models.C2Note note)
                     {
                         double seconds = _context.TimeEngine.TickToSeconds(note.tick);
-                        Canvas.SetLeft(rect, seconds * _pixelsPerSecond);
+
+                        // 📐 智能判别居中偏移量：如果图片宽 16 就偏 8，如果是矩形宽 4 就偏 2
+                        double offset = (child is Image) ? 8.0 : 2.0;
+
+                        Canvas.SetLeft(fe, seconds * _pixelsPerSecond - offset);
                     }
                 }
             }

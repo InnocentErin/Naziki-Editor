@@ -10,6 +10,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\NoteSkins\Cytus2_Default\CDrag.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\CDragChild.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\Click.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\Drag.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\DragChild.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\Flick.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\Hold.png" />
+    <None Remove="Resources\NoteSkins\Cytus2_Default\LongHold.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
     <PackageReference Include="NAudio" Version="2.3.0" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
@@ -22,8 +33,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="ProjectAbout\" />
     <Folder Include="Icon\" />
+    <Folder Include="ProjectAbout\" />
+    <Folder Include="Resources\Sounds\NoteSound\Cytus_Default\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\CDrag.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\CDragChild.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\Click.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\Drag.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\DragChild.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\Flick.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\Hold.png" />
+    <Resource Include="Resources\NoteSkins\Cytus2_Default\Notes\LongHold.png" />
   </ItemGroup>
 
 </Project>

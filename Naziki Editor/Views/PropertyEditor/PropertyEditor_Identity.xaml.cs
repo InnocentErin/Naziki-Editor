@@ -34,6 +34,27 @@ namespace Naziki_Editor.Views.PropertyEditor
             TxtObjectId.Text = _editingObject.Id;
             TxtParentId.Text = _editingObject.ParentId;
 
+            // 🚀 【私有 ID 视觉反馈系统】
+            bool isPrivateIdMode = _editingObject.GetType().Name == "C2SceneController" ||
+                                   _editingObject.GetType().Name == "C2NoteController" ||
+                                   !string.IsNullOrEmpty(_editingObject.TargetId);
+
+            if (isPrivateIdMode)
+            {
+                TxtObjectId.Foreground = System.Windows.Media.Brushes.DarkOrange;
+                TxtObjectId.ToolTip = "🪄 私有模式：此 ID 仅供编辑器轨道管理，导出 Cytoid 谱面时将自动隐身！";
+
+                TxtIdWarning.Text = "🪄 私有 ID 模式 (导出将自动隐身)";
+                TxtIdWarning.Foreground = System.Windows.Media.Brushes.Goldenrod;
+                TxtIdWarning.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TxtObjectId.Foreground = (System.Windows.Media.Brush)Application.Current.FindResource("MainTextColor");
+                TxtObjectId.ToolTip = "全局唯一身份证，不能与别人重名哦！";
+                TxtIdWarning.Visibility = Visibility.Collapsed;
+            }
+
             // 1. 🟢【谱面数据接通】：如果绑定了谱面，接通音符雷达网
             if (_context != null && _context.HasChart && _context.Chart.note_list != null && _context.Chart.note_list.Count > 0)
             {
@@ -229,8 +250,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (RowTargetId != null) RowTargetId.Visibility = Visibility.Collapsed;
 
             // 📖 自动回显门派类型
-            if (_context?.ProjectData?.TemplateTypes != null && _context.ProjectData.TemplateTypes.TryGetValue(templateName, out TemplateType type))
+            if (_context?.StoryboardMeta?.TemplateMetas != null && _context.StoryboardMeta.TemplateMetas.TryGetValue(templateName, out EditorTemplateMeta tMeta))
             {
+                TemplateType type = tMeta.Type; // 🌟 从包裹里解压出门派基因
                 CmbTemplateType.SelectionChanged -= CmbTemplateType_SelectionChanged; // 拔掉网线防误触
                 foreach (ComboBoxItem item in CmbTemplateType.Items)
                 {

@@ -4,7 +4,7 @@
              Background="{DynamicResource BoardBgColor}">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="30"/>
+            <RowDefinition Height="50"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -17,7 +17,7 @@
                 <TextBlock Text="🎭 属性时间切片" Foreground="{DynamicResource TipsColor}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
                 <ScrollViewer x:Name="ScrollMicroRuler" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                    <Canvas x:Name="MicroRulerCanvas" Height="30" Width="1000"/>
+                    <Canvas x:Name="MicroRulerCanvas" Height="50" Width="1000"/>
                 </ScrollViewer>
             </Grid>
         </Border>

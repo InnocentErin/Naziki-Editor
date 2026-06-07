@@ -28,8 +28,7 @@ namespace Naziki_Editor.Models
 
 
         // 在 NazikiProjectModel 类的内部，追加这个属性：
-        // 5. 模板分类账本 (TemplateName -> TemplateType)
-        public System.Collections.Generic.Dictionary<string, TemplateType> TemplateTypes { get; set; } = new System.Collections.Generic.Dictionary<string, TemplateType>();
+        
 
         // 🌟 6. 控制板顺位身份证留痕账本 (Key: cb_类型_宿主ID_顺位索引 -> Value: 内存中追踪的唯一ID)
         public System.Collections.Generic.Dictionary<string, string> ControlBoardIdMaps { get; set; } = new System.Collections.Generic.Dictionary<string, string>();
