@@ -248,6 +248,54 @@ namespace Naziki_Editor.Views
         {
             InitializeComponent();
 
+            // =========================================================
+            // 🎧 校园广播站：MainWindow 专属对讲机耳机接线处 (解耦核心)
+            // =========================================================
+
+            // 频道 1：听候“素材库小弟”的召唤，有新素材双击时，主窗口自动接单干活！
+            State.EventBus.Subscribe<IStoryboardEntity>("CreateEventFromAsset", (newEvent) =>
+            {
+                this.CreateNewEventFromAsset(newEvent);
+            });
+
+            // 频道 2：听候“属性面板小弟”的召唤，需要打开高级属性表单时，主窗口来施法弹窗！
+            State.EventBus.Subscribe<object>("RequestOpenPropertyEditor", (obj) =>
+            {
+                if (obj is IStoryboardEntity selectedObj)
+                {
+                    this.OpenPropertyEditor(selectedObj);
+                }
+                else if (obj is C2Template template)
+                {
+                    // 自动反查模板的名字钥匙
+                    var targetEntry = this.Context.Storyboard.templates.FirstOrDefault(x => x.Value == template);
+                    if (targetEntry.Key != null)
+                    {
+                        this.OpenTemplatePropertyEditor(targetEntry.Key, template);
+                    }
+                }
+            });
+
+            // 频道 3：听候“谱面缺失结界”里的按钮召唤，当点击“导入谱面”时，跨空触发导入！
+            State.EventBus.Subscribe("RequestImportChart", () =>
+            {
+                // 🌟 完美挂钩：这里直接呼叫你原本顶部菜单栏里的那个导入谱面方法
+                // 如果你的导入谱面方法叫 MenuImportChart_Click，直接这样模拟点击即可：
+                MenuImportChart_Click(null, null);
+            });
+
+            // 频道 4：听候“素材库小弟”的召唤，需要全面刷新硬盘素材时执行！
+            State.EventBus.Subscribe("RequestRefreshAssets", () =>
+            {
+                this.RefreshAllAssets();
+            });
+
+
+
+
+
+
+
             // 🔌 ✨ 终极通电！主窗口一启动，就把数据包分发给所有小弟！
             EventList.LoadContext(Context);
             NoteList.LoadContext(Context);

@@ -10,7 +10,9 @@ namespace Naziki_Editor.Views
 {
     public partial class AssetListControl : UserControl
     {
-        public MainWindow ParentMainWindow => Window.GetWindow(this) as MainWindow;
+        // 🌟 正式接入粮仓！再也不用强行认主窗口当爹啦！
+        public State.ProjectDataContext Context { get; private set; }
+        public void LoadContext(State.ProjectDataContext context) => Context = context;
 
         public AssetListControl()
         {
@@ -28,10 +30,11 @@ namespace Naziki_Editor.Views
 
         private void CommitRename(AssetItemModel item)
         {
-            if (item == null || ParentMainWindow == null) return;
+            // ✨ 改成从安全的 Context 粮仓里拿数据！
+            if (item == null || Context == null || Context.ProjectData == null) return;
 
-            string projectDir = System.IO.Path.GetDirectoryName(ParentMainWindow.CurrentProjectFilePath);
-            string matFolder = ParentMainWindow.CurrentProjectData.MaterialFolderPath;
+            string projectDir = System.IO.Path.GetDirectoryName(Context.ProjectFilePath);
+            string matFolder = Context.ProjectData.MaterialFolderPath;
 
             if (item.AssetType == "Image" || item.AssetType == "Video")
                 AssetMetaManager.SetExternalAssetDisplayName(projectDir, matFolder, item.FileName, item.DisplayName);
@@ -67,13 +70,13 @@ namespace Naziki_Editor.Views
 
         private void ExecutePaste()
         {
-            if (ParentMainWindow == null || string.IsNullOrEmpty(ParentMainWindow.CurrentProjectFilePath)) return;
+            if (Context == null || string.IsNullOrEmpty(Context.ProjectFilePath)) return;
 
             if (Clipboard.ContainsFileDropList())
             {
                 var files = Clipboard.GetFileDropList();
-                string projectDir = Path.GetDirectoryName(ParentMainWindow.CurrentProjectFilePath);
-                string targetDir = Path.Combine(projectDir, ParentMainWindow.CurrentProjectData.MaterialFolderPath);
+                string projectDir = Path.GetDirectoryName(Context.ProjectFilePath);
+                string targetDir = Path.Combine(projectDir, Context.ProjectData.MaterialFolderPath);
 
                 if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
 
@@ -95,7 +98,7 @@ namespace Naziki_Editor.Views
                         try { File.Copy(sourceFile, destFile); hasChanged = true; } catch { }
                     }
                 }
-                if (hasChanged) ParentMainWindow.RefreshAllAssets();
+                if (hasChanged) State.EventBus.Publish("RequestRefreshAssets");
             }
         }
 
@@ -106,7 +109,7 @@ namespace Naziki_Editor.Views
                 var result = MessageBox.Show($"确定要将素材【{item.DisplayName}】彻底删除吗？\n这是物理级销毁，不可撤销哦！", "小艾的危险警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                 {
-                    try { if (File.Exists(item.FilePath)) File.Delete(item.FilePath); ParentMainWindow.RefreshAllAssets(); }
+                    try { if (File.Exists(item.FilePath)) File.Delete(item.FilePath); State.EventBus.Publish("RequestRefreshAssets"); }
                     catch (System.Exception ex) { MessageBox.Show($"呜哇！删除被阻挡了 QAQ：\n{ex.Message}", "删除失败"); }
                 }
             }
@@ -123,7 +126,7 @@ namespace Naziki_Editor.Views
 
         private void EditBox_Loaded(object sender, RoutedEventArgs e) { var tb = sender as TextBox; tb.Focus(); tb.SelectAll(); }
         private void MenuRename_Click(object sender, RoutedEventArgs e) { if (sender is MenuItem menuItem && menuItem.DataContext is AssetItemModel item) item.IsEditing = true; }
-        private void MenuRefresh_Click(object sender, RoutedEventArgs e) => ParentMainWindow?.RefreshAllAssets();
+        private void MenuRefresh_Click(object sender, RoutedEventArgs e) => State.EventBus.Publish("RequestRefreshAssets");
 
         private void ListAssets_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
@@ -169,9 +172,10 @@ namespace Naziki_Editor.Views
                     catch (System.Exception ex) { MessageBox.Show($"解析胶囊失败啦！\\n原因：{ex.Message}", "小艾的报错提醒"); }
                 }
 
-                if (newEvent != null && Window.GetWindow(this) is MainWindow main)
+                if (newEvent != null)
                 {
-                    main.CreateNewEventFromAsset(newEvent);
+                    // 📢 对着大喇叭喊：有个素材被双击解析好啦！主窗口快接单！
+                    State.EventBus.Publish("CreateEventFromAsset", newEvent);
                     e.Handled = true;
                 }
             }

@@ -311,10 +311,8 @@ namespace Naziki_Editor.Views
         // 🔘 结界上的“导入谱面”按钮被点击时，跨频道呼叫主窗口的大魔法！
         private void BtnOverlayImportChart_Click(object sender, RoutedEventArgs e)
         {
-            if (Window.GetWindow(this) is MainWindow main)
-            {
-                ((dynamic)main).ExecuteImportChart();
-            }
+            // 📢 对着大喇叭喊话：有人按下了导入谱面按钮！主窗口你听到了吗，快去干活！
+            State.EventBus.Publish("RequestImportChart");
         }
 
 

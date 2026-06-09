@@ -287,21 +287,11 @@ namespace Naziki_Editor.Views
 
         private void BtnEditProperties_Click(object sender, RoutedEventArgs e)
         {
-            if (Window.GetWindow(this) is MainWindow main)
+            if (_currentObject != null)
             {
-                // ✨ 采用 dynamic 幻影法术！彻底切断编译期硬核类型检查，让 PropertyPanelControl 顺利通关！
-                if (_currentObject is IStoryboardEntity selectedObj)
-                {
-                    ((dynamic)main).OpenPropertyEditor(selectedObj);
-                }
-                else if (_currentObject is C2Template template)
-                {
-                    var targetEntry = main.Context.Storyboard.templates.FirstOrDefault(x => x.Value == template);
-                    if (targetEntry.Key != null)
-                    {
-                        ((dynamic)main).OpenTemplatePropertyEditor(targetEntry.Key, template);
-                    }
-                }
+                // 📢 呼叫主战舰！我这里有个对象需要打开高级属性编辑器啦！
+                // 无论是普通对象还是模板，主窗口的频道 2 都已经写好了自动分拣逻辑，直接把对象丢过去就行！
+                State.EventBus.Publish("RequestOpenPropertyEditor", _currentObject);
             }
         }
 
