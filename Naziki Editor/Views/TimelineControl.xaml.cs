@@ -703,7 +703,7 @@ namespace Naziki_Editor.Views
 
 
         // ==========================================
-        // 🎹 音符雷达尺：在底部画布精准画出谱面音符！(全息资源换肤+长按寿命光轨完全体)
+        // 🎹 音符雷达尺：在底部画布精准画出谱面音符！(大一统工厂模式接入)
         // ==========================================
         public void DrawNoteRuler()
         {
@@ -712,106 +712,12 @@ namespace Naziki_Editor.Views
 
             if (_context == null || !_context.HasChart || _context.Chart.note_list == null) return;
 
+            // 动态对齐物理长度
             double totalWidth = _totalDurationSeconds * _pixelsPerSecond + 200;
             NotePreviewCanvas.Width = totalWidth;
 
-            foreach (var note in _context.Chart.note_list)
-            {
-                double seconds = _context.TimeEngine.TickToSeconds(note.tick);
-                double xPos = seconds * _pixelsPerSecond;
-
-                // 🚀 1. 【时空光轨】：如果是 Hold(1) 或 LongHold(2)，优先在底层绘制持续时间线条
-                if (note.type == 1 || note.type == 2)
-                {
-                    double endSeconds = _context.TimeEngine.TickToSeconds(note.tick + note.hold_tick);
-                    double durationSeconds = endSeconds - seconds;
-
-                    if (durationSeconds > 0)
-                    {
-                        var durationRect = new Rectangle
-                        {
-                            Tag = note, // 绑定身份证，交由缩放引擎接管拉伸
-                            Width = durationSeconds * _pixelsPerSecond,
-                            Height = 2,  // 优雅的 2 像素极细光轨
-                            Cursor = Cursors.Hand,
-                            ToolTip = $"ID: {note.id}\n持续: {durationSeconds:F3}s\nTick跨度: {note.hold_tick}"
-                        };
-
-                        if (note.type == 1)
-                        {
-                            durationRect.Fill = Brushes.White; // Hold 用纯白圣洁光轨
-                            Canvas.SetTop(durationRect, 10);   // 外挂在图标的【稍顶部】边缘
-                        }
-                        else
-                        {
-                            durationRect.Fill = Brushes.Gold;  // LongHold 用耀眼黄金光轨
-                            Canvas.SetTop(durationRect, 28);   // 外挂在图标的【稍底部】边缘
-                        }
-
-                        Canvas.SetLeft(durationRect, xPos); // 从音符起始中心点完美向右延展
-                        NotePreviewCanvas.Children.Add(durationRect);
-                    }
-                }
-
-                // 🧙‍♂️ 2. 从全局资源大管家那里，召唤对应门派的图标！
-                var iconBmp = Core.EditorResourceManager.GetNoteIcon(note.type);
-                UIElement noteUI;
-
-                if (iconBmp != null)
-                {
-                    noteUI = new Image
-                    {
-                        Source = iconBmp,
-                        Width = 16,
-                        Height = 16,
-                        Tag = note,
-                        ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s",
-                        Cursor = Cursors.Hand
-                    };
-                    Canvas.SetLeft(noteUI, xPos - 8); // 居中偏移
-                    Canvas.SetTop(noteUI, 13);        // 下沉核心图标轨
-                }
-                else
-                {
-                    var rect = new Rectangle
-                    {
-                        Tag = note,
-                        Width = 4,
-                        Height = 16,
-                        RadiusX = 2,
-                        RadiusY = 2,
-                        ToolTip = $"ID: {note.id}\nTick: {note.tick}\nTime: {seconds:F3}s",
-                        Cursor = Cursors.Hand
-                    };
-                    if (note.type == 1) rect.Fill = Brushes.LightGreen;
-                    else if (note.type == 2) rect.Fill = Brushes.LightSkyBlue;
-                    else if (note.type == 3 || note.type == 6) rect.Fill = Brushes.Gold;
-                    else if (note.type == 4) rect.Fill = Brushes.Plum;
-                    else rect.Fill = Brushes.White;
-
-                    noteUI = rect;
-                    Canvas.SetLeft(noteUI, xPos - 2);
-                    Canvas.SetTop(noteUI, 13);
-                }
-                NotePreviewCanvas.Children.Add(noteUI);
-
-                // 🚀 3. 【ID周期高显】：每隔4个音符（ID是5的倍数），在上方绘制 ID 文字！
-                if (note.id % 5 == 0)
-                {
-                    TextBlock txtId = new TextBlock
-                    {
-                        Text = note.id.ToString(),
-                        FontSize = 9,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = (Brush)Application.Current.FindResource("TipsColor") ?? Brushes.Gray,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Tag = note
-                    };
-                    Canvas.SetLeft(txtId, xPos - 5);
-                    Canvas.SetTop(txtId, 0);
-                    NotePreviewCanvas.Children.Add(txtId);
-                }
-            }
+            // 🚀 一键呼叫核心测绘工厂！最后一个参数传 false，代表宏观主轴模式
+            Core.Timeline.NoteVisualEngine.RenderNoteRuler(NotePreviewCanvas, _context.Chart.note_list, _context.TimeEngine, _pixelsPerSecond, false);
         }
 
 
@@ -893,7 +799,7 @@ namespace Naziki_Editor.Views
             updateTracks(TrackGroupsContainer);
             updateTracks(BottomTrackGroupsContainer);
 
-            // 2. 光速更新底部音符尺 (全面支持 Image、ID文字、兜底方块、以及持续时间长轨的像素级绝对锁死对齐！)
+            // 2. 光速更新底部音符尺 (全量支持 Image缩放、ID文字跟随、Hold长轨拉伸、以及 Drag 全息虚线极速形变！)
             if (NotePreviewCanvas != null)
             {
                 NotePreviewCanvas.Width = newWidth;
@@ -904,32 +810,35 @@ namespace Naziki_Editor.Views
                         double seconds = _context.TimeEngine.TickToSeconds(note.tick);
                         double absoluteX = seconds * _pixelsPerSecond;
 
-                        // 📐 【多态时空对齐与拉伸公式】：根据组件流派精准操纵物理尺度！
-                        if (child is Image)
+                        // 📐 【多态时空对齐与拉伸公式】：根据组件的物理形态，执行降维形变算法！
+                        if (child is Image img)
                         {
-                            Canvas.SetLeft(fe, absoluteX - 8.0); // 图标居中
+                            // ✨ 极致对齐：自动根据图片当前尺寸（子音符会自动变小）的一半进行精准动态居中！
+                            Canvas.SetLeft(img, absoluteX - (img.Width / 2.0));
                         }
                         else if (child is TextBlock)
                         {
-                            Canvas.SetLeft(fe, absoluteX - 5.0); // ID文字居中
+                            Canvas.SetLeft(fe, absoluteX - 5.0); // ID文字保持美观居中
+                        }
+                        else if (child is Line line && line.DataContext is Models.C2Note lastChild)
+                        {
+                            // 🚀 【神级补线】：从 DataContext 中瞬间抓回隐藏的末端子节点，跨越维度重算物理跨度！
+                            double lastChildSeconds = _context.TimeEngine.TickToSeconds(lastChild.tick);
+                            line.X1 = absoluteX;                             // 虚线的左端点锁定在滑条头部
+                            line.X2 = lastChildSeconds * _pixelsPerSecond;   // 虚线的右端点紧紧咬住最后一位子节点！
                         }
                         else if (child is Rectangle rect)
                         {
-                            // ⚡ 【双态雷达】：利用高度物理特征，精准分流处理！
                             if (rect.Height == 2)
                             {
-                                // 🌟 场景 A：它是 Hold/LongHold 持续时间长轨！
-                                Canvas.SetLeft(rect, absoluteX); // 寿命长轨无偏置，直接从音符绝对起点向右画
-
-                                // ⏳ 极速跨度换算：重新给长轨注入缩放后的物理宽度！
+                                Canvas.SetLeft(rect, absoluteX);
                                 double endSec = _context.TimeEngine.TickToSeconds(note.tick + note.hold_tick);
                                 double durSec = endSec - seconds;
-                                rect.Width = durSec * _pixelsPerSecond;
+                                rect.Width = durSec * _pixelsPerSecond; // Hold 光轨等比拉伸
                             }
                             else
                             {
-                                // 🌟 场景 B：它是无皮肤时的兜底音符小方块（Height = 16）
-                                Canvas.SetLeft(rect, absoluteX - 2.0); // 小方块居中偏置
+                                Canvas.SetLeft(rect, absoluteX - (rect.Width / 2.0)); // 兜底方块智能对称
                             }
                         }
                     }

@@ -828,8 +828,80 @@ namespace Naziki_Editor.Views
 
         private void TriggerAutoLinkIfReady()
         {
-            if (Context.HasChart && Context.HasStoryboard)
-                ChartStoryboardLink.TryTriggerAutoLink(Context.Chart, Context.Storyboard, Context.TimeEngine, EventList.NoteCtrlListBox, EventList.UpdateEmptyHintVisibility);
+            // =========================================================
+            // 🎵 谱面与故事板就位后的自动配对检测 (UI层专属魔法)
+            // =========================================================
+            if (Context.HasChart && Context.HasStoryboard && Context.Storyboard.note_controllers?.Count > 0)
+            {
+                // 1. 弹出询问框（UI的活，由 MainWindow 亲自来干！）
+                var result = MessageBox.Show(
+                    "检测到谱面与故事板均已就位！✨\n是否让故事板的音符控制器与谱面文件自动配对？\n(做出选择前，一定要确定这个故事板是基于你所上传的谱面文件制作的哦！)",
+                    "自动配对询问",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    // 2. 呼叫刚刚改造好的纯净核心，它只管算数，并吐回配对成功的数量
+                    int linkedCount = ChartStoryboardLink.ExecuteAutoLink(Context.Chart, Context.Storyboard);
+
+                    // 3. 刷新界面列表（列表刷新也属于UI的活！）
+                    // 🌟 核心交接：在这里调用你原有的刷新 UI 列表的方法
+                    // 3. 刷新界面列表（列表刷新也属于UI的活！）
+                    // 先清空原本的列表画板
+                    EventList.NoteCtrlListBox.Items.Clear();
+
+                    // 遍历故事板的音符控制器，为它们量身定制 UI 外衣
+                    foreach (var ctrl in Context.Storyboard.note_controllers)
+                    {
+                        if (ctrl.BaseState?.NoteTarget == null) continue;
+
+                        var target = ctrl.BaseState.NoteTarget;
+
+                        // 情况 A：普通的数字 ID
+                        if (target is long || target is int || long.TryParse(target.ToString(), out _))
+                        {
+                            int targetId = Convert.ToInt32(target);
+                            var matchedNote = Context.Chart.note_list.FirstOrDefault(n => n.id == targetId);
+
+                            if (matchedNote != null)
+                            {
+                                var item = new ListBoxItem() { Tag = ctrl };
+                                item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("Id") { Source = ctrl });
+                                EventList.NoteCtrlListBox.Items.Add(item);
+                            }
+                            else
+                            {
+                                var item = new ListBoxItem() { Content = $"{ctrl.Id} | Note ID: {targetId} (谱面未命中)", Foreground = Brushes.Gray, Tag = ctrl };
+                                EventList.NoteCtrlListBox.Items.Add(item);
+                            }
+                        }
+                        // 情况 B：强类型的选择器 JSON 对象
+                        else if (target is Newtonsoft.Json.Linq.JObject jobj)
+                        {
+                            try
+                            {
+                                var item = new ListBoxItem() { Tag = ctrl, Foreground = Brushes.DarkCyan, FontWeight = FontWeights.Bold };
+                                item.SetBinding(ListBoxItem.ContentProperty, new System.Windows.Data.Binding("Id") { Source = ctrl });
+                                EventList.NoteCtrlListBox.Items.Add(item);
+                            }
+                            catch
+                            {
+                                EventList.NoteCtrlListBox.Items.Add(new ListBoxItem() { Content = $"{ctrl.Id} | 未知选择器", Tag = ctrl });
+                            }
+                        }
+                    }
+
+                    // 最后，呼叫事件列表更新一下底部的空提示文字状态
+                    EventList.UpdateEmptyHintVisibility(); // ✨ 完美的直接施法！
+
+                    // 4. 完美收尾，温馨提示
+                    MessageBox.Show($"自动联姻成功！已完美挂钩 {linkedCount} 个音符事件！", "配对成功");
+
+                    // 别忘了标记数据已被修改，激活时光机存档哦！
+                    Context.MarkAsModified();
+                }
+            }
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;

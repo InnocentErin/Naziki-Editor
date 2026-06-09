@@ -429,67 +429,9 @@ namespace Naziki_Editor.Views.TimelineClip
                 MicroRulerCanvas.Children.Add(text);
             }
 
-            // 2. 补上五颜六色的音符（独立沉降到标尺下半部分，并全面接入全局资源管家！）
-            if (_context?.Chart?.note_list != null)
-            {
-                foreach (var note in _context.Chart.note_list)
-                {
-                    double x = _context.TimeEngine.TickToSeconds(note.tick) * _pixelsPerSecond;
-
-                    // 🧙‍♂️ 【微观换肤】：从全局资源大管家那里，光速召唤对应门派的图标！
-                    var iconBmp = Core.EditorResourceManager.GetNoteIcon(note.type);
-                    UIElement noteUI;
-
-                    if (iconBmp != null)
-                    {
-                        // 🌟 成功获取自定义图标：由于微观时光屋高度宝贵，这里将尺寸设为精致的 12x12，视觉感极其高雅！
-                        noteUI = new Image
-                        {
-                            Source = iconBmp,
-                            Width = 12,
-                            Height = 12,
-                            Tag = note,
-                            ToolTip = $"ID: {note.id}\nTick: {note.tick}\nType: {note.type}",
-                            Cursor = Cursors.Hand
-                        };
-                        // 居中偏移量：宽度 12，向左偏 6 像素，正中心完美对齐时间轴！
-                        Canvas.SetLeft(noteUI, x - 6);
-                        Canvas.SetTop(noteUI, 34); // 刚好贴在音符轨道的正中心
-                    }
-                    else
-                    {
-                        // 🛡️ 兜底防御：如果用户把外部皮肤文件删坏了，优雅降级为以前的小方块，绝对不崩溃！
-                        var rect = new System.Windows.Shapes.Rectangle { Width = 3, Height = 10, RadiusX = 1, RadiusY = 1 };
-
-                        if (note.type == 1) rect.Fill = Brushes.LightGreen;
-                        else if (note.type == 2) rect.Fill = Brushes.LightSkyBlue;
-                        else if (note.type == 3 || note.type == 6) rect.Fill = Brushes.Gold;
-                        else if (note.type == 4) rect.Fill = Brushes.Plum;
-                        else rect.Fill = Brushes.White;
-
-                        noteUI = rect;
-                        Canvas.SetLeft(noteUI, x - 1.5);
-                        Canvas.SetTop(noteUI, 35);
-                    }
-
-                    MicroRulerCanvas.Children.Add(noteUI);
-
-                    // 🚀 【微观ID高显刻度】：每隔4个音符（ID是5的倍数），在其上方追加数字注明！
-                    if (note.id % 5 == 0)
-                    {
-                        var idText = new TextBlock
-                        {
-                            Text = note.id.ToString(),
-                            FontSize = 9,
-                            Foreground = Brushes.DarkGray,
-                            FontWeight = FontWeights.SemiBold
-                        };
-                        Canvas.SetLeft(idText, x + 3); // 错开在刻度线右侧 3 像素，极具细节美感
-                        Canvas.SetTop(idText, 23);     // 刚好漂浮在时间与音符的独立分界线上！
-                        MicroRulerCanvas.Children.Add(idText);
-                    }
-                }
-            }
+            // 2. 补上五颜六色的音符 
+            // 最后一个参数传 true，代表微观时光屋模式，自动切换为精致的 12px 微调排版
+            Core.Timeline.NoteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
 
             // 3. ✨ 高光时刻：在标尺上画一块半透明的蓝色玻璃，明确标出方块的本体位置！
             double startX = _clipModel.StartTime * _pixelsPerSecond;
