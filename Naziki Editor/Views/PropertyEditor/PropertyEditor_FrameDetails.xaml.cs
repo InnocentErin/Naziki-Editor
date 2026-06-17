@@ -249,16 +249,17 @@ namespace Naziki_Editor.Views.PropertyEditor
                 {
                     StackPanel fixedPropsContainer = new StackPanel { Name = "PanelRootFixedProps", Margin = new Thickness(0, 10, 0, 0) };
 
-                    // 🌟 1. 【黑魔法】：从父窗口偷看当前对象到底是不是“控制板”！
+                    // 🌟 1. 【黑魔法】：从父窗口偷看当前激活的对象！
                     _isControlBoard = false;
+                    IStoryboardEntity currentActiveEntity = null;
                     var parentWin = Window.GetWindow(this);
                     if (parentWin != null)
                     {
                         var field = parentWin.GetType().GetField("_currentActiveObject", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                         if (field != null)
                         {
-                            var activeObj = field.GetValue(parentWin) as IStoryboardEntity;
-                            if (activeObj != null && !string.IsNullOrEmpty(activeObj.TargetId))
+                            currentActiveEntity = field.GetValue(parentWin) as IStoryboardEntity;
+                            if (currentActiveEntity != null && !string.IsNullOrEmpty(currentActiveEntity.TargetId))
                             {
                                 _isControlBoard = true;
                             }
@@ -291,37 +292,56 @@ namespace Naziki_Editor.Views.PropertyEditor
                         });
                     }
 
+                    // 🚀🚀🚀 【场景控制器专属降维打击】：动态初始核心！
+                    if (currentActiveEntity is C2SceneController sceneCtrl)
+                    {
+                        Grid gridMode = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+                        gridMode.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                        gridMode.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                        TextBlock lblMode = new TextBlock { Text = "🎛️ 控制器维度核心:", FontWeight = FontWeights.Bold, Foreground = (Brush)Application.Current.Resources["HighlightBorderColor"] ?? Brushes.LightSkyBlue, VerticalAlignment = VerticalAlignment.Center };
+                        Grid.SetColumn(lblMode, 0); gridMode.Children.Add(lblMode);
+
+                        ComboBox cmbMode = new ComboBox { Padding = new Thickness(5) };
+                        cmbMode.Items.Add(new ComboBoxItem { Content = "🎥 核心相机与空间系统", Tag = "Camera" });
+                        cmbMode.Items.Add(new ComboBoxItem { Content = "🎨 外观颜色与表现控制", Tag = "Appearance" });
+                        cmbMode.Items.Add(new ComboBoxItem { Content = "📱 全局游戏 UI 控制", Tag = "UI" });
+                        cmbMode.Items.Add(new ComboBoxItem { Content = "🌌 屏幕画面滤镜特效", Tag = "Effects" });
+
+                        // 回显当前维度
+                        foreach (ComboBoxItem item in cmbMode.Items)
+                        {
+                            if (item.Tag.ToString() == (sceneCtrl.EditorMode ?? "Camera")) { cmbMode.SelectedItem = item; break; }
+                        }
+
+                        // 切换维度时，惊醒时光机并刷新下方列表
+                        cmbMode.SelectionChanged += (s, e) => {
+                            if (cmbMode.SelectedItem is ComboBoxItem selected)
+                            {
+                                sceneCtrl.EditorMode = selected.Tag.ToString();
+                                _context?.MarkAsModified();
+                                LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
+                            }
+                        };
+
+                        Grid.SetColumn(cmbMode, 1); gridMode.Children.Add(cmbMode);
+                        fixedPropsContainer.Children.Add(gridMode);
+                    }
+
                     PropertyInfo[] props = _currentState.GetType().GetProperties();
                     foreach (var prop in props)
                     {
-                        // 筛选需要置顶的初始固定属性 (联动增加 Text 判定)
+                        // 筛选需要置顶的初始固定属性
                         if (prop.Name == "Path" || prop.Name == "Text" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
                         {
-                            // 🛑 【终极拦截】：如果是控制板，直接跳过生成，统统失去实体！
-                            if (_isControlBoard) continue;
-
-                            // 🛑 【神圣隔离】：如果是模板模式，绝对禁止暴露实体 DNA，直接跳过！
-                            if (isTemplateMode) continue;
-
+                            // 🛑 拦截控制板和模板
+                            if (_isControlBoard || isTemplateMode) continue;
                             var row = CreateFixedPropertyRow(prop);
                             fixedPropsContainer.Children.Add(row);
                         }
                     }
                     timePanel.Children.Add(fixedPropsContainer);
                 }
-            }
-
-        }
-
-        private void BindStaticProperty(TextBox txt, string propName)
-        {
-            if (_currentState == null) return;
-            PropertyInfo prop = _currentState.GetType().GetProperty(propName);
-            if (prop != null)
-            {
-                Binding b = new Binding(propName) { Source = _currentState, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged };
-                if (propName == "Time" || propName == "AddTime" || propName == "RelativeTime") b.Converter = new TimeBindingConverter();
-                txt.SetBinding(TextBox.TextProperty, b);
             }
         }
 
@@ -507,7 +527,6 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelSpatialContainer.Children.Clear(); CmbSpatialProps.Items.Clear();
             PanelAppearanceContainer.Children.Clear(); CmbAppearanceProps.Items.Clear();
             PanelUiContainer.Children.Clear(); CmbUiProps.Items.Clear();
-            PanelCameraContainer.Children.Clear(); CmbCameraProps.Items.Clear();
             PanelEffectsContainer.Children.Clear(); CmbEffectsProps.Items.Clear();
 
             PropertyInfo[] props = _currentState.GetType().GetProperties();
@@ -528,9 +547,38 @@ namespace Naziki_Editor.Views.PropertyEditor
                 // 🌟 【小艾的终极防线】：如果处于模板编辑模式，且该属性不属于此门派，直接蒸发！
                 if (_rootState != null && _rootState.GetType().Name == "TemplateState") // 只要是模板类
                 {
-                    if (!Core.TemplateManager.IsPropertyAllowed(prop.Name, _currentTemplateType))
+                    // 🚫 【神圣隔离 1】：控制器和音符控制器绝对没有 Destroy 和 Template 属性！
+                if ((prop.Name == "Destroy" || prop.Name == "Template") && (_currentState is ControllerState || _currentState is NoteControllerState)) continue;
+
+                // 🎛️ 【神圣隔离 2】：场景控制器的降维大门！根据 EditorMode 屏蔽不相干属性！
+                if (_currentState is ControllerState)
+                {
+                    // 同样用黑魔法拿到 activeEntity
+                    IStoryboardEntity activeEntity = null;
+                    var parentWin = Window.GetWindow(this);
+                    if (parentWin != null)
                     {
-                        continue; // 不允许显示的属性，看都不给看，直接跳过！
+                        var field = parentWin.GetType().GetField("_currentActiveObject", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field != null) activeEntity = field.GetValue(parentWin) as IStoryboardEntity;
+                    }
+
+                    if (activeEntity is C2SceneController sceneCtrl)
+                    {
+                        string mode = sceneCtrl.EditorMode ?? "Camera";
+                        bool isAllowed = false;
+                        
+                        var cameraProps = new System.Collections.Generic.HashSet<string> { "Perspective", "Size", "Fov", "X", "Y", "Z", "RotX", "RotY", "RotZ" };
+                        var appearanceProps = new System.Collections.Generic.HashSet<string> { "StoryboardOpacity", "NoteOpacityMultiplier", "ScanlineColor", "NoteRingColor", "NoteFillColors", "OverrideScanlinePos", "ScanlinePos" };
+                        var uiProps = new System.Collections.Generic.HashSet<string> { "UiOpacity", "ScanlineOpacity", "BackgroundDim" };
+
+                        // 维度白名单精准分发
+                        if (mode == "Camera" && cameraProps.Contains(prop.Name)) isAllowed = true;
+                        else if (mode == "Appearance" && appearanceProps.Contains(prop.Name)) isAllowed = true;
+                        else if (mode == "UI" && uiProps.Contains(prop.Name)) isAllowed = true;
+                        else if (mode == "Effects" && !cameraProps.Contains(prop.Name) && !appearanceProps.Contains(prop.Name) && !uiProps.Contains(prop.Name)) isAllowed = true;
+
+                        if (!isAllowed) continue; // 核心拦截！非当前维度的属性直接蒸发！
+                        }
                     }
                 }
 
@@ -566,8 +614,6 @@ namespace Naziki_Editor.Views.PropertyEditor
                         targetPanel = PanelSpatialContainer; targetComboBox = CmbSpatialProps; break;
                     case Core.PropertyCategory.UiControl:
                         targetPanel = PanelUiContainer; targetComboBox = CmbUiProps; break;
-                    case Core.PropertyCategory.Camera:
-                        targetPanel = PanelCameraContainer; targetComboBox = CmbCameraProps; break;
                     case Core.PropertyCategory.Effects:
                         targetPanel = PanelEffectsContainer; targetComboBox = CmbEffectsProps; break;
                     default:
@@ -589,14 +635,18 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (CmbSpatialProps.Items.Count > 0) CmbSpatialProps.SelectedIndex = 0;
             if (CmbAppearanceProps.Items.Count > 0) CmbAppearanceProps.SelectedIndex = 0;
             if (CmbUiProps.Items.Count > 0) CmbUiProps.SelectedIndex = 0;
-            if (CmbCameraProps.Items.Count > 0) CmbCameraProps.SelectedIndex = 0;
             if (CmbEffectsProps.Items.Count > 0) CmbEffectsProps.SelectedIndex = 0;
+            // 🌟 终极大一统：自动隐藏没有属性也没有可用下拉框的空抽屉！
+            // 以后不管是 Sprite 还是 Controller，只要这个分类下没东西，整个容器直接隐身！
+            if (ExpanderSpatial != null) ExpanderSpatial.Visibility = (PanelSpatialContainer.Children.Count > 0 || CmbSpatialProps.Items.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+            if (ExpanderAppearance != null) ExpanderAppearance.Visibility = (PanelAppearanceContainer.Children.Count > 0 || CmbAppearanceProps.Items.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+            if (ExpanderUi != null) ExpanderUi.Visibility = (PanelUiContainer.Children.Count > 0 || CmbUiProps.Items.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+            if (ExpanderEffects != null) ExpanderEffects.Visibility = (PanelEffectsContainer.Children.Count > 0 || CmbEffectsProps.Items.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void BtnAddSpatial_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbSpatialProps);
         private void BtnAddAppearance_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbAppearanceProps);
         private void BtnAddUiProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbUiProps);
-        private void BtnAddCameraProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbCameraProps);
         private void BtnAddEffectsProp_Click(object sender, RoutedEventArgs e) => ExecutePropertyActivation(CmbEffectsProps);
 
         private void ExecutePropertyActivation(ComboBox cmb)

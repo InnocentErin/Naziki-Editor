@@ -72,7 +72,7 @@
                 </Border>
 
                 <StackPanel x:Name="PanelSceneCards" Visibility="Collapsed">
-                    <Expander Header="📍 空间坐标与尺寸控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                    <Expander x:Name="ExpanderSpatial" Header="📍 空间坐标与核心相机" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
                         <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
                             <StackPanel>
                                 <StackPanel x:Name="PanelSpatialContainer" />
@@ -87,7 +87,7 @@
                             </StackPanel>
                         </Border>
                     </Expander>
-                    <Expander Header="🎨 外观颜色与表现控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                    <Expander x:Name="ExpanderAppearance" Header="🎨 外观颜色与表现控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
                         <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
                             <StackPanel>
                                 <StackPanel x:Name="PanelAppearanceContainer" />
@@ -105,7 +105,7 @@
                 </StackPanel>
 
                 <StackPanel x:Name="PanelControllerCards" Visibility="Collapsed">
-                    <Expander Header="📱 全局游戏 UI 控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
+                    <Expander x:Name="ExpanderUi" Header="📱 全局游戏 UI 控制" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
                         <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
                             <StackPanel>
                                 <StackPanel x:Name="PanelUiContainer" />
@@ -120,22 +120,7 @@
                             </StackPanel>
                         </Border>
                     </Expander>
-                    <Expander Header="🎥 核心相机系统" IsExpanded="True" Margin="0,0,0,10" FontWeight="Bold">
-                        <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
-                            <StackPanel>
-                                <StackPanel x:Name="PanelCameraContainer" />
-                                <Grid Margin="0,10,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="CmbCameraProps" FontWeight="Normal"/>
-                                    <Button x:Name="BtnAddCameraProp" Grid.Column="1" Content="➕ 开启属性" Padding="12,4" Margin="5,0,0,0" Click="BtnAddCameraProp_Click"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </Expander>
-                    <Expander Header="✨ 屏幕画面滤镜 (Filters)" IsExpanded="False" Margin="0,0,0,10" FontWeight="Bold">
+                    <Expander x:Name="ExpanderEffects" Header="✨ 屏幕画面滤镜 (Filters)" IsExpanded="False" Margin="0,0,0,10" FontWeight="Bold">
                         <Border BorderThickness="1" BorderBrush="{DynamicResource BorderColor}" Padding="10" CornerRadius="0,0,5,5" Margin="0,5,0,0">
                             <StackPanel>
                                 <StackPanel x:Name="PanelEffectsContainer" />

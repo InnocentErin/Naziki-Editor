@@ -63,7 +63,11 @@ namespace Naziki_Editor.Models
     public class C2Text : StoryboardEntity<TextState> { }
     public class C2Line : StoryboardEntity<LineState> { }
     public class C2Video : StoryboardEntity<VideoState> { }
-    public class C2SceneController : StoryboardEntity<ControllerState> { }
+    public class C2SceneController : StoryboardEntity<ControllerState>
+    {
+        [JsonIgnore]
+        public string EditorMode { get; set; } = "Camera"; // 默认为核心相机模式
+    }
     public class C2NoteController : StoryboardEntity<NoteControllerState> { }
     public class C2Template : StoryboardEntity<TemplateState> { }
 

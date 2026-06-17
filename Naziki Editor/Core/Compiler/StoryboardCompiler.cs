@@ -15,6 +15,7 @@ namespace Naziki_Editor.Core.Compiler
         private Dictionary<string, C2Template> _templates;
 
         public List<string> CompileWarnings { get; private set; } = new List<string>();
+
         // 构造函数接受整个 Chart、时间引擎和模板字典，准备好一切进行编译
         public StoryboardCompiler(C2Chart chart, ChartTimeEngine engine, Dictionary<string, C2Template> templates)
         {
@@ -22,6 +23,7 @@ namespace Naziki_Editor.Core.Compiler
             _engine = engine;
             _templates = templates;
         }
+
         // 主入口：展平整个 Storyboard，处理所有对象类型
         public void FlattenStoryboard(StoryboardRoot root)
         {
@@ -32,7 +34,12 @@ namespace Naziki_Editor.Core.Compiler
             ProcessEntityList<C2Video, VideoState>(root.videos);
             ProcessEntityList<C2SceneController, ControllerState>(root.controllers);
             ProcessEntityList<C2NoteController, NoteControllerState>(root.note_controllers);
+
+            // 🌟 终极进化：细胞分裂法术！
+            // 在所有控制器的相对时间被展平为绝对时间后，执行高维到低维的物理拆解！
+            MitosisSceneControllers(root.controllers);
         }
+
         // 通用处理函数：针对每种对象列表，调用展平函数处理它们的关键帧
         private void ProcessEntityList<TEntity, TState>(List<TEntity> entities)
             where TEntity : StoryboardEntity<TState>
@@ -280,6 +287,152 @@ namespace Naziki_Editor.Core.Compiler
                 }
             }
             return merged;
+        }
+
+        // ==========================================
+        // 🦠 4. 细胞分裂引擎 (Controller Mitosis)
+        // ==========================================
+        private void MitosisSceneControllers(List<C2SceneController> controllers)
+        {
+            if (controllers == null || controllers.Count == 0) return;
+
+            var newControllersList = new List<C2SceneController>();
+            int spawnCount = 1;
+
+            foreach (var ctrl in controllers)
+            {
+                var usedModes = new HashSet<string>();
+
+                // 嗅探当前控制器到底跨界了几个门派
+                CheckStateModes(ctrl.BaseState, usedModes);
+                if (ctrl.Keyframes != null)
+                {
+                    foreach (var state in ctrl.Keyframes) CheckStateModes(state, usedModes);
+                }
+
+                if (usedModes.Count == 0)
+                {
+                    ctrl.EditorMode = "Camera"; // 兜底：纯空壳直接分配给相机
+                    newControllersList.Add(ctrl);
+                }
+                else if (usedModes.Count == 1)
+                {
+                    ctrl.EditorMode = usedModes.First(); // 单维度对象，直接发身份证！
+                    newControllersList.Add(ctrl);
+                }
+                else
+                {
+                    // 💥 细胞分裂法术触发！
+                    foreach (var mode in usedModes)
+                    {
+                        var clone = DeepClone(ctrl); // 完美复制基因
+
+                        // 赋予分裂体独立身份证，防止 ID 冲突
+                        clone.Id = string.IsNullOrEmpty(ctrl.Id) ? $"mitosis_ctrl_{spawnCount++}" : $"{ctrl.Id}_{mode.ToLower()}";
+                        clone.EditorMode = mode;
+
+                        // 净化 BaseState，擦除不属于当前门派的属性
+                        PurgeNonModeProperties(clone.BaseState, mode);
+
+                        // 净化所有帧，剔除彻底无用的空壳帧
+                        var cleanKeyframes = new List<ControllerState>();
+                        if (clone.Keyframes != null)
+                        {
+                            foreach (var state in clone.Keyframes)
+                            {
+                                PurgeNonModeProperties(state, mode);
+                                // 如果这一帧在净化后，还有属于自己维度的属性，才保留它！
+                                if (HasAnyActiveProperty(state, mode))
+                                {
+                                    cleanKeyframes.Add(state);
+                                }
+                            }
+                        }
+                        clone.Keyframes = cleanKeyframes;
+                        newControllersList.Add(clone);
+                    }
+                }
+            }
+
+            // 偷天换日：用分裂后的纯净大军替换掉原来杂交的控制器
+            controllers.Clear();
+            controllers.AddRange(newControllersList);
+        }
+
+        private void CheckStateModes(ControllerState state, HashSet<string> usedModes)
+        {
+            if (state == null) return;
+            var props = typeof(ControllerState).GetProperties();
+            foreach (var prop in props)
+            {
+                if (IsBaseProperty(prop.Name)) continue; // 忽略基础属性如 Time
+
+                object val = prop.GetValue(state);
+                bool isExplicitNull = (val == null);
+                if (val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) isExplicitNull = true;
+
+                if (!isExplicitNull)
+                {
+                    var cat = PropertyClassifier.GetCategory(prop.Name);
+                    usedModes.Add(GetModeByCategory(cat));
+                }
+            }
+        }
+
+        private void PurgeNonModeProperties(ControllerState state, string targetMode)
+        {
+            if (state == null) return;
+            var props = typeof(ControllerState).GetProperties();
+            foreach (var prop in props)
+            {
+                if (IsBaseProperty(prop.Name)) continue;
+
+                var cat = PropertyClassifier.GetCategory(prop.Name);
+                if (GetModeByCategory(cat) != targetMode)
+                {
+                    prop.SetValue(state, null); // 橡皮擦法术：不属于自己的属性全部设为空！
+                }
+            }
+        }
+
+        private bool HasAnyActiveProperty(ControllerState state, string targetMode)
+        {
+            if (state == null) return false;
+            var props = typeof(ControllerState).GetProperties();
+            foreach (var prop in props)
+            {
+                if (IsBaseProperty(prop.Name)) continue;
+
+                var cat = PropertyClassifier.GetCategory(prop.Name);
+                if (GetModeByCategory(cat) == targetMode)
+                {
+                    object val = prop.GetValue(state);
+                    bool isExplicitNull = (val == null);
+                    if (val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) isExplicitNull = true;
+                    if (!isExplicitNull) return true;
+                }
+            }
+            return false;
+        }
+
+        private string GetModeByCategory(PropertyCategory category)
+        {
+            return category switch
+            {
+                PropertyCategory.Spatial => "Camera",
+                PropertyCategory.Appearance => "Appearance",
+                PropertyCategory.UiControl => "UI",
+                PropertyCategory.Effects => "Effects",
+                _ => "Camera"
+            };
+        }
+
+        private bool IsBaseProperty(string propName)
+        {
+            // 基础属性绝对不能被当做门派特征，也不能被错误擦除
+            return propName == "Time" || propName == "RelativeTime" || propName == "AddTime" ||
+                   propName == "Easing" || propName == "Destroy" || propName == "Template" ||
+                   propName == "Layer" || propName == "Order";
         }
     }
 }

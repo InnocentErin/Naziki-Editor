@@ -35,9 +35,8 @@ namespace Naziki_Editor.Views.PropertyEditor
             TxtParentId.Text = _editingObject.ParentId;
 
             // 🚀 【私有 ID 视觉反馈系统】
-            bool isPrivateIdMode = _editingObject.GetType().Name == "C2SceneController" ||
-                                   _editingObject.GetType().Name == "C2NoteController" ||
-                                   !string.IsNullOrEmpty(_editingObject.TargetId);
+            // 现在的私有模式，仅仅只针对依附于实体的“影子控制板 (TargetId 不为空)”啦！
+            bool isPrivateIdMode = !string.IsNullOrEmpty(_editingObject.TargetId);
 
             if (isPrivateIdMode)
             {
