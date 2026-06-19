@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Windows; // ✨ 小艾特地引进了 Windows 魔法，用来召唤弹窗！
 using Naziki_Editor.Models;
 using Naziki_Editor.Core;
 
@@ -58,42 +59,37 @@ namespace Naziki_Editor.Core.Compiler
             if (originalStates == null || originalStates.Count == 0) return originalStates;
 
             var flattenedList = new List<TState>();
-            float lastStateTime = 0f; // 追踪“最后定义的状态的时间”，专供 add_time 使用！
+            float lastStateTime = 0f;
 
             foreach (var state in originalStates)
             {
                 List<float> triggerTimes = new List<float>();
 
-                // 🎯【官方宪法第 1 条】：如果定义了 add_time -> 最后定义的状态时间 + add_time
                 if (state.AddTime.HasValue)
                 {
                     triggerTimes.Add(lastStateTime + state.AddTime.Value);
                 }
-                // 🎯【官方宪法第 2 条】：如果定义了 relative_time ,同时也定义了 time -> time + relative_time
                 else if (state.RelativeTime.HasValue && state.Time != null && state.Time.ToString() != float.MaxValue.ToString())
                 {
                     var absTimes = ResolveAbsoluteTimes(state.Time);
                     foreach (var t in absTimes) triggerTimes.Add(t + state.RelativeTime.Value);
                 }
-                // 🎯【官方宪法第 4 条】：定义了 relative_time, 但没有父状态(顶层对象) -> 当前游戏时间(0) + relative_time
                 else if (state.RelativeTime.HasValue)
                 {
                     triggerTimes.Add(0f + state.RelativeTime.Value);
                 }
-                // 🎯【官方宪法第 5 条】：都没有定义 -> 直接使用 time
                 else if (state.Time != null && state.Time.ToString() != float.MaxValue.ToString())
                 {
                     triggerTimes = ResolveAbsoluteTimes(state.Time);
                 }
                 else
                 {
-                    triggerTimes.Add(float.MaxValue); // 隐藏/未触发状态
+                    triggerTimes.Add(float.MaxValue);
                 }
 
                 if (triggerTimes.Count > 1 && state.Destroy == true)
                     CompileWarnings.Add($"⚠️ 警告：检测到属性包含了 destroy:true，且被应用在了包含 {triggerTimes.Count} 个时间锚点的数组中！");
 
-                // 🪄 裂变与模板递归展开
                 if (string.IsNullOrEmpty(state.Template) || _templates == null || !_templates.ContainsKey(state.Template))
                 {
                     foreach (float t in triggerTimes)
@@ -101,7 +97,7 @@ namespace Naziki_Editor.Core.Compiler
                         var clone = DeepClone(state);
                         clone.Time = t; clone.RelativeTime = null; clone.AddTime = null;
                         flattenedList.Add(clone);
-                        if (t != float.MaxValue) lastStateTime = t; // 更新上一个状态的时间
+                        if (t != float.MaxValue) lastStateTime = t;
                     }
                 }
                 else
@@ -121,14 +117,13 @@ namespace Naziki_Editor.Core.Compiler
                         }
                         else
                         {
-                            // 进入模板，将当前的 baseTime 作为【父状态的时间】传递进去！
                             var expandedChildren = ExpandTemplateKeyframes<TState>(template.Keyframes, baseTime, mergedBaseState, new HashSet<string> { state.Template });
                             flattenedList.AddRange(expandedChildren);
 
                             if (expandedChildren.Count > 0)
                             {
                                 float lastChildTime = (float)expandedChildren.Last().Time;
-                                if (lastChildTime != float.MaxValue) lastStateTime = lastChildTime; // 跨模板的多米诺传递
+                                if (lastChildTime != float.MaxValue) lastStateTime = lastChildTime;
                             }
                         }
                     }
@@ -139,34 +134,30 @@ namespace Naziki_Editor.Core.Compiler
         }
 
         // ==========================================
-        // 🪆 2. 子帧递归拆解术 (严格使用 baseTime 作为 relative_time 的父锚点！)
+        // 🪆 2. 子帧递归拆解术
         // ==========================================
         private List<TState> ExpandTemplateKeyframes<TState>(List<TemplateState> templateStates, float baseTime, TState inheritedBaseState, HashSet<string> visitedTemplates) where TState : ObjectState, new()
         {
             var result = new List<TState>();
-            float lastStateTime = baseTime; // 初始的“上一个状态时间”默认从父状态开始
+            float lastStateTime = baseTime;
 
             foreach (var tState in templateStates)
             {
                 float currentTriggerTime = 0f;
 
-                // 🎯【官方宪法第 1 条】：最后定义的状态时间 + add_time
                 if (tState.AddTime.HasValue)
                 {
                     currentTriggerTime = lastStateTime + tState.AddTime.Value;
                 }
-                // 🎯【官方宪法第 2 条】：time + relative_time
                 else if (tState.RelativeTime.HasValue && tState.Time != null && tState.Time.ToString() != float.MaxValue.ToString())
                 {
                     var absTimes = ResolveAbsoluteTimes(tState.Time);
                     currentTriggerTime = (absTimes.Count > 0 ? absTimes[0] : baseTime) + tState.RelativeTime.Value;
                 }
-                // 🎯【官方宪法第 3 条】：存在父状态 -> 父状态的时间 (baseTime) + relative_time
                 else if (tState.RelativeTime.HasValue)
                 {
-                    currentTriggerTime = baseTime + tState.RelativeTime.Value; // 🌟 核心锚点：死死咬住父时间！
+                    currentTriggerTime = baseTime + tState.RelativeTime.Value;
                 }
-                // 🎯【官方宪法第 5 条】：都没有定义 -> time
                 else if (tState.Time != null && tState.Time.ToString() != float.MaxValue.ToString())
                 {
                     var absTimes = ResolveAbsoluteTimes(tState.Time);
@@ -178,7 +169,6 @@ namespace Naziki_Editor.Core.Compiler
                     currentTriggerTime = float.MaxValue;
                 }
 
-                // 成功计算出时间后，立刻更新为下一个元素的“上一个时间”
                 if (currentTriggerTime != float.MaxValue) lastStateTime = currentTriggerTime;
 
                 TState mergedState = MergeProperties<TState>(inheritedBaseState, tState);
@@ -216,7 +206,7 @@ namespace Naziki_Editor.Core.Compiler
         }
 
         // ==========================================
-        // ⏱️ 3. 万能时空雷达 & 基因融合器 (保持原样)
+        // ⏱️ 3. 万能时空雷达 & 基因融合器
         // ==========================================
         private List<float> ResolveAbsoluteTimes(object timeObj)
         {
@@ -297,7 +287,11 @@ namespace Naziki_Editor.Core.Compiler
             if (controllers == null || controllers.Count == 0) return;
 
             var newControllersList = new List<C2SceneController>();
-            int spawnCount = 1;
+
+            // 🌟 弹窗情报收集器
+            int targetSplitCount = 0; // 发现了多少个需要分裂的混合体
+            int newSpawnCount = 0;    // 分裂出了多少个纯净单体
+            int idSequence = 1;
 
             foreach (var ctrl in controllers)
             {
@@ -323,12 +317,14 @@ namespace Naziki_Editor.Core.Compiler
                 else
                 {
                     // 💥 细胞分裂法术触发！
+                    targetSplitCount++;
+
                     foreach (var mode in usedModes)
                     {
                         var clone = DeepClone(ctrl); // 完美复制基因
 
                         // 赋予分裂体独立身份证，防止 ID 冲突
-                        clone.Id = string.IsNullOrEmpty(ctrl.Id) ? $"mitosis_ctrl_{spawnCount++}" : $"{ctrl.Id}_{mode.ToLower()}";
+                        clone.Id = string.IsNullOrEmpty(ctrl.Id) ? $"mitosis_ctrl_{idSequence++}" : $"{ctrl.Id}_{mode.ToLower()}";
                         clone.EditorMode = mode;
 
                         // 净化 BaseState，擦除不属于当前门派的属性
@@ -350,6 +346,7 @@ namespace Naziki_Editor.Core.Compiler
                         }
                         clone.Keyframes = cleanKeyframes;
                         newControllersList.Add(clone);
+                        newSpawnCount++;
                     }
                 }
             }
@@ -357,6 +354,19 @@ namespace Naziki_Editor.Core.Compiler
             // 偷天换日：用分裂后的纯净大军替换掉原来杂交的控制器
             controllers.Clear();
             controllers.AddRange(newControllersList);
+
+            // 📢 终极智能弹窗：只有发生分裂时，才去打扰大大！
+            if (targetSplitCount > 0)
+            {
+                MessageBox.Show(
+                    $"✨ 细胞分裂引擎运转报告 ✨\n\n" +
+                    $"嗅探雷达发现外部谱面中存在 {targetSplitCount} 个【多维度混合控制器】！\n" +
+                    $"为了保证编辑器微观时光屋的纯净，小艾已在底层将它们无损拆分成了 {newSpawnCount} 个【纯净单维度控制器】啦！\n\n" +
+                    $"(各属性的时间链均已自动展平对齐，打谱师可以放心修改！)",
+                    "🧬 细胞分裂成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
         }
 
         private void CheckStateModes(ControllerState state, HashSet<string> usedModes)
@@ -365,7 +375,7 @@ namespace Naziki_Editor.Core.Compiler
             var props = typeof(ControllerState).GetProperties();
             foreach (var prop in props)
             {
-                if (IsBaseProperty(prop.Name)) continue; // 忽略基础属性如 Time
+                if (IsBaseProperty(prop.Name)) continue;
 
                 object val = prop.GetValue(state);
                 bool isExplicitNull = (val == null);
@@ -429,7 +439,6 @@ namespace Naziki_Editor.Core.Compiler
 
         private bool IsBaseProperty(string propName)
         {
-            // 基础属性绝对不能被当做门派特征，也不能被错误擦除
             return propName == "Time" || propName == "RelativeTime" || propName == "AddTime" ||
                    propName == "Easing" || propName == "Destroy" || propName == "Template" ||
                    propName == "Layer" || propName == "Order";

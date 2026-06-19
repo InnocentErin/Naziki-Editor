@@ -16,21 +16,51 @@ namespace Naziki_Editor.Views.TimelineClip
         private TimelineClipModel _clipModel;
         private ProjectDataContext _context;
         private double _pixelsPerSecond;
-        private double _lastCalculatedMaxTime = 0; // 记录总时空长度
+        private double _lastCalculatedMaxTime = 0;
+
+        private Point _panStartPoint;
+        private double _panStartOffset;
+        private bool _isPanning = false;
 
         public ClipDetailedEditor()
         {
             InitializeComponent();
 
-            // ✨ 1. 让顶部标尺和底部画板永远对齐联动！
+            // ✨ 1. 标尺联动
             ScrollPropCanvas.ScrollChanged += (s, e) => {
                 ScrollMicroRuler.ScrollToHorizontalOffset(e.HorizontalOffset);
             };
 
-            // ✨ 2. 绑定滚轮缩放神技！
+            // ✨ 2. 注入顶级工业手感：基于绝对静止层的左右平移引擎！
+            PanCaptureLayer.MouseLeftButtonDown += (s, e) => {
+                _isPanning = true;
+                _panStartPoint = e.GetPosition(this);
+                _panStartOffset = ScrollPropCanvas.HorizontalOffset;
+                PanCaptureLayer.CaptureMouse();
+                e.Handled = true;
+            };
+
+            PanCaptureLayer.MouseMove += (s, e) => {
+                if (_isPanning)
+                {
+                    Point currentPos = e.GetPosition(this);
+                    double deltaX = currentPos.X - _panStartPoint.X;
+                    ScrollPropCanvas.ScrollToHorizontalOffset(_panStartOffset - deltaX);
+                }
+            };
+
+            PanCaptureLayer.MouseLeftButtonUp += (s, e) => {
+                if (_isPanning)
+                {
+                    _isPanning = false;
+                    PanCaptureLayer.ReleaseMouseCapture();
+                    e.Handled = true;
+                }
+            };
+
+            // ✨ 3. 挂载神级缩放
+            PanCaptureLayer.MouseWheel += Editor_PreviewMouseWheel;
             this.PreviewMouseWheel += Editor_PreviewMouseWheel;
-
-
         }
 
         /// <summary>
@@ -123,16 +153,15 @@ namespace Naziki_Editor.Views.TimelineClip
             var templateBoxes = Core.StoryboardTimeConverter.DecodeTimelineKeyframes(
                 _clipModel.AssociatedObject, "Template", _context.TimeEngine, _context.Chart?.note_list, _clipModel.StartTime);
 
-            // 按时间严格排序（越早触发的排在越前面，完全符合大大要求！）
+            // ✨ 【核心升级】：先按时间排序，然后用 GroupBy 强行把名字一样的模板合并到同一个维度里！
             var sortedTriggers = templateBoxes.Where(b => b.Value != null && !string.IsNullOrEmpty(b.Value.ToString()))
                                               .OrderBy(b => b.VisualRelTime).ToList();
+            var groupedTemplates = sortedTriggers.GroupBy(b => b.Value.ToString()).ToList();
 
-            foreach (var triggerBox in sortedTriggers)
+            foreach (var group in groupedTemplates)
             {
-                string tName = triggerBox.Value.ToString();
-                double triggerAbsTime = _clipModel.StartTime + triggerBox.VisualRelTime;
-
-                // C. 基因冲突探测（暂时的轻量级雷达，后续移入 Validator）
+                string tName = group.Key;
+                // C. 基因冲突探测（只需要拿这一组的第一个去探测一次就够了）
                 bool hasConflict = false;
                 List<string> conflictProps = new List<string>();
                 Models.C2Template tData = null;
@@ -150,31 +179,24 @@ namespace Naziki_Editor.Views.TimelineClip
                         if (!tHasAnim && tData.GetKeyframes() != null)
                         {
                             foreach (var tf in tData.GetKeyframes())
-                            {
                                 if (Core.FastReflectionHelper.TryGetValue(tf, tp.Name, out object tfVal) && tfVal != null) { tHasAnim = true; break; }
-                            }
                         }
 
-                        // 如果模板动了这个属性，且主事件也动了，警报拉响！
-                        if (tHasAnim && mainAnimatedProps.Contains(tp.Name))
-                        {
-                            hasConflict = true;
-                            conflictProps.Add(tp.Name);
-                        }
+                        if (tHasAnim && mainAnimatedProps.Contains(tp.Name)) { hasConflict = true; conflictProps.Add(tp.Name); }
                     }
                 }
 
-                // D. 盖楼：动态生成独立组头
+                // D. 盖楼：动态生成独立组头 (合并版！)
                 Brush headerBgBrush = hasConflict ? new SolidColorBrush(Color.FromArgb(80, 220, 50, 50)) : (Brush)Application.Current.FindResource("MenuBgColor");
                 string conflictTip = hasConflict ? $"⚠️ 警告：检测到属性冲突风险！\n此模板与主事件共同竞争了以下属性：{string.Join(", ", conflictProps)}" : "✨ 基因纯净无冲突";
 
                 Border tplHeaderLeft = new Border { Height = 28, Background = headerBgBrush, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), ToolTip = conflictTip };
                 Grid tplHeaderGrid = new Grid();
-                tplHeaderGrid.Children.Add(new TextBlock { Text = $"🌟 模板: {tName}", Foreground = Brushes.Gold, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0) });
+                tplHeaderGrid.Children.Add(new TextBlock { Text = $"🌟 模板: {tName} (共触发 {group.Count()} 次)", Foreground = Brushes.Gold, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0) });
 
                 Button unbindBtn = new Button
                 {
-                    Content = "✂️ 烘焙解绑",
+                    Content = "✂️ 批量解绑",
                     FontSize = 10,
                     Padding = new Thickness(5, 1, 5, 1),
                     Margin = new Thickness(0, 0, 5, 0),
@@ -184,20 +206,16 @@ namespace Naziki_Editor.Views.TimelineClip
                     Background = Brushes.Transparent,
                     Foreground = (Brush)Application.Current.FindResource("MainTextColor"),
                     BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
-                    ToolTip = $"将 [{tName}] 的关键帧直接融入主事件中"
+                    ToolTip = $"将 [{tName}] 的所有 {group.Count()} 次触发全部烘焙为私有关键帧！"
                 };
                 unbindBtn.Click += (s, ev) =>
                 {
-                    if (tData == null || triggerBox.State == null) return;
-
+                    if (tData == null) return;
                     var mainEntity = _clipModel.AssociatedObject;
                     var mainKeyframes = mainEntity.GetKeyframes();
                     if (mainKeyframes == null) return;
-
-                    // 提取主实体关键帧的强类型 DNA (比如 SpriteState 或 TextState)
                     Type stateType = mainEntity.GetBaseState().GetType();
 
-                    // 🛠️ 定义神圣的基因拷贝法术 (忽略时间/模板等控制属性，只拷贝真正的数值！)
                     Action<object, object> copyGenetics = (source, target) => {
                         var props = source.GetType().GetProperties();
                         foreach (var p in props)
@@ -212,63 +230,41 @@ namespace Naziki_Editor.Views.TimelineClip
                         }
                     };
 
-                    // 🌟 1. 提取模板初始状态 (BaseState) -> 转化为触发点绝对时间帧
-                    var tBase = tData.GetBaseState();
-                    if (tBase != null)
+                    // ✨ 一次性烘焙该组里的所有触发点！
+                    foreach (var triggerBox in group)
                     {
-                        var startFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
-                        startFrame.Time = (float)triggerAbsTime; // 钉死在触发的那一瞬间
-                        copyGenetics(tBase, startFrame);
-                        mainKeyframes.Add(startFrame);
-                    }
-
-                    // 🌟 2. 提取模板关键帧 (Keyframes) -> 逐个转化为绝对时间帧，带入主事件
-                    if (tData.GetKeyframes() != null)
-                    {
-                        double accumulatedRel = 0;
-                        foreach (var tkf in tData.GetKeyframes())
+                        double triggerAbsTime = _clipModel.StartTime + triggerBox.VisualRelTime;
+                        var tBase = tData.GetBaseState();
+                        if (tBase != null)
                         {
-                            if (tkf is Models.TemplateState ts)
+                            var startFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
+                            startFrame.Time = (float)triggerAbsTime; copyGenetics(tBase, startFrame); mainKeyframes.Add(startFrame);
+                        }
+                        if (tData.GetKeyframes() != null)
+                        {
+                            double accumulatedRel = 0;
+                            foreach (var tkf in tData.GetKeyframes())
                             {
-                                // 解算模板内部的相对时间
-                                if (ts.RelativeTime.HasValue) accumulatedRel += ts.RelativeTime.Value;
-                                else if (ts.AddTime.HasValue) accumulatedRel += ts.AddTime.Value;
-                                else if (ts.Time != null && double.TryParse(ts.Time.ToString(), out double absT)) accumulatedRel = absT;
-
-                                // 映射到宏观绝对时间
-                                double frameAbsTime = triggerAbsTime + accumulatedRel;
-                                var animFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
-                                animFrame.Time = (float)frameAbsTime;
-
-                                // 复制缓动曲线
-                                if (!string.IsNullOrEmpty(ts.Easing))
-                                    animFrame.Easing = ts.Easing;
-
-                                copyGenetics(tkf, animFrame);
-                                mainKeyframes.Add(animFrame);
+                                if (tkf is Models.TemplateState ts)
+                                {
+                                    if (ts.RelativeTime.HasValue) accumulatedRel += ts.RelativeTime.Value;
+                                    else if (ts.AddTime.HasValue) accumulatedRel += ts.AddTime.Value;
+                                    else if (ts.Time != null && double.TryParse(ts.Time.ToString(), out double absT)) accumulatedRel = absT;
+                                    double frameAbsTime = triggerAbsTime + accumulatedRel;
+                                    var animFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
+                                    animFrame.Time = (float)frameAbsTime;
+                                    if (!string.IsNullOrEmpty(ts.Easing)) animFrame.Easing = ts.Easing;
+                                    copyGenetics(tkf, animFrame); mainKeyframes.Add(animFrame);
+                                }
                             }
                         }
+                        if (triggerBox.State is Models.ObjectState trueState) trueState.Template = null;
                     }
 
-                    // 🌟 3. 斩断羁绊！剥离宿主身上的 Template 寄生基因
-                    if (triggerBox.State is Models.ObjectState trueState)
-                    {
-                        trueState.Template = null; // 🚀 直接通过基类属性赋值，抛弃反射，更安全极速！
-                    }
-
-                    // 🌟 4. 重建宇宙闭环
                     _context.MarkAsModified();
-
-                    // 呼叫主时间轴重绘（因为方块的外观需要消去 🪄 角标）
-                    if (Window.GetWindow(this) is MainWindow mainWin)
-                    {
-                        mainWin.TimelineConsole.LoadStoryboardTimeline(mainWin.Context);
-                    }
-
-                    // 原地重新加载微观时光屋！
+                    if (Window.GetWindow(this) is MainWindow mainWin) mainWin.TimelineConsole.LoadStoryboardTimeline(mainWin.Context);
                     LoadClipData(_clipModel, _context, _pixelsPerSecond);
-
-                    MessageBox.Show($"✨ [{tName}] 模板的全部基因已成功降维剥离，并烘焙为当前事件的私有关键帧！\n\n您可以直接在下方的【主事件关键帧】轨道中对它们进行细微调整啦！", "烘焙解绑成功");
+                    MessageBox.Show($"✨ [{tName}] 的 {group.Count()} 次调用已全数降维剥离！", "批量解绑成功");
                 };
                 tplHeaderGrid.Children.Add(unbindBtn);
                 tplHeaderLeft.Child = tplHeaderGrid;
@@ -277,34 +273,34 @@ namespace Naziki_Editor.Views.TimelineClip
                 Border tplHeaderRight = new Border { Height = 28, Background = headerBgBrush, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1) };
                 PropTracksStackPanel.Children.Add(tplHeaderRight);
 
-                // E. 盖楼：模板内部时空延展轨
+                // E. 盖楼：模板内部时空延展轨 (轨道上可以画出好几次触发的星星了！)
                 Border tplTrackLeft = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(20, 0, 0, 0) };
-                tplTrackLeft.Child = new TextBlock { Text = $"触发于 {triggerAbsTime:0.00}s", Foreground = Brushes.DarkKhaki, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
+                tplTrackLeft.Child = new TextBlock { Text = $"✦ 共享轨", Foreground = Brushes.DarkKhaki, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
                 PropHeadersStackPanel.Children.Add(tplTrackLeft);
 
                 Border tplTrackRight = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1) };
-                Canvas tplCanvas = new Canvas { Width = targetPhysicalWidth, IsHitTestVisible = false }; // 绝对只读护盾
+                Canvas tplCanvas = new Canvas { Width = targetPhysicalWidth, IsHitTestVisible = false };
 
-                // ✨ 绘制模板内部的小星星
+                // ✨ 在同一条轨道上，遍历组内的每一次触发，点亮星星矩阵！
                 if (tData != null)
                 {
-                    // 1. 绘制起点降临星 (BaseState)
-                    DrawTemplateStar(tplCanvas, triggerAbsTime * _pixelsPerSecond);
-
-                    // 2. 绘制后续相对星 (展开模板自身的长度！)
-                    if (tData.GetKeyframes() != null)
+                    foreach (var triggerBox in group)
                     {
-                        double accumulatedRel = 0;
-                        foreach (var tkf in tData.GetKeyframes())
-                        {
-                            if (tkf is Models.TemplateState ts)
-                            {
-                                if (ts.RelativeTime.HasValue) accumulatedRel += ts.RelativeTime.Value;
-                                else if (ts.AddTime.HasValue) accumulatedRel += ts.AddTime.Value;
-                                else if (ts.Time != null && double.TryParse(ts.Time.ToString(), out double absT)) accumulatedRel = absT;
+                        double triggerAbsTime = _clipModel.StartTime + triggerBox.VisualRelTime;
+                        DrawTemplateStar(tplCanvas, triggerAbsTime * _pixelsPerSecond); // 起点星
 
-                                double starX = (triggerAbsTime + accumulatedRel) * _pixelsPerSecond;
-                                DrawTemplateStar(tplCanvas, starX);
+                        if (tData.GetKeyframes() != null)
+                        {
+                            double accumulatedRel = 0;
+                            foreach (var tkf in tData.GetKeyframes())
+                            {
+                                if (tkf is Models.TemplateState ts)
+                                {
+                                    if (ts.RelativeTime.HasValue) accumulatedRel += ts.RelativeTime.Value;
+                                    else if (ts.AddTime.HasValue) accumulatedRel += ts.AddTime.Value;
+                                    else if (ts.Time != null && double.TryParse(ts.Time.ToString(), out double absT)) accumulatedRel = absT;
+                                    DrawTemplateStar(tplCanvas, (triggerAbsTime + accumulatedRel) * _pixelsPerSecond); // 后续星
+                                }
                             }
                         }
                     }
@@ -350,6 +346,10 @@ namespace Naziki_Editor.Views.TimelineClip
                 ClipPropertyTrackRow trackRow = new ClipPropertyTrackRow();
                 trackRow.Width = targetPhysicalWidth;
                 trackRow.HorizontalAlignment = HorizontalAlignment.Left;
+
+                // 把当前的属性名字塞进 Tag 里，让它拥有记忆！
+                trackRow.Tag = prop;
+
                 trackRow.Init(prop, _clipModel, _context, _pixelsPerSecond);
                 PropTracksStackPanel.Children.Add(trackRow);
             }
@@ -368,44 +368,151 @@ namespace Naziki_Editor.Views.TimelineClip
 
 
 
+        // 🚀 专业级缩放：锚定鼠标位置，全局极速排版！
         private void Editor_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            if (Keyboard.Modifiers == ModifierKeys.Control)
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                double zoomDelta = e.Delta > 0 ? 1.15 : 1 / 1.15;
-                _pixelsPerSecond *= zoomDelta;
-                if (_pixelsPerSecond < 10) _pixelsPerSecond = 10;
-                if (_pixelsPerSecond > 2000) _pixelsPerSecond = 2000;
+                e.Handled = true;
 
-                double newWidth = _lastCalculatedMaxTime * _pixelsPerSecond;
-                MicroRulerCanvas.Width = newWidth;
-                RenderMicroRulerTicks(_lastCalculatedMaxTime);
+                double zoomDelta = e.Delta > 0 ? 1.2 : (1.0 / 1.2);
+                double oldPixels = _pixelsPerSecond;
+                double newPixels = _pixelsPerSecond * zoomDelta;
 
+                newPixels = Math.Max(10.0, Math.Min(2000.0, newPixels));
+                if (Math.Abs(newPixels - oldPixels) < 0.01) return;
+
+                // 核心：推算鼠标正下方指向的“绝对时间”
+                Point mousePos = e.GetPosition(ScrollPropCanvas);
+                double timeAtMouse = (ScrollPropCanvas.HorizontalOffset + mousePos.X) / oldPixels;
+
+                _pixelsPerSecond = newPixels;
+                double newPhysicalWidth = _lastCalculatedMaxTime * _pixelsPerSecond;
+
+                // 1. 🚀 调用神级极速位移法术 (0 开销！)
+                FastUpdateMicroRuler();
+
+                // 2. ⚡ 极速重排下方所有的属性轨道！
                 foreach (UIElement el in PropTracksStackPanel.Children)
                 {
-                    if (el is ClipPropertyTrackRow row)
+                    if (el is Border border && border.Child is Canvas tplCanvas)
                     {
-                        row.Width = newWidth;
-                        row.UpdateZoom(_pixelsPerSecond);
+                        tplCanvas.Width = newPhysicalWidth;
+                        foreach (UIElement child in tplCanvas.Children)
+                        {
+                            if (child is TextBlock star && star.Tag is double absTimeSec)
+                            {
+                                Canvas.SetLeft(star, absTimeSec * _pixelsPerSecond - 6);
+                            }
+                        }
+                    }
+                    else if (el is ClipPropertyTrackRow trackRow)
+                    {
+                        trackRow.Width = newPhysicalWidth;
+                        trackRow.FastUpdateZoom(_pixelsPerSecond);
                     }
                 }
-                e.Handled = true;
+
+                // 3. 锚定回拨：把刚才鼠标指着的那一秒，重新拉回鼠标物理位置的下方！
+                double newOffset = (timeAtMouse * _pixelsPerSecond) - mousePos.X;
+                ScrollPropCanvas.ScrollToHorizontalOffset(newOffset);
+            }
+        }
+        // 🚀 宏观轴同款：O(1) 极速坐标位移法术！绝不新建控件！
+        private void FastUpdateMicroRuler()
+        {
+            double newPhysicalWidth = _lastCalculatedMaxTime * _pixelsPerSecond;
+            MicroRulerCanvas.Width = newPhysicalWidth;
+
+            foreach (UIElement child in MicroRulerCanvas.Children)
+            {
+                if (child is FrameworkElement fe)
+                {
+                    // A. 处理标尺刻度与蓝玻璃
+                    if (fe.Tag is string tagStr)
+                    {
+                        if (tagStr == "HIGHLIGHT")
+                        {
+                            double startX = _clipModel.StartTime * _pixelsPerSecond;
+                            double endX = _clipModel.EndTime * _pixelsPerSecond;
+                            Canvas.SetLeft(fe, startX);
+                            fe.Width = Math.Max(2, endX - startX);
+                        }
+                        else if (tagStr.StartsWith("TICK_LINE_"))
+                        {
+                            int s = int.Parse(tagStr.Substring(10));
+                            ((System.Windows.Shapes.Line)fe).X1 = s * _pixelsPerSecond;
+                            ((System.Windows.Shapes.Line)fe).X2 = s * _pixelsPerSecond;
+                        }
+                        else if (tagStr.StartsWith("TICK_TEXT_"))
+                        {
+                            int s = int.Parse(tagStr.Substring(10));
+                            Canvas.SetLeft(fe, s * _pixelsPerSecond + 2);
+                        }
+                    }
+                    // B. ✨ 完美复刻宏观轴：多态音符物理形变算法！
+                    else if (fe.Tag is Models.C2Note note)
+                    {
+                        double seconds = _context.TimeEngine.TickToSeconds(note.tick);
+                        double absoluteX = seconds * _pixelsPerSecond;
+
+                        if (child is Image img)
+                        {
+                            Canvas.SetLeft(img, absoluteX - (img.Width / 2.0));
+                        }
+                        else if (child is TextBlock)
+                        {
+                            // 微观时光屋专属：文字的 LeftOffset 是 +3.0
+                            Canvas.SetLeft(fe, absoluteX + 3.0);
+                        }
+                        else if (child is System.Windows.Shapes.Line line && line.DataContext is Models.C2Note lastChild)
+                        {
+                            double lastChildSeconds = _context.TimeEngine.TickToSeconds(lastChild.tick);
+                            line.X1 = absoluteX;
+                            line.X2 = lastChildSeconds * _pixelsPerSecond;
+                        }
+                        else if (child is System.Windows.Shapes.Rectangle rect)
+                        {
+                            if (rect.Height == 2)
+                            {
+                                Canvas.SetLeft(rect, absoluteX);
+                                double endSec = _context.TimeEngine.TickToSeconds(note.tick + note.hold_tick);
+                                rect.Width = (endSec - seconds) * _pixelsPerSecond;
+                            }
+                            else
+                            {
+                                Canvas.SetLeft(rect, absoluteX - (rect.Width / 2.0));
+                            }
+                        }
+                    }
+                }
             }
         }
 
 
 
 
-        private void DrawTemplateStar(Canvas canvas, double x)
+
+
+
+
+
+
+
+
+        private void DrawTemplateStar(Canvas canvas, double xPos)
         {
             TextBlock star = new TextBlock
             {
                 Text = "✦",
                 Foreground = Brushes.Gold,
                 FontSize = 14,
-                FontWeight = FontWeights.Bold
+                FontWeight = FontWeights.Bold,
+                // 🌟 黑科技：利用当前的物理坐标反推绝对秒数，并封存在神圣基因(Tag)里！
+                // 这样在外部调用完全不用改代码，缩放引擎也能精准抓取它！
+                Tag = xPos / _pixelsPerSecond
             };
-            Canvas.SetLeft(star, x - 6);
+            Canvas.SetLeft(star, xPos - 6);
             Canvas.SetTop(star, 10);
             canvas.Children.Add(star);
         }
@@ -417,30 +524,30 @@ namespace Naziki_Editor.Views.TimelineClip
             MicroRulerCanvas.Children.Clear();
             int maxSeconds = (int)Math.Ceiling(maxTime);
 
-            // 1. 画秒数白线（收纳在标尺上半部分）
+            // 1. 画秒数白线（给它们打上专属的基因条码 TICK_LINE 和 TICK_TEXT）
             for (int s = 0; s <= maxSeconds; s++)
             {
                 double x = s * _pixelsPerSecond;
-                // 时间白线缩短，控制在 Y: 5~18
-                MicroRulerCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = x, X2 = x, Y1 = 5, Y2 = 18, Stroke = Brushes.Gray, StrokeThickness = 1 });
-                var text = new TextBlock { Text = s + "s", FontSize = 10, Foreground = Brushes.Gray };
+                MicroRulerCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = x, X2 = x, Y1 = 5, Y2 = 18, Stroke = Brushes.Gray, StrokeThickness = 1, Tag = $"TICK_LINE_{s}" });
+
+                var text = new TextBlock { Text = s + "s", FontSize = 10, Foreground = Brushes.Gray, Tag = $"TICK_TEXT_{s}" };
                 Canvas.SetLeft(text, x + 2);
-                Canvas.SetTop(text, 2); // 钉在最上方
+                Canvas.SetTop(text, 2);
                 MicroRulerCanvas.Children.Add(text);
             }
 
-            // 2. 补上五颜六色的音符 
-            // 最后一个参数传 true，代表微观时光屋模式，自动切换为精致的 12px 微调排版
+            // 2. 补上五颜六色的音符 (底层已经内置了 C2Note Tag)
             Core.Timeline.NoteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
 
-            // 3. ✨ 高光时刻：在标尺上画一块半透明的蓝色玻璃，明确标出方块的本体位置！
+            // 3. ✨ 高光时刻：半透明蓝玻璃 (打上 HIGHLIGHT 标签)
             double startX = _clipModel.StartTime * _pixelsPerSecond;
             double endX = _clipModel.EndTime * _pixelsPerSecond;
             var highlight = new System.Windows.Shapes.Rectangle
             {
                 Width = Math.Max(2, endX - startX),
                 Height = 50,
-                Fill = new SolidColorBrush(Color.FromArgb(40, 77, 184, 255))
+                Fill = new SolidColorBrush(Color.FromArgb(40, 77, 184, 255)),
+                Tag = "HIGHLIGHT"
             };
             Canvas.SetLeft(highlight, startX);
             MicroRulerCanvas.Children.Add(highlight);

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Naziki_Editor.Models;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -31,9 +32,11 @@ namespace Naziki_Editor.Views
         private State.ProjectDataContext _context = null; // 记住当前的大本营上下文！
 
         // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
+        // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
         private class TrackRegistryItem
         {
             public Border TrackBorder { get; set; }
+            public TextBlock HeaderTextBlock { get; set; } 
             public Models.TimelineTrackGroupModel Group { get; set; }
             public Models.TimelineTrackModel Track { get; set; }
         }
@@ -125,9 +128,9 @@ namespace Naziki_Editor.Views
                 // 🚂 先渲染轨道头，再渲染轨道内容，保持视觉上的层次感和正确的交互区域划分！
                 foreach (var track in sortedTracks)
                 {
-                    // 左侧：轨道名
-                    var trackLeft = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1) };
-                    trackLeft.Child = new TextBlock { Text = track.TrackName, Foreground = (Brush)Application.Current.FindResource("MainTextColor"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(15, 0, 0, 0) };
+                    // 左侧：轨道名 (✨ 剥离出 textBlock 方便我们后续 0ms 互换文字！)
+                    var headerText = new TextBlock { Text = track.TrackName, Foreground = (Brush)Application.Current.FindResource("MainTextColor"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(15, 0, 0, 0) };
+                    var trackLeft = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Child = headerText };
 
                     // ✨ 修复：使用动态分配的 targetHeader，而不是写死的 TrackHeadersContainer！
                     targetHeader.Children.Add(trackLeft);
@@ -135,51 +138,49 @@ namespace Naziki_Editor.Views
                     // 右侧：万能 Canvas 画板
                     var trackCanvas = new Canvas { Height = 40, Background = Brushes.Transparent, ClipToBounds = true, Width = _totalDurationSeconds * _pixelsPerSecond + 200 };
                     var trackRight = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Child = trackCanvas };
-                    
-                    // ✨ 【精准追加】：在塞入 StackPanel 之前，将轨道真名和物理容器登记进对应的隔离注册表中！
-                    var registryItem = new TrackRegistryItem { TrackBorder = trackRight, Group = group, Track = track };
+
+                    // ✨ 【精准追加】：把文字标签 (headerText) 也一并注册进隔离区雷达里！
+                    var registryItem = new TrackRegistryItem { TrackBorder = trackRight, HeaderTextBlock = headerText, Group = group, Track = track };
                     if (group.GroupIndex >= 0) _upperTrackRegistry.Add(registryItem);
                     else _lowerTrackRegistry.Add(registryItem);
 
-                    // ✨ 修复：使用动态分配的 targetTrack，而不是写死的 TrackGroupsContainer！
                     targetTrack.Children.Add(trackRight);
 
                     // C. 🧩 将方块 (Clip) 渲染到对应的画板上
                     foreach (var clip in track.Clips)
                     {
                         var clipCtrl = new TimelineClipControl();
-                        clipCtrl.Tag = clip; // ✨ 小艾新增：给方块贴上名片，方便极速缩放！
+                        clipCtrl.Tag = clip;
 
-                        // 预留接口：将大本营上下文传进去
                         if (Window.GetWindow(this) is MainWindow mainWin)
                         {
                             clipCtrl.Init(clip, mainWin.Context, _pixelsPerSecond, clip.TrackIndex, 999);
                         }
 
-                        // 双击：微观变身监听
                         clipCtrl.OnRequestDetailedEditMode += (targetModel) => { EnterDetailedEditMode(targetModel); };
-
-                        // ✨ 单击：接通中继反射弧，把模型里的原生 Cytoid 对象传出去！
-                        clipCtrl.OnClipSelected += (targetModel) => {
-                            OnTimelineObjectSelected?.Invoke(targetModel.AssociatedObject);
-                        };
-
-                        // 🚀 追加：接通 Ctrl+Click 的高级召唤法术！
-                        clipCtrl.OnRequestPropertyEditor += (targetModel) => {
-                            OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject);
-                        };
-
-                        // ✨ 【核心追加接线】：接通方块的宏观跨轨上下揉搓、拉扯运动信号！
+                        clipCtrl.OnClipSelected += (targetModel) => { OnTimelineObjectSelected?.Invoke(targetModel.AssociatedObject); };
+                        clipCtrl.OnRequestPropertyEditor += (targetModel) => { OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject); };
                         clipCtrl.OnMacroGridDrag += ClipCtrl_OnMacroGridDrag;
 
+                        // 🌟 【手术 B 时空神明排版】：识别控制器并霸占整轨
+                        bool isGlobalController = (clip.AssociatedObject is C2SceneController || clip.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(clip.AssociatedObject.TargetId);
 
-                        Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
-                        Canvas.SetTop(clipCtrl, 6); // 轨道高度 40，居中留白
+                        if (isGlobalController)
+                        {
+                            Canvas.SetLeft(clipCtrl, 0); // 强制钉死在轨道最左端
+                            Canvas.SetTop(clipCtrl, 6);
+                            clipCtrl.Width = _totalDurationSeconds * _pixelsPerSecond + 200; // 强制撑满物理轨道
+                        }
+                        else
+                        {
+                            // 凡人方块，乖乖遵守时间法则
+                            Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
+                            Canvas.SetTop(clipCtrl, 6);
 
-                        // ✨ 核心修复：注入物理碰撞体积！限制最大长度防止显存爆炸！
-                        double clipDuration = clip.EndTime - clip.StartTime;
-                        if (clipDuration > 300) clipDuration = 300; // 兜底：如果控制器是无限长，最多只画300秒
-                        clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                            double clipDuration = clip.EndTime - clip.StartTime;
+                            if (clipDuration > 300) clipDuration = 300;
+                            clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                        }
 
                         trackCanvas.Children.Add(clipCtrl);
                     }
@@ -306,23 +307,80 @@ namespace Naziki_Editor.Views
 
                     if (root != null && currentIndex != targetIndex)
                     {
+                        bool swapped = false;
                         if (entity is Models.C2SceneController ctrl && root.controllers != null)
                         {
                             if (currentIndex >= 0 && currentIndex < root.controllers.Count && targetIndex >= 0 && targetIndex < root.controllers.Count)
                             {
-                                root.controllers.Remove(ctrl);
-                                root.controllers.Insert(targetIndex, ctrl);
-                                dataChanged = true;
+                                var temp = root.controllers[targetIndex];
+                                root.controllers[targetIndex] = root.controllers[currentIndex];
+                                root.controllers[currentIndex] = temp;
+                                swapped = true;
                             }
                         }
                         else if (entity is Models.C2NoteController noteCtrl && root.note_controllers != null)
                         {
                             if (currentIndex >= 0 && currentIndex < root.note_controllers.Count && targetIndex >= 0 && targetIndex < root.note_controllers.Count)
                             {
-                                root.note_controllers.Remove(noteCtrl);
-                                root.note_controllers.Insert(targetIndex, noteCtrl);
-                                dataChanged = true;
+                                var temp = root.note_controllers[targetIndex];
+                                root.note_controllers[targetIndex] = root.note_controllers[currentIndex];
+                                root.note_controllers[currentIndex] = temp;
+                                swapped = true;
                             }
+                        }
+
+                        if (swapped)
+                        {
+                            _context.MarkAsModified();
+
+                            // 🚀 0ms 极限优化：局部 UI DOM 互换法术！绝不触发全局重绘！
+                            var oldRegistryItem = _lowerTrackRegistry.FirstOrDefault(r => r.Track.TrackIndex == currentIndex);
+                            var newRegistryItem = closestItem; // 目标轨道
+
+                            if (oldRegistryItem != null && newRegistryItem != null)
+                            {
+                                var oldCanvas = oldRegistryItem.TrackBorder.Child as Canvas;
+                                var newCanvas = newRegistryItem.TrackBorder.Child as Canvas;
+
+                                // 抓出目标轨道里原来住着的那个方块 (也就是被挤掉的那个)
+                                var otherClipCtrl = newCanvas?.Children.OfType<TimelineClipControl>().FirstOrDefault();
+
+                                // 🧳 物理搬家
+                                if (oldCanvas != null) oldCanvas.Children.Remove(clipCtrl);
+                                if (newCanvas != null && otherClipCtrl != null) newCanvas.Children.Remove(otherClipCtrl);
+
+                                // 🔄 互相拎到对方的房间里，并强制解除幽灵坐标！
+                                if (newCanvas != null)
+                                {
+                                    newCanvas.Children.Add(clipCtrl);
+                                    // ✨ 修复：落地瞬间，重置被拖动方块的局部坐标！
+                                    Canvas.SetLeft(clipCtrl, 0);
+                                    Canvas.SetTop(clipCtrl, 6);
+                                }
+                                if (oldCanvas != null && otherClipCtrl != null)
+                                {
+                                    oldCanvas.Children.Add(otherClipCtrl);
+                                    // ✨ 修复：落地瞬间，重置被挤掉方块的局部坐标！
+                                    Canvas.SetLeft(otherClipCtrl, 0);
+                                    Canvas.SetTop(otherClipCtrl, 6);
+                                }
+
+                                // 同步更新两个方块的模型内驻留索引，并让方块自己刷新状态！
+                                clipModel.TrackIndex = targetIndex;
+                                if (otherClipCtrl?.Tag is Models.TimelineClipModel otherModel)
+                                {
+                                    otherModel.TrackIndex = currentIndex;
+                                    otherClipCtrl.Init(otherModel, _context, _pixelsPerSecond, currentIndex, 999);
+                                }
+                                clipCtrl.Init(clipModel, _context, _pixelsPerSecond, targetIndex, 999);
+
+                                // ✨ 核心修复：直接交换左侧的轨道名字！
+                                string tempText = oldRegistryItem.HeaderTextBlock.Text;
+                                oldRegistryItem.HeaderTextBlock.Text = newRegistryItem.HeaderTextBlock.Text;
+                                newRegistryItem.HeaderTextBlock.Text = tempText;
+                            }
+
+                            return; // 时空互换完毕，直接结束！
                         }
                     }
                 }
@@ -354,13 +412,23 @@ namespace Naziki_Editor.Views
                 }
                 else
                 {
-                    // 同轨平移或纯单点，优雅在原地立正对齐
-                    Canvas.SetLeft(clipCtrl, clipModel.StartTime * _pixelsPerSecond);
-                    Canvas.SetTop(clipCtrl, 6);
+                    // 🌟 同轨平移或纯单点，优雅在原地立正对齐
+                    bool isGlobalController = (clipModel.AssociatedObject is C2SceneController || clipModel.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(clipModel.AssociatedObject.TargetId);
 
-                    double clipDuration = clipModel.EndTime - clipModel.StartTime;
-                    if (clipDuration > 300) clipDuration = 300;
-                    clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                    if (isGlobalController)
+                    {
+                        Canvas.SetLeft(clipCtrl, 0); // 永远在最左边
+                        clipCtrl.Width = _totalDurationSeconds * _pixelsPerSecond + 200; // 保持撑满
+                    }
+                    else
+                    {
+                        Canvas.SetLeft(clipCtrl, clipModel.StartTime * _pixelsPerSecond);
+                        double clipDuration = clipModel.EndTime - clipModel.StartTime;
+                        if (clipDuration > 300) clipDuration = 300;
+                        clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                    }
+
+                    Canvas.SetTop(clipCtrl, 6);
                 }
             }
         }
@@ -631,6 +699,9 @@ namespace Naziki_Editor.Views
 
         private void OnTimelineMouseWheel(object sender, MouseWheelEventArgs e)
         {
+            // 🛡️ 史诗级修复：如果当前是在微观时光屋里（标签页索引 > 0），大本营绝对不拦截滚轮事件！放行给微观世界！
+            if (TimelineTabs != null && TimelineTabs.SelectedIndex > 0) return;
+
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 e.Handled = true;
@@ -784,11 +855,21 @@ namespace Naziki_Editor.Views
                         {
                             if (clipObj is TimelineClipControl clipCtrl && clipCtrl.Tag is Models.TimelineClipModel clip)
                             {
-                                // 重新计算物理坐标
-                                Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
-                                double clipDuration = clip.EndTime - clip.StartTime;
-                                if (clipDuration > 300) clipDuration = 300;
-                                clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                                // 🌟 保证控制器在缩放时也能撑满！
+                                bool isGlobalController = (clip.AssociatedObject is C2SceneController || clip.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(clip.AssociatedObject.TargetId);
+
+                                if (isGlobalController)
+                                {
+                                    Canvas.SetLeft(clipCtrl, 0);
+                                    clipCtrl.Width = newWidth; // 使用新的轨道总宽撑满
+                                }
+                                else
+                                {
+                                    Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
+                                    double clipDuration = clip.EndTime - clip.StartTime;
+                                    if (clipDuration > 300) clipDuration = 300;
+                                    clipCtrl.Width = Math.Max(10, clipDuration * _pixelsPerSecond);
+                                }
                             }
                         }
                     }

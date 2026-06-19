@@ -477,12 +477,25 @@ namespace Naziki_Editor.Views.TimelineClip
 
 
 
-        // 🚀 响应滚轮缩放，光速重新摆放小菱形的位置！
         // 🚀 响应滚轮缩放，调用引擎彻底重绘，安全又省心！
-        public void UpdateZoom(double newPixelsPerSecond)
+        // 🚀 宏观级极速缩放引擎：绝对不摧毁重建，仅做数学坐标变换！
+        public void FastUpdateZoom(double newPixelsPerSecond)
         {
+            if (Math.Abs(_pixelsPerSecond - newPixelsPerSecond) < 0.001) return;
+
+            // 1. 算出新旧宇宙的膨胀/收缩比例
+            double scale = newPixelsPerSecond / _pixelsPerSecond;
+
+            // 2. 极速位移所有小菱形（只需修改 Canvas.Left，0 毫秒开销！）
+            foreach (var node in _nodes)
+            {
+                double oldX = Canvas.GetLeft(node);
+                Canvas.SetLeft(node, oldX * scale);
+            }
+
+            // 3. 存下新倍率，并极速重绘折线！
             _pixelsPerSecond = newPixelsPerSecond;
-            RenderTrackKeyframes();
+            RedrawPropertyCurves();
         }
     }
 }

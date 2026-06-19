@@ -16,9 +16,13 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="🎭 属性时间切片" Foreground="{DynamicResource TipsColor}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                <ScrollViewer x:Name="ScrollMicroRuler" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                    <Canvas x:Name="MicroRulerCanvas" Height="50" Width="1000"/>
-                </ScrollViewer>
+                <Grid Grid.Column="1">
+                    <ScrollViewer x:Name="ScrollMicroRuler" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <Canvas x:Name="MicroRulerCanvas" Height="50" Width="1000"/>
+                    </ScrollViewer>
+
+                    <Border x:Name="PanCaptureLayer" Background="Transparent" Cursor="SizeWE"/>
+                </Grid>
             </Grid>
         </Border>
 

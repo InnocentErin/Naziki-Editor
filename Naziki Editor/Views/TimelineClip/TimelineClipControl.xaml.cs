@@ -103,81 +103,88 @@ namespace Naziki_Editor.Views
 
 
         }
-        // 🌊 绘制高频阵列的离散波纹
-        // 🌊 绘制高频阵列的离散波纹
-        public void DrawDiscreteRipples()
+        private void DrawDiscreteRipples()
         {
-            if (_model?.AssociatedObject == null || _context == null) return;
+            if (!(_model.AssociatedObject is C2NoteController noteCtrl)) return;
 
-            // 1. 先清空旧波纹 (通过 Tag 识别，防止误删其他节点)
-            var oldRipples = NodeCanvas.Children.OfType<UIElement>().Where(e => e is System.Windows.Shapes.Line l && l.Tag?.ToString() == "Ripple").ToList();
-            foreach (var r in oldRipples) NodeCanvas.Children.Remove(r);
+            // 🔍 1. 提取 NoteTarget 目标参数
+            var targetProp = noteCtrl.BaseState?.GetType().GetProperty("NoteTarget");
+            object targetObj = targetProp?.GetValue(noteCtrl.BaseState);
+            if (targetObj == null || _context?.Chart?.note_list == null) return;
 
-            var keyframes = _model.AssociatedObject.GetKeyframes();
-            if (keyframes == null) return;
+            var matchedNotes = new List<C2Note>();
+            string targetStr = targetObj.ToString().Trim();
+            NoteSelectorModel selector = null;
 
-            // 占位符反查准备，确保 $note 能被正确翻译
-            string currentNoteIdStr = "";
-            try
+            // 🧠 2. 接入大大的音符选择器大脑！(智能解析 JSON 或 单一 ID)
+            if (targetStr.StartsWith("{"))
             {
-                if (FastReflectionHelper.TryGetValue(_model.AssociatedObject, "Note", out object noteTarget) && noteTarget != null)
-                    currentNoteIdStr = noteTarget.ToString().Trim();
+                try { selector = Newtonsoft.Json.JsonConvert.DeserializeObject<NoteSelectorModel>(targetStr); } catch { }
             }
-            catch { }
-
-            foreach (var frame in keyframes)
+            else if (int.TryParse(targetStr, out int singleId))
             {
-                var timeProp = frame.GetType().GetProperty("Time");
-                if (timeProp == null) continue;
+                selector = new NoteSelectorModel { Start = singleId, End = singleId };
+            }
 
-                var timeVal = timeProp.GetValue(frame);
-                if (timeVal is Newtonsoft.Json.Linq.JArray jArr)
+            // 🔬 3. 像素级过滤音符
+            if (selector != null)
+            {
+                foreach (var note in _context.Chart.note_list)
                 {
-                    foreach (var tToken in jArr)
-                    {
-                        string timeStr = tToken.ToString().Trim();
-                        if (timeStr.Contains("$note") && !string.IsNullOrEmpty(currentNoteIdStr))
-                            timeStr = timeStr.Replace("$note", currentNoteIdStr);
+                    int ndir = 1;
+                    if (note.page_index >= 0 && _context.Chart.page_list != null && note.page_index < _context.Chart.page_list.Count)
+                        ndir = _context.Chart.page_list[note.page_index].scan_line_direction;
 
-                        double absTime = 0.0;
+                    bool isMatch = true;
+                    if (selector.Type != null && !selector.Type.Contains(note.type)) isMatch = false;
+                    if (selector.Start.HasValue && note.id < selector.Start.Value) isMatch = false;
+                    if (selector.End.HasValue && note.id > selector.End.Value) isMatch = false;
+                    if (selector.Direction.HasValue && ndir != selector.Direction.Value) isMatch = false;
+                    if (selector.MinX.HasValue && note.x < selector.MinX.Value) isMatch = false;
+                    if (selector.MaxX.HasValue && note.x > selector.MaxX.Value) isMatch = false;
 
-                        // 🚀 核心修复：使用项目现有的原生雷达解析绝对时间！
-                        if (timeStr.Contains("start") || timeStr.Contains("end") || timeStr.Contains("intro") || timeStr.Contains("at"))
-                        {
-                            if (_context.TimeEngine != null)
-                            {
-                                absTime = _context.TimeEngine.ParseCytoidTimeExpression(timeStr, _context.Chart?.note_list);
-                            }
-                        }
-                        else
-                        {
-                            double.TryParse(timeStr, out absTime);
-                        }
-
-                        // 计算相对于这个方块左边缘的 X 像素坐标
-                        double localX = (absTime - _model.StartTime) * _pixelsPerSecond;
-
-                        // 只要它在方块内部，就画一条幽灵虚线！
-                        if (localX >= 0)
-                        {
-                            System.Windows.Shapes.Line ripple = new System.Windows.Shapes.Line
-                            {
-                                X1 = localX,
-                                X2 = localX,
-                                Y1 = 0,
-                                Y2 = this.Height > 0 ? this.Height : 40, // 撑满方块高度
-                                Stroke = Brushes.White,
-                                StrokeThickness = 1.5,
-                                Opacity = 0.3, // 半透明的高雅幽灵感
-                                StrokeDashArray = new DoubleCollection { 2, 2 },
-                                Tag = "Ripple",
-                                IsHitTestVisible = false // 绝对不能挡住鼠标点击！
-                            };
-                            NodeCanvas.Children.Add(ripple);
-                        }
-                    }
+                    if (isMatch) matchedNotes.Add(note);
                 }
             }
+
+            if (matchedNotes.Count == 0) return; // 没匹配到，保持方块安静
+
+            // 📐 4. 绘制高亮背景区间 (时空边界结界！)
+            double minSec = matchedNotes.Min(n => _context.TimeEngine.TickToSeconds(n.tick));
+            double maxSec = matchedNotes.Max(n => _context.TimeEngine.TickToSeconds(n.tick + (n.hold_tick > 0 ? n.hold_tick : 0)));
+
+            double startX = minSec * _pixelsPerSecond;
+            double endX = maxSec * _pixelsPerSecond;
+            double width = endX - startX;
+
+            // ✨ 空间膨胀修复：如果是单点音符，宽度接近 0。
+            // 我们强行把结界撑开，给它一个 24 像素的华丽底座，并让它完美居中！
+            if (width < 20)
+            {
+                double center = startX + (width / 2.0);
+                width = 24;
+                startX = center - 12;
+            }
+
+            var highlightRect = new System.Windows.Shapes.Rectangle
+            {
+                Width = width,
+                Height = 36,
+                Fill = new SolidColorBrush(Color.FromArgb(40, 135, 206, 250)), // 半透明天蓝结界
+                Stroke = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.LightSkyBlue,
+                StrokeThickness = 1,
+                RadiusX = 4,
+                RadiusY = 4,
+                IsHitTestVisible = false // 绝不阻挡底层的操作
+            };
+            Canvas.SetLeft(highlightRect, startX);
+            Canvas.SetTop(highlightRect, 2);
+            NodeCanvas.Children.Add(highlightRect);
+
+            // 🎵 5. 终极偷天换日投影：召唤底部音符刻度工厂！
+            var subCanvas = new Canvas { IsHitTestVisible = false };
+            Core.Timeline.NoteVisualEngine.RenderNoteRuler(subCanvas, matchedNotes, _context.TimeEngine, _pixelsPerSecond, false);
+            NodeCanvas.Children.Add(subCanvas);
         }
 
 
@@ -209,10 +216,20 @@ namespace Naziki_Editor.Views
 
             // 5. 还原内部关键帧渲染
             RebuildInternalKeyframes();
+
+            // 6. 画出音符雷达波纹！
+            if (_model.AssociatedObject is C2NoteController)
+            {
+                DrawDiscreteRipples();
+            }
         }
 
         private void UpdateXPositionAndWidth()
         {
+            // 🌟 如果是神明级控制器，把排版全权交给父级 TimelineControl！自己不准计算！
+            bool isGlobalController = (_model.AssociatedObject is C2SceneController || _model.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(_model.AssociatedObject.TargetId);
+            if (isGlobalController) return;
+
             // 初始化我们的核心时空像素转换官
             var coordEngine = new Core.Timeline.TimelineCoordEngine(_pixelsPerSecond);
             double left = coordEngine.TimeToX(_model.StartTime);
@@ -244,11 +261,8 @@ namespace Naziki_Editor.Views
         {
             if (_model.AssociatedObject == null) return;
 
-            // 判定 A：是否是 $note 寄生宏？
             bool isMacro = false;
             dynamic baseState = _model.AssociatedObject.GetBaseState();
-
-            // 优雅反射探头：探测 Time 或者是特定的 NoteTarget 是否属于宏指令
             if (baseState != null)
             {
                 try
@@ -259,21 +273,36 @@ namespace Naziki_Editor.Views
                 catch { }
             }
 
+            // 🌟 【新增基因判定】：神明级全局控制器（不带 TargetId 的场景/音符控制器）
+            bool isGlobalController = (_model.AssociatedObject is C2SceneController || _model.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(_model.AssociatedObject.TargetId);
+
             if (isMacro)
             {
                 // 🔒 【边缘封印】：禁止左右边缘拉伸，并在角标打上 ♪ 烙印
                 ResizeLeftThumb.Visibility = Visibility.Collapsed;
                 ResizeRightThumb.Visibility = Visibility.Collapsed;
                 TxtModeIcon.Text = "♪";
-                // 让内嵌的 Rectangle 闪烁可爱的音符虚线！
                 DashBorderShape.Stroke = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.DodgerBlue;
                 DashBorderShape.StrokeDashArray = new DoubleCollection() { 3, 2 };
-                ClipBackground.BorderBrush = Brushes.Transparent; // 隐藏外层 Border 的实线边框
+                ClipBackground.BorderBrush = Brushes.Transparent;
+            }
+            else if (isGlobalController)
+            {
+                // 🌟 【手术 B 锁定】：彻底没收控制器的左右伸缩把手！
+                ResizeLeftThumb.Visibility = Visibility.Collapsed;
+                ResizeRightThumb.Visibility = Visibility.Collapsed;
+                TxtModeIcon.Text = _model.AssociatedObject is C2SceneController ? "🎛️" : "🎵";
+                DashBorderShape.Stroke = Brushes.Transparent;
+                DashBorderShape.StrokeDashArray = null;
+                // 让它看起来像一条实心的无敌轨！
+                ClipBackground.BorderBrush = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.DodgerBlue;
             }
             else
             {
+                // 🌟 恢复普通方块的把手显示
+                ResizeLeftThumb.Visibility = Visibility.Visible;
+                ResizeRightThumb.Visibility = Visibility.Visible;
                 TxtModeIcon.Text = "⏱";
-                // 绝对时间恢复原状
                 DashBorderShape.Stroke = Brushes.Transparent;
                 DashBorderShape.StrokeDashArray = null;
                 ClipBackground.BorderBrush = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.DodgerBlue;
@@ -355,28 +384,32 @@ namespace Naziki_Editor.Views
             if (_isDraggingClip)
             {
                 Point currentPos = e.GetPosition(this.Parent as UIElement);
-                // ✨ 物理防抖结界：如果鼠标移动距离小于 3 像素，判定为普通单击的微小手抖，绝不触发换轨和时间平移！
                 if (Math.Abs(currentPos.X - _clipDragStartPoint.X) < 3 && Math.Abs(currentPos.Y - _clipDragStartPoint.Y) < 3)
                     return;
 
-                // 1. ⏱️ X 轴时间平移
-                double deltaX = currentPos.X - _clipDragStartPoint.X;
-                double deltaTime = deltaX / _pixelsPerSecond;
+                // 🌟 【手术 B 拖拽锁定】
+                bool isGlobalController = (_model.AssociatedObject is C2SceneController || _model.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(_model.AssociatedObject.TargetId);
 
-                double oldDuration = _model.EndTime - _model.StartTime; // 记录原有跨度
-                _model.StartTime = _originalStartTime + deltaTime;
-                if (_model.StartTime < 0) _model.StartTime = 0;
+                // 1. ⏱️ X 轴时间平移 (只有凡人方块可以左右拖拽！)
+                if (!isGlobalController)
+                {
+                    double deltaX = currentPos.X - _clipDragStartPoint.X;
+                    double deltaTime = deltaX / _pixelsPerSecond;
 
-                // 🌟 核心对齐：保持方块宏观总长度绝对不发生穿模形变！
-                _model.EndTime = _model.StartTime + oldDuration;
+                    double oldDuration = _model.EndTime - _model.StartTime;
+                    _model.StartTime = _originalStartTime + deltaTime;
+                    if (_model.StartTime < 0) _model.StartTime = 0;
 
-                Canvas.SetLeft(this, _model.StartTime * _pixelsPerSecond);
+                    _model.EndTime = _model.StartTime + oldDuration;
 
-                // 2. ↕️ Y 轴自由时空拉扯：允许方块外壳跟随鼠标在垂直方向任意漂移
+                    Canvas.SetLeft(this, _model.StartTime * _pixelsPerSecond);
+                }
+
+                // 2. ↕️ Y 轴自由时空拉扯：允许方块跟随鼠标垂直漂移（神明也要换房间呀！）
                 double deltaY = currentPos.Y - _clipDragStartPoint.Y;
                 Canvas.SetTop(this, _originalY + deltaY);
 
-                // 📡 实时向大本营发射移动坐标，由大本营来执行全景隔离碰撞雷达！
+                // 📡 实时向大本营发射移动坐标
                 OnMacroGridDrag?.Invoke(this, e, MacroDragStage.Moving);
             }
         }
@@ -537,18 +570,39 @@ namespace Naziki_Editor.Views
             NodeCanvas.Children.Clear();
             _nodeThumbs.Clear();
 
-            var keyframes = _model.AssociatedObject?.GetKeyframes();
-            if (keyframes == null) return;
+            if (_model.AssociatedObject == null) return;
 
-            // 遍历所有帧状态，在方块内画出 ♦
-            double totalDuration = _model.EndTime - _model.StartTime;
-            if (totalDuration <= 0) totalDuration = 1.0;
+            // 🌟 净化 1：凡人方块 (普通场景对象) 绝对不显示关键帧 (视觉减负！)
+            bool isGlobalController = (_model.AssociatedObject is C2SceneController || _model.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(_model.AssociatedObject.TargetId);
+            if (!isGlobalController) return;
 
-            foreach (var frame in keyframes)
+            // 🌟 净化 2：音符控制器也不在这画帧，它有专属的 DrawDiscreteRipples 雷达！
+            if (_model.AssociatedObject is C2NoteController) return;
+
+            // 🌟 净化 3：场景控制器专属 —— “只读的小钻石”！
+            if (_model.AssociatedObject is C2SceneController ctrl && ctrl.Keyframes != null)
             {
-                // 获取当前帧的相对秒数
-                // 暂时用测试节点占位，实际用反射抓取 frame.Time 或算出来的绝对秒数
-                AddKeyframeNodeToCanvas(50, 0.5);
+                var coordEngine = new Core.Timeline.TimelineCoordEngine(_pixelsPerSecond);
+                foreach (var state in ctrl.Keyframes)
+                {
+                    double timeSec = 0;
+                    if (state.Time != null && double.TryParse(state.Time.ToString(), out double t)) timeSec = t;
+                    if (timeSec == float.MaxValue) continue;
+
+                    double xPos = coordEngine.TimeToX(timeSec);
+
+                    // 画一个漂亮的只读菱形 (Path)，替代原来可以乱拖的 Thumb！
+                    var diamond = new System.Windows.Shapes.Path
+                    {
+                        Fill = (Brush)Application.Current.FindResource("HighlightBorderColor") ?? Brushes.LightSkyBlue,
+                        Data = Geometry.Parse("M 0,4 L 4,0 L 8,4 L 4,8 Z"), // 8x8 完美菱形
+                        ToolTip = $"只读属性帧时间: {timeSec:F3}s\n(请双击进入微观时光屋调校)",
+                        IsHitTestVisible = true // 允许鼠标悬停显示文字，但不允许拖动
+                    };
+                    Canvas.SetLeft(diamond, xPos - 4);
+                    Canvas.SetTop(diamond, 16); // 居中悬浮
+                    NodeCanvas.Children.Add(diamond);
+                }
             }
         }
 
