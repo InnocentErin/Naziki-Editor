@@ -82,7 +82,7 @@ namespace Naziki_Editor.Views.TimelineClip
             // ==========================================
             double maxTime = 10;
             if (_context.Chart?.note_list != null && _context.Chart.note_list.Count > 0)
-                maxTime = _context.TimeEngine.TickToSeconds(_context.Chart.note_list[context.Chart.note_list.Count - 1].tick) + 5;
+                maxTime = _context.TimeEngine.TickToSeconds(_context.Chart.note_list[_context.Chart.note_list.Count - 1].tick) + 5;
 
             double lastFrameAbs = StoryboardTimeConverter.CalculateEntityEndTime(
                 _clipModel.AssociatedObject,
@@ -90,6 +90,10 @@ namespace Naziki_Editor.Views.TimelineClip
                 _context.TimeEngine,
                 _context.Chart?.note_list
             );
+
+            // 🚀 【性能防爆屏障】：如果计算出的结束时间是未初始化的极大值（如 float.MaxValue），直接强制截断！
+            // 防止后续生成宽度达到几百万像素的标尺，导致 WPF 测算引擎疯狂触发 SetValue 死循环！
+            if (lastFrameAbs > 10000) lastFrameAbs = maxTime;
 
             // 联动修正：确保方块模型内存里的 EndTime 与核心同步刷新
             _clipModel.EndTime = lastFrameAbs;
@@ -521,14 +525,18 @@ namespace Naziki_Editor.Views.TimelineClip
 
         private void RenderMicroRulerTicks(double maxTime)
         {
-            MicroRulerCanvas.Children.Clear();
+            // ✨ 1. 必须先召唤音符雷达！
+            // 提前让引擎画好音符（并执行它的 Canvas.Clear()），绝不影响后续图层！
+            Core.Timeline.NoteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
+
             int maxSeconds = (int)Math.Ceiling(maxTime);
 
-            // 1. 画秒数白线（给它们打上专属的基因条码 TICK_LINE 和 TICK_TEXT）
+            // ✨ 2. 在音符画完之后，补上绝对秒数刻度（覆盖在音符之上，更清晰！）
             for (int s = 0; s <= maxSeconds; s++)
             {
                 double x = s * _pixelsPerSecond;
-                MicroRulerCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = x, X2 = x, Y1 = 5, Y2 = 18, Stroke = Brushes.Gray, StrokeThickness = 1, Tag = $"TICK_LINE_{s}" });
+                // 让刻度线从顶部往下画 20 像素
+                MicroRulerCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = x, X2 = x, Y1 = 0, Y2 = 20, Stroke = Brushes.Gray, StrokeThickness = 1, Tag = $"TICK_LINE_{s}" });
 
                 var text = new TextBlock { Text = s + "s", FontSize = 10, Foreground = Brushes.Gray, Tag = $"TICK_TEXT_{s}" };
                 Canvas.SetLeft(text, x + 2);
@@ -536,15 +544,17 @@ namespace Naziki_Editor.Views.TimelineClip
                 MicroRulerCanvas.Children.Add(text);
             }
 
-            // 2. 补上五颜六色的音符 (底层已经内置了 C2Note Tag)
-            Core.Timeline.NoteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
-
-            // 3. ✨ 高光时刻：半透明蓝玻璃 (打上 HIGHLIGHT 标签)
+            // ✨ 3. 最后铺上这块半透明的蓝色玻璃结界，标明方块的生命周期
             double startX = _clipModel.StartTime * _pixelsPerSecond;
             double endX = _clipModel.EndTime * _pixelsPerSecond;
+
+            // 🚀 【二次防爆兜底】：为矩形宽度设下安全极限，防止 WPF 渲染核爆
+            double rectWidth = endX - startX;
+            if (rectWidth > 100000) rectWidth = 100000;
+
             var highlight = new System.Windows.Shapes.Rectangle
             {
-                Width = Math.Max(2, endX - startX),
+                Width = Math.Max(2, rectWidth),
                 Height = 50,
                 Fill = new SolidColorBrush(Color.FromArgb(40, 77, 184, 255)),
                 Tag = "HIGHLIGHT"

@@ -50,8 +50,32 @@ namespace Naziki_Editor.Views.TimelineClip
 
 
 
+
+        // 🌟 大一统法则：真理之眼！无视宏观假象，直接提取 BaseState 里真实的绝对秒数！
+        private double GetTrueBaseTimeSec()
+        {
+            double fallback = _clipModel.StartTime;
+            if (_clipModel?.AssociatedObject == null) return fallback;
+
+            var baseState = _clipModel.AssociatedObject.GetBaseState();
+            if (baseState != null)
+            {
+                var timeProp = baseState.GetType().GetProperty("Time");
+                if (timeProp != null)
+                {
+                    object timeVal = timeProp.GetValue(baseState);
+                    if (timeVal != null)
+                    {
+                        // 呼叫大大的统一时间引擎，无论是 "$note" 还是 "10"，瞬间翻译为绝对秒数！
+                        return _context.TimeEngine.ParseCytoidTimeExpression(timeVal.ToString(), _context.Chart?.note_list);
+                    }
+                }
+            }
+            return fallback;
+        }
+
         // ==========================================
-        // 🎨 核心重绘引擎：初始属性与关键帧完美独立！
+        // 🎨 核心重绘引擎：V8 极速防爆版！
         // ==========================================
         public void RenderTrackKeyframes()
         {
@@ -60,20 +84,20 @@ namespace Naziki_Editor.Views.TimelineClip
 
             if (_clipModel?.AssociatedObject == null) return;
 
-            // 1. 🛡️ 询问大管家：这个属性是不是 Slider（有极值限制的数值型）？
             var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
             bool isSlider = rule != null && rule.UIType == Core.PropertyUIType.Slider;
 
+            // 🚀 【性能优化 1】：将资源查找移出循环！WPF 查找资源的耗时在循环内是毁灭性的！
+            Style nodeStyle = Application.Current.TryFindResource(isSlider ? "OpacityThumbStyle" : "KeyframeThumbStyle") as Style;
+
             // ==========================================
-            // ✨ 核心修正：无条件独立渲染最左侧的【初始属性钮扣】
+            // 渲染 BaseState (初始钮扣)
             // ==========================================
+            double trueBaseTimeSec = GetTrueBaseTimeSec(); // 🌟 提取真实起跑线！
             var baseState = _clipModel.AssociatedObject.GetBaseState();
             if (baseState != null && Core.FastReflectionHelper.TryGetValue(baseState, _propertyName, out object baseVal) && baseVal != null)
             {
-                // ⏱️ 时空锚定：初始属性的 X 轴永远钉死在方块的 StartTime 起点！
-                double initialAbsX = _clipModel.StartTime * _pixelsPerSecond;
-
-                // 📐 Y 轴映射
+                double initialAbsX = trueBaseTimeSec * _pixelsPerSecond;
                 double initialY = 14;
                 if (isSlider)
                 {
@@ -84,41 +108,44 @@ namespace Naziki_Editor.Views.TimelineClip
                     initialY = 28 * (1.0 - ratio);
                 }
 
-                // 🌟 生成初始专属钮扣 (给它打上专属的标签)
                 Thumb initialNode = new Thumb
                 {
-                    Tag = "BASE_STATE_NODE", // 【核心暗号】代表它是神圣初始状态，非普通关键帧！
-                    Style = Application.Current.TryFindResource(isSlider ? "OpacityThumbStyle" : "KeyframeThumbStyle") as Style
+                    Tag = "BASE_STATE_NODE",
+                    Style = nodeStyle, // ✨ 使用缓存的样式！
+                    Background = Brushes.Gold,
+                    BorderBrush = Brushes.White,
+                    ToolTip = $"🌟 初始状态锚点 (Base State)\n时间: {trueBaseTimeSec:F3}s\n(拖动我将直接改变整个事件方块的起点哦！)",
+                    Margin = new Thickness(-6, 0, 0, 0)
                 };
 
                 initialNode.DragDelta += Node_DragDelta;
                 initialNode.MouseRightButtonDown += Node_MouseRightButtonDown;
-                // ✨ 当拖拽松开时，强制进行一次身份刷新与主权隔离！
                 initialNode.DragCompleted += (s, ev) => { RenderTrackKeyframes(); };
 
-                KeyframeNodeCanvas.Children.Add(initialNode);
+                // 🚀 【性能优化 2】：必须先设定依赖属性(SetLeft/SetTop)，最后再 Add！
+                // 这样元素在内存中组装好，进入屏幕时只会引发 1 次轻量级渲染！绝不卡顿！
                 Canvas.SetLeft(initialNode, initialAbsX);
                 Canvas.SetTop(initialNode, initialY);
+                KeyframeNodeCanvas.Children.Add(initialNode);
                 _nodes.Add(initialNode);
             }
 
             // ==========================================
-            // 🧬 ⚡ 呼叫独立时间转换引擎：一次性安全压平获取所有可见帧
+            // 渲染其它解码后的普通关键帧
             // ==========================================
             var decodedFrames = Core.StoryboardTimeConverter.DecodeTimelineKeyframes(
-    _clipModel.AssociatedObject, 
-    _propertyName, 
-    _context.TimeEngine,           // 喂入大大的 ChartTimeEngine！
-    _context.Chart?.note_list,     // 喂入 C2Chart 的强类型音符列表！
-    _clipModel.StartTime           // 喂入方块自己的宏观起点
-);
+                _clipModel.AssociatedObject,
+                _propertyName,
+                _context.TimeEngine,
+                _context.Chart?.note_list,
+                trueBaseTimeSec
+            );
 
             foreach (var box in decodedFrames)
             {
-                // 如果有关键帧不小心堆在了出生点，为了视觉不冲突，跳过渲染
                 if (box.VisualRelTime <= 0.001) continue;
 
-                double absoluteTime = _clipModel.StartTime + box.VisualRelTime;
+                double absoluteTime = trueBaseTimeSec + box.VisualRelTime;
                 double xPos = absoluteTime * _pixelsPerSecond;
 
                 double yPos = 14;
@@ -133,22 +160,23 @@ namespace Naziki_Editor.Views.TimelineClip
 
                 Thumb node = new Thumb
                 {
-                    Tag = box.State, // 真实关键帧的 Tag 依然装着它自己的状态对象
-                    Style = Application.Current.TryFindResource(isSlider ? "OpacityThumbStyle" : "KeyframeThumbStyle") as Style
+                    Tag = box.State,
+                    Style = nodeStyle, // ✨ 使用缓存的样式！
+                    Margin = new Thickness(-6, 0, 0, 0)
                 };
 
                 node.DragDelta += Node_DragDelta;
                 node.MouseRightButtonDown += Node_MouseRightButtonDown;
-                // 拖拽结束后，让小菱形在轨道上根据最新时间重新洗牌、对齐站好！
                 node.DragCompleted += (s, ev) => { RenderTrackKeyframes(); };
 
-                KeyframeNodeCanvas.Children.Add(node);
+                // 🚀 【性能优化 2】：先设定位置，再塞进画板！
                 Canvas.SetLeft(node, xPos);
                 Canvas.SetTop(node, yPos);
+                KeyframeNodeCanvas.Children.Add(node);
                 _nodes.Add(node);
             }
 
-            // 6. 🧶 画出命运的连线！
+            // 画线逻辑不变
             RedrawPropertyCurves();
         }
 
@@ -173,7 +201,7 @@ namespace Naziki_Editor.Views.TimelineClip
         /// </summary>
         private void TrackRow_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            
+
         }
 
         private void Node_DragDelta(object sender, DragDeltaEventArgs e)
@@ -187,24 +215,53 @@ namespace Naziki_Editor.Views.TimelineClip
                 bool isBaseStateNode = (node.Tag is string str && str == "BASE_STATE_NODE");
 
                 // ==========================================
-                // 1. ⏱️ X 轴水平绝对移动控制（全面满足大大的多态时间滑动需求！）
+                // 1. ⏱️ X 轴水平绝对移动控制（大一统法则完美升级版！）
                 // ==========================================
+                double trueBaseTimeSec = GetTrueBaseTimeSec(); // 🌟 提取真理
+
                 if (isBaseStateNode)
                 {
-                    // 初始核心纽扣：绝对领域防线，强行钉死在方块微观起点，完全封印左右位移
-                    double initialAbsX = _clipModel.StartTime * _pixelsPerSecond;
-                    Canvas.SetLeft(node, initialAbsX);
-                }
-                else if (node.Tag is Models.ObjectState state)
-                {
-                    // 普通关键帧：执行严格的“绝对不超车防线（叹息之墙 2.0）”
                     double currentX = Canvas.GetLeft(node);
                     double newX = currentX + e.HorizontalChange;
 
-                    double minX = _clipModel.StartTime * _pixelsPerSecond;
+                    double minX = 0;
+                    double maxX = double.MaxValue;
+                    if (_nodes.Count > 1 && _nodes[1] != node) maxX = Canvas.GetLeft(_nodes[1]) - 1;
+
+                    if (newX < minX) newX = minX;
+                    if (newX > maxX) newX = maxX;
+
+                    Canvas.SetLeft(node, newX);
+
+                    double deltaSec = (newX - currentX) / _pixelsPerSecond;
+
+                    // 🌟 身份鉴定：普通对象拖动初始点会改变寿命边界，但永生控制器绝对不改边界！
+                    bool isController = _clipModel.AssociatedObject.GetType().Name.Contains("Controller");
+                    if (!isController)
+                    {
+                        _clipModel.StartTime += deltaSec;
+                    }
+
+                    var baseState = _clipModel.AssociatedObject.GetBaseState();
+                    if (baseState != null)
+                    {
+                        var timeProp = baseState.GetType().GetProperty("Time");
+                        if (timeProp != null)
+                        {
+                            object oldTime = timeProp.GetValue(baseState);
+                            object newTimeStr = Core.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaSec);
+                            timeProp.SetValue(baseState, newTimeStr);
+                        }
+                    }
+                }
+                else if (node.Tag is Models.ObjectState state)
+                {
+                    double currentX = Canvas.GetLeft(node);
+                    double newX = currentX + e.HorizontalChange;
+
+                    double minX = 0;
                     double maxX = double.MaxValue;
 
-                    // 碰撞界限：严禁超越左边的物理节点或右边的物理节点
                     if (index > 0) minX = Canvas.GetLeft(_nodes[index - 1]) + 1;
                     if (index < _nodes.Count - 1) maxX = Canvas.GetLeft(_nodes[index + 1]) - 1;
 
@@ -213,18 +270,17 @@ namespace Naziki_Editor.Views.TimelineClip
 
                     Canvas.SetLeft(node, newX);
 
-                    // 🧙‍♂️ 计算调整后的绝对秒数与视觉相对时间
                     double newAbsTime = newX / _pixelsPerSecond;
-                    double newVisualRelTime = newAbsTime - _clipModel.StartTime;
+                    // 🌟 计算视差相对时间，必须减去真实的起跑线！
+                    double newVisualRelTime = newAbsTime - trueBaseTimeSec;
 
-                    // 🚀 呼叫满配核心反写引擎：内部自动识别【绝对秒数/音符锚点延迟/相对级联】，精准重写！
                     Core.StoryboardTimeConverter.WriteBackVisualTime(
                         _clipModel.AssociatedObject,
                         state,
                         newVisualRelTime,
-                        _context.TimeEngine,        // 喂入音符换算引擎
-                        _context.Chart?.note_list,  // 喂入全量音符列表
-                        _clipModel.StartTime        // 喂入方块起点秒数
+                        _context.TimeEngine,
+                        _context.Chart?.note_list,
+                        trueBaseTimeSec             // 🌟 喂给底层的基准点！
                     );
                 }
 
@@ -281,7 +337,8 @@ namespace Naziki_Editor.Views.TimelineClip
 
                 // 1. 打开属性编辑器
                 var editItem = new MenuItem { Header = "⚙️ 打开属性编辑器" };
-                editItem.Click += (s, ev) => {
+                editItem.Click += (s, ev) =>
+                {
                     if (Window.GetWindow(this) is MainWindow main && _clipModel?.AssociatedObject != null)
                     {
                         main.OpenPropertyEditor(_clipModel.AssociatedObject);
@@ -294,7 +351,8 @@ namespace Naziki_Editor.Views.TimelineClip
                 {
                     // 2. 复制属性
                     var copyItem = new MenuItem { Header = "📋 复制关键帧属性" };
-                    copyItem.Click += (s, ev) => {
+                    copyItem.Click += (s, ev) =>
+                    {
                         if (node.Tag is Models.ObjectState state)
                         {
                             string json = Newtonsoft.Json.JsonConvert.SerializeObject(state);
@@ -307,7 +365,8 @@ namespace Naziki_Editor.Views.TimelineClip
 
                     // 3. 粘贴属性（冲突检测）
                     var pasteItem = new MenuItem { Header = "📥 粘贴属性", IsEnabled = _clipboardState != null };
-                    pasteItem.Click += (s, ev) => {
+                    pasteItem.Click += (s, ev) =>
+                    {
                         if (_clipboardState != null && node.Tag is Models.ObjectState targetState)
                         {
                             CheckAndPasteProperties(targetState);
@@ -370,7 +429,8 @@ namespace Naziki_Editor.Views.TimelineClip
 
             // 核心修复：允许在空白处新建，并自动继承事件的初始属性
             var newItem = new MenuItem { Header = "➕ 在此处新建关键帧" };
-            newItem.Click += (s, ev) => {
+            newItem.Click += (s, ev) =>
+            {
                 double clickX = e.GetPosition(KeyframeNodeCanvas).X;
                 double newAbsTime = clickX / _pixelsPerSecond;
                 double newRelTime = newAbsTime - _clipModel.StartTime;
@@ -399,7 +459,8 @@ namespace Naziki_Editor.Views.TimelineClip
             if (_clipboardState != null)
             {
                 var pasteNewItem = new MenuItem { Header = "📥 在此处新建关键帧并粘贴" };
-                pasteNewItem.Click += (s, ev) => {
+                pasteNewItem.Click += (s, ev) =>
+                {
                     double clickX = e.GetPosition(KeyframeNodeCanvas).X;
                     double newAbsTime = clickX / _pixelsPerSecond;
                     double newRelTime = newAbsTime - _clipModel.StartTime;
@@ -445,7 +506,7 @@ namespace Naziki_Editor.Views.TimelineClip
         // =========================================================================
         // 🔮 辅助数学桩（真实开发中对接 Cytoid_StoryboardModel 的 States 列表）
         // =========================================================================
-        
+
         private void RedrawPropertyCurves()
         {
             CurveRenderCanvas.Children.Clear();
@@ -465,8 +526,9 @@ namespace Naziki_Editor.Views.TimelineClip
             foreach (var node in sortedNodes)
             {
                 // 连接节点的正中心 (加上半径偏移)
-                double x = Canvas.GetLeft(node) + 6;
-                double y = Canvas.GetTop(node) + 6;
+
+                double x = Canvas.GetLeft(node);
+                double y = Canvas.GetTop(node) + 6; // Y 轴我们没动 Margin，所以依然加 6 寻找中心。
                 curve.Points.Add(new Point(x, y));
             }
 

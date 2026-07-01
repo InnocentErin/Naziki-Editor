@@ -1473,7 +1473,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private readonly PropertyInfo _prop;
         private readonly object _state;
         private readonly State.ProjectDataContext _context;
-        private Newtonsoft.Json.Linq.JArray _pointsArray;
+        private JArray _pointsArray;
         private StackPanel _pointsContainer;
         private bool _isInternalUpdating = false;
 
@@ -1497,16 +1497,16 @@ namespace Naziki_Editor.Views.PropertyEditor
             object val = _prop.GetValue(_state);
             if (val != null)
             {
-                try { _pointsArray = Newtonsoft.Json.Linq.JArray.FromObject(val); }
+                try { _pointsArray = JArray.FromObject(val); }
                 catch { _pointsArray = null; }
             }
 
             // 防呆兜底：如果是新线条，自动给足保底的两个点 (默认 X 取 NoteX=1, Y 取 NoteY=2)
             if (_pointsArray == null || _pointsArray.Count < 2)
             {
-                _pointsArray = new Newtonsoft.Json.Linq.JArray(
-                    new Newtonsoft.Json.Linq.JObject { ["x"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = -100f, ["Unit"] = 1 }, ["y"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = 0f, ["Unit"] = 2 }, ["z"] = null },
-                    new Newtonsoft.Json.Linq.JObject { ["x"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = 100f, ["Unit"] = 1 }, ["y"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = 0f, ["Unit"] = 2 }, ["z"] = null }
+                _pointsArray = new JArray(
+                    new JObject { ["x"] = new JObject { ["Value"] = -100f, ["Unit"] = 1 }, ["y"] = new JObject { ["Value"] = 0f, ["Unit"] = 2 }, ["z"] = null },
+                    new JObject { ["x"] = new JObject { ["Value"] = 100f, ["Unit"] = 1 }, ["y"] = new JObject { ["Value"] = 0f, ["Unit"] = 2 }, ["z"] = null }
                 );
             }
             RenderUI();
@@ -1520,7 +1520,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             for (int i = 0; i < pointCount; i++)
             {
-                var ptObj = _pointsArray[i] as Newtonsoft.Json.Linq.JObject;
+                var ptObj = _pointsArray[i] as JObject;
                 _pointsContainer.Children.Add(CreatePointRow(ptObj, pointCount));
             }
             _isInternalUpdating = false;
@@ -1529,16 +1529,16 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         private void AddNewPoint()
         {
-            _pointsArray.Add(new Newtonsoft.Json.Linq.JObject
+            _pointsArray.Add(new JObject
             {
-                ["x"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = 0f, ["Unit"] = 1 },
-                ["y"] = new Newtonsoft.Json.Linq.JObject { ["Value"] = 0f, ["Unit"] = 2 },
+                ["x"] = new JObject { ["Value"] = 0f, ["Unit"] = 1 },
+                ["y"] = new JObject { ["Value"] = 0f, ["Unit"] = 2 },
                 ["z"] = null
             });
             RenderUI();
         }
 
-        private UIElement CreatePointRow(Newtonsoft.Json.Linq.JObject pt, int totalCount)
+        private UIElement CreatePointRow(JObject pt, int totalCount)
         {
             var border = new Border { BorderBrush = Brushes.DimGray, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 0, 5), Padding = new Thickness(5, 5, 5, 5), Background = new SolidColorBrush(Color.FromRgb(40, 40, 40)) };
             var grid = new Grid();
@@ -1563,7 +1563,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             return border;
         }
 
-        private UIElement CreateAxisInput(string label, Newtonsoft.Json.Linq.JObject pt, string axis, int defaultUnit)
+        private UIElement CreateAxisInput(string label, JObject pt, string axis, int defaultUnit)
         {
             var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
             panel.Children.Add(new TextBlock { Text = label, Foreground = Brushes.LightSkyBlue, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
@@ -1579,7 +1579,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             cmbUnit.Items.Add(new ComboBoxItem { Content = "CY", Tag = 6 });
 
             var axisToken = pt[axis];
-            if (axisToken != null && axisToken.Type != Newtonsoft.Json.Linq.JTokenType.Null)
+            if (axisToken != null && axisToken.Type != JTokenType.Null)
             {
                 txtVal.Text = axisToken["Value"]?.ToString();
                 int u = axisToken["Unit"]?.Value<int>() ?? defaultUnit;
@@ -1600,7 +1600,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 }
                 else if (float.TryParse(t, out float v))
                 {
-                    if (pt[axis] == null || pt[axis].Type == Newtonsoft.Json.Linq.JTokenType.Null) pt[axis] = new Newtonsoft.Json.Linq.JObject();
+                    if (pt[axis] == null || pt[axis].Type == JTokenType.Null) pt[axis] = new JObject();
                     pt[axis]["Value"] = v;
                     pt[axis]["Unit"] = (int)((ComboBoxItem)cmbUnit.SelectedItem).Tag;
                 }
@@ -1626,7 +1626,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                 if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
                 {
-                    var ctxProp = parentWin.GetType().GetProperty("_context", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
                     if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
                 }
             }

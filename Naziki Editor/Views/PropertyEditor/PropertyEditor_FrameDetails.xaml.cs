@@ -98,12 +98,15 @@ namespace Naziki_Editor.Views.PropertyEditor
         private bool _isRoot;
         private bool _isControlBoard = false; // ✨ 新增：高阶属性控制板检测锁
 
-        private Naziki_Editor.State.ProjectDataContext _context;
+        private ProjectDataContext _context;
+        // 🌟 新增：记住当前编辑对象的宏观本体，以及刚刚被静默注入的属性名！
+        private IStoryboardEntity _mainObject;
+        private string _lastAutoInjectedProp = null;
 
-        private System.Collections.Generic.Dictionary<string, C2Template> _globalTemplates;
+        private Dictionary<string, C2Template> _globalTemplates;
         private HashSet<string> _invalidProperties = new HashSet<string>();
 
-        public void InitTemplates(System.Collections.Generic.Dictionary<string, C2Template> templates)
+        public void InitTemplates(Dictionary<string, C2Template> templates)
         {
             _globalTemplates = templates;
         }
@@ -116,13 +119,17 @@ namespace Naziki_Editor.Views.PropertyEditor
         // ==========================================
         // 📥 终极修正入口：精准对接新世界时空
         // ==========================================
-        public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot, ProjectDataContext context)
+        public void LoadState(object stateReference, string frameTitle, object rootState, bool isRoot, ProjectDataContext context, IStoryboardEntity mainObject = null)
         {
             _context = context;
             _currentState = stateReference;
             _rootState = rootState;
             _isRoot = isRoot;
             _currentTitle = frameTitle;
+
+            // 🌟 记住本体，并在每次切换关键帧时清空提示印记！
+            if (mainObject != null) _mainObject = mainObject;
+            _lastAutoInjectedProp = null;
 
             if (_currentState == null)
             {
@@ -382,6 +389,26 @@ namespace Naziki_Editor.Views.PropertyEditor
             FrameworkElement inputCtrl = BuildBoundInputControl(prop, value, isLocked, templateValue);
             Grid.SetColumn(inputCtrl, 1);
             grid.Children.Add(inputCtrl);
+
+            // 🌟 拦截拦截！看看这个属性是不是刚才被静默兜底的那个幸运儿？
+            if (prop.Name == _lastAutoInjectedProp)
+            {
+                StackPanel sp = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                grid.Margin = new Thickness(0); // 清除原本 grid 的底边距，交给大盒子管理
+                sp.Children.Add(grid);
+
+                // ✨ 降临温馨提示文本！
+                sp.Children.Add(new TextBlock
+                {
+                    Text = "💡 该属性为新属性，已于初始属性(BaseState)静默新增默认值，若有需要请前往调整。",
+                    Foreground = Brushes.DarkOrange,
+                    FontSize = 11,
+                    Margin = new Thickness(140, 4, 0, 0), // 精准向右缩进 140，对齐右侧的输入框
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                return sp; // 返回加了提示的超级组合包！
+            }
 
             return grid;
         }
@@ -653,11 +680,52 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             if (cmb.SelectedItem is ComboBoxItem item && item.Tag is PropertyInfo prop)
             {
-                Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-                object defaultVal = uType == typeof(string) ? "" : (uType == typeof(UnitFloat) ? new UnitFloat { Value = 0, Unit = ReferenceUnit.World } : (uType == typeof(System.Collections.Generic.List<string>) ? new System.Collections.Generic.List<string>(new string[12]) : Activator.CreateInstance(uType)));
+                // 1. 去大管家那里要默认约束
+                var rule = Core.PropertyConstraintManager.GetConstraint(prop.Name);
 
+                Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                object defaultVal = null;
+
+                // 🔮 安全转换默认值
+                if (rule != null && rule.DefaultValue != null)
+                {
+                    try { defaultVal = Convert.ChangeType(rule.DefaultValue, uType); } catch { }
+                }
+
+                // 终极白板兜底 (结合大大原有的严谨逻辑)
+                if (defaultVal == null)
+                {
+                    defaultVal = uType == typeof(string) ? "" : (uType == typeof(UnitFloat) ? new UnitFloat { Value = 0, Unit = ReferenceUnit.World } : (uType == typeof(System.Collections.Generic.List<string>) ? new System.Collections.Generic.List<string>(new string[12]) : Activator.CreateInstance(uType)));
+                }
+
+                // 2. 赋予当前正在编辑的关键帧
                 prop.SetValue(_currentState, defaultVal);
-                LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
+
+                // ==========================================
+                // 🌟 3. 静默探测并注入 BaseState (初始属性兜底)
+                // ==========================================
+                _lastAutoInjectedProp = null;
+                if (_mainObject != null)
+                {
+                    var baseState = _mainObject.GetBaseState();
+                    if (baseState != null && baseState != _currentState) // 确保不是初始帧本身
+                    {
+                        var baseProp = baseState.GetType().GetProperty(prop.Name);
+                        if (baseProp != null)
+                        {
+                            object baseVal = baseProp.GetValue(baseState);
+                            if (baseVal == null)
+                            {
+                                // 💥 初始帧没有这个属性！静默注入默认值！
+                                baseProp.SetValue(baseState, defaultVal);
+                                _lastAutoInjectedProp = prop.Name; // 盖上印记，通知 UI 弹出提示！
+                            }
+                        }
+                    }
+                }
+
+                // 4. 重新刷新面板 (顺便带上 _mainObject)
+                LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context, _mainObject);
             }
         }
 

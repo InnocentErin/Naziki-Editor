@@ -11,12 +11,13 @@
         <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="150" SharedSizeGroup="TrackHeaderCol"/>
+                    <ColumnDefinition Width="2"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="🎭 属性时间切片" Foreground="{DynamicResource TipsColor}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="0" Text="🎭 属性时间切片" Foreground="{DynamicResource TipsColor}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                <Grid Grid.Column="1">
+                <Grid Grid.Column="2">
                     <ScrollViewer x:Name="ScrollMicroRuler" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                         <Canvas x:Name="MicroRulerCanvas" Height="50" Width="1000"/>
                     </ScrollViewer>

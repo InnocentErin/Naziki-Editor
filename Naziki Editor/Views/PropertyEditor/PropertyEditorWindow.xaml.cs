@@ -49,13 +49,13 @@ namespace Naziki_Editor.Views.PropertyEditor
                 ModFrameList.LoadData(activeObj, _context);
 
                 var method = ModFrameDetails.GetType().GetMethod("LoadState");
-                method?.Invoke(ModFrameDetails, new object[] { null, "", null, false, _context });
+                method?.Invoke(ModFrameDetails, new object[] { null, "", null, false, _context, _currentActiveObject });
             };
 
             // 3. 左侧点关键帧，右侧加载详情
             ModFrameList.OnFrameSelected += (state, title, bindingProps, isRoot) =>
             {
-                ModFrameDetails.LoadState(state, title, bindingProps, isRoot, _context);
+                ModFrameDetails.LoadState(state, title, bindingProps, isRoot, _context, _currentActiveObject);
             };
 
             // 4. 搜刮影子并交给子控件接管！
