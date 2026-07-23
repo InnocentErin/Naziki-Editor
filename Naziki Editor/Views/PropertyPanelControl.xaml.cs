@@ -1,10 +1,12 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
+using Naziki_Editor.Core.Abstractions;
 
 namespace Naziki_Editor.Views
 {
@@ -13,9 +15,9 @@ namespace Naziki_Editor.Views
         public event Action<object> OnEditPropertiesRequested;
         public event Action<object> OnSaveAsMaterialRequested;
         public event Action OnApplyPropertiesRequested;
-        public event Action OnDataModified;
 
         private object _currentObject;
+        private readonly IMessageBroker _messageBroker;
         public ProjectDataContext Context { get; private set; }
 
         public void LoadContext(ProjectDataContext context)
@@ -26,6 +28,11 @@ namespace Naziki_Editor.Views
         public PropertyPanelControl()
         {
             InitializeComponent();
+        }
+
+        public PropertyPanelControl(IMessageBroker messageBroker) : this()
+        {
+            _messageBroker = messageBroker;
         }
 
         public void SetSelectedObject(object obj)
@@ -291,7 +298,7 @@ namespace Naziki_Editor.Views
             {
                 // 📢 呼叫主战舰！我这里有个对象需要打开高级属性编辑器啦！
                 // 无论是普通对象还是模板，主窗口的频道 2 都已经写好了自动分拣逻辑，直接把对象丢过去就行！
-                State.EventBus.Publish("RequestOpenPropertyEditor", _currentObject);
+                _messageBroker.Publish("RequestOpenPropertyEditor", _currentObject);
             }
         }
 

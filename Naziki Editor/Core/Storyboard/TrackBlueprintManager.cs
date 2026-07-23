@@ -1,4 +1,5 @@
-﻿using Naziki_Editor.Models;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Models;
 using System.Collections.Generic;
 
 namespace Naziki_Editor.Core
@@ -14,12 +15,12 @@ namespace Naziki_Editor.Core
         public object DefaultValue { get; set; }
     }
 
-    public static class TrackBlueprintManager
+    public class TrackBlueprintManager : ITrackBlueprintManager
     {
         // ==========================================
         // 🔮 场景控制器 (Scene Controller) 终极蓝图
         // ==========================================
-        public static readonly List<TrackBlueprint> ControllerBlueprints = new List<TrackBlueprint>
+        public List<TrackBlueprint> ControllerBlueprints { get; } = new List<TrackBlueprint>
         {
             // 🏷️ 基础与UI控制
             new TrackBlueprint { GroupName = "基础透明度", JsonName = "storyboard_opacity", DisplayName = "故事板总透明度", DataType = TrackDataType.Float },
@@ -93,7 +94,7 @@ namespace Naziki_Editor.Core
         };
 
         // 供 UI 调用的分发口
-        public static List<TrackBlueprint> GetBlueprintsForType(System.Type type)
+        public List<TrackBlueprint> GetBlueprintsForType(System.Type type)
         {
             if (type == typeof(ControllerState) || type == typeof(C2SceneController))
                 return ControllerBlueprints;

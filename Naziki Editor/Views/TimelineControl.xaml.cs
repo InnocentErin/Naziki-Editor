@@ -1,4 +1,9 @@
-﻿using Naziki_Editor.Models;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Common;
+using Naziki_Editor.Core.Messaging;
+using Naziki_Editor.Core.Storyboard;
+using Naziki_Editor.Models;
+using Naziki_Editor.UI.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -25,26 +30,29 @@ namespace Naziki_Editor.Views
         private double _currentPlayheadSeconds = 0.0;
         private string _lastTimeText = "";
 
-        // 🎬 详细调整模式（微观时光屋）状态锁
-        private TimelineClip.ClipDetailedEditor _detailedEditor = null;
-        private bool _isDetailedEditMode = false;
-        private Models.TimelineClipModel _editingClipModel = null;
         private State.ProjectDataContext _context = null; // 记住当前的大本营上下文！
+        private TimelineViewModel _viewModel;
+        private IAudioSyncEngine _audioEngine;
+        private IMessageBroker _messageBroker;
+        private IDialogService _dialogService;
+        private UI.Rendering.NoteVisualEngine _noteVisualEngine;
+        private IStoryboardRepository _storyboardRepository;
+        private IPropertyEditorService _propertyEditorService;
+        private UI.Rendering.GlobalRenderEngine _renderEngine;
 
-        // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
         // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
         private class TrackRegistryItem
         {
             public Border TrackBorder { get; set; }
             public TextBlock HeaderTextBlock { get; set; } 
-            public Models.TimelineTrackGroupModel Group { get; set; }
-            public Models.TimelineTrackModel Track { get; set; }
+            public TimelineTrackGroupModel Group { get; set; }
+            public TimelineTrackModel Track { get; set; }
         }
         private List<TrackRegistryItem> _upperTrackRegistry = new List<TrackRegistryItem>(); // 上半宇宙（画面实体）
         private List<TrackRegistryItem> _lowerTrackRegistry = new List<TrackRegistryItem>(); // 下半宇宙（控制器）
 
         // 🌍 宇宙数据源：全景与微观的所有轨道，全靠它驱动！
-        public ObservableCollection<Models.TimelineTrackGroupModel> TrackGroups { get; private set; } = new ObservableCollection<Models.TimelineTrackGroupModel>();
+        public ObservableCollection<TimelineTrackGroupModel> TrackGroups { get; private set; } = new ObservableCollection<TimelineTrackGroupModel>();
         // ✨ 追加：向大本营汇报“某对象被选中”的神经接口
         public event Action<object> OnTimelineObjectSelected;
         // 🚀 追加：向大本营汇报“请求打开属性编辑器”的神经接口 (Ctrl+单击)
@@ -52,9 +60,29 @@ namespace Naziki_Editor.Views
         public TimelineControl()
         {
             InitializeComponent();
+        }
+
+        public TimelineControl(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine) : this()
+        {
+            Initialize(audioEngine, messageBroker, dialogService, noteVisualEngine, storyboardRepository, propertyEditorService, renderEngine);
+        }
+
+        public void Initialize(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine)
+        {
+            _audioEngine = audioEngine;
+            _messageBroker = messageBroker;
+            _dialogService = dialogService;
+            _noteVisualEngine = noteVisualEngine;
+            _storyboardRepository = storyboardRepository;
+            _propertyEditorService = propertyEditorService;
+            _renderEngine = renderEngine;
+            _viewModel = new TimelineViewModel(_messageBroker);
+            DataContext = _viewModel;
             InitializeAudioEngine();
             UpdateTimelineWidth();
         }
+
+        public double TotalTrackWidth => _totalDurationSeconds * _pixelsPerSecond + 200;
 
         // =========================================================================
         // 📡 神级联机中枢：一键接通底层大本营，全自动生成排版！
@@ -62,18 +90,14 @@ namespace Naziki_Editor.Views
         public void LoadStoryboardTimeline(State.ProjectDataContext context)
         {
             _context = context;
+            var calculatedGroups = new UI.Services.TimelineDataEngine().BuildMacroTimeline(context);
 
-            // 2. 🌟 拔掉严苛的 return！只要接通，哪怕没有谱面数据，也要让大脑画出空壳！
-            var storyboard = (context != null && context.HasStoryboard) ? context.Storyboard : null;
-
-            // 3. 呼叫 Core 大脑，根据大本营的实体计算中心辐射排版数据
-            var calculatedGroups = Core.Timeline.TimelineDataEngine.BuildMacroTimeline(context);
-
-            // 4. 把打包好的数据包交接给万能数据源
             TrackGroups.Clear();
-            foreach (var g in calculatedGroups) TrackGroups.Add(g);
+            foreach (var g in calculatedGroups)
+            {
+                TrackGroups.Add(g);
+            }
 
-            // 5. 让画笔动起来！
             RefreshTimelineUI();
             DrawNoteRuler();
         }
@@ -85,95 +109,125 @@ namespace Naziki_Editor.Views
         {
             if (TrackHeadersContainer == null || TrackGroupsContainer == null) return;
 
-            // ✨ 【精准追加】：每次重新盖楼前，清空旧的辖区注册表
             _upperTrackRegistry.Clear();
             _lowerTrackRegistry.Clear();
 
-            // 1. 净化废墟
             TrackHeadersContainer.Children.Clear();
             TrackGroupsContainer.Children.Clear();
             if (BottomTrackHeadersContainer != null) BottomTrackHeadersContainer.Children.Clear();
             if (BottomTrackGroupsContainer != null) BottomTrackGroupsContainer.Children.Clear();
 
-            // 2. 按 GroupIndex 降序排列 (数值越大的图层越在上面)
             var sortedGroups = TrackGroups.OrderByDescending(g => g.GroupIndex).ToList();
 
             foreach (var group in sortedGroups)
             {
-                // ✨ 引力分发：>= 0 塞给上半区，< 0 塞给下半区
                 StackPanel targetHeader = group.GroupIndex >= 0 ? TrackHeadersContainer : BottomTrackHeadersContainer;
                 StackPanel targetTrack = group.GroupIndex >= 0 ? TrackGroupsContainer : BottomTrackGroupsContainer;
 
-                if (targetHeader == null) targetHeader = TrackHeadersContainer;
-                if (targetTrack == null) targetTrack = TrackGroupsContainer;
+                targetHeader ??= TrackHeadersContainer;
+                targetTrack ??= TrackGroupsContainer;
 
-                // A. 📦 渲染大组头部
-                var headerLeft = new Border { Height = 26, Background = (Brush)Application.Current.FindResource("MenuBgColor"), BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1) };
-                headerLeft.Child = new TextBlock { Text = group.GroupName, Foreground = (Brush)Application.Current.FindResource("HighlightBorderColor"), FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0) };
-
-                // 标题也必须跟着目标引力走，不能写死！
+                var headerLeft = new Border
+                {
+                    Height = 26,
+                    Background = (Brush)Application.Current.FindResource("MenuBgColor"),
+                    BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                    BorderThickness = new Thickness(0, 0, 0, 1)
+                };
+                headerLeft.Child = new TextBlock
+                {
+                    Text = group.GroupName,
+                    Foreground = (Brush)Application.Current.FindResource("HighlightBorderColor"),
+                    FontWeight = FontWeights.Bold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(5, 0, 0, 0)
+                };
                 targetHeader.Children.Add(headerLeft);
 
-                var headerRight = new Border { Height = 26, Background = (Brush)Application.Current.FindResource("MenuBgColor"), BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1) };
-
-                // 占位也必须跟着目标引力走！
+                var headerRight = new Border
+                {
+                    Height = 26,
+                    Background = (Brush)Application.Current.FindResource("MenuBgColor"),
+                    BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                    BorderThickness = new Thickness(0, 0, 0, 1)
+                };
                 targetTrack.Children.Add(headerRight);
 
-                if (!group.IsExpanded) continue; // 折叠的组直接跳过其内部的微观渲染
+                if (!group.IsExpanded) continue;
 
-                // B. 🚂 渲染小轨道
-                // 🚂 智能渲染小轨道：根据图层的引力方向决定排序！
-                var sortedTracks = group.Tracks.OrderByDescending(t => t.TrackIndex).ToList();
+                var sortedTracks = group.SortTracksAscending
+                    ? group.Tracks.OrderBy(t => t.TrackIndex).ToList()
+                    : group.Tracks.OrderByDescending(t => t.TrackIndex).ToList();
 
-                // 🚂 先渲染轨道头，再渲染轨道内容，保持视觉上的层次感和正确的交互区域划分！
                 foreach (var track in sortedTracks)
                 {
-                    // 左侧：轨道名 (✨ 剥离出 textBlock 方便我们后续 0ms 互换文字！)
-                    var headerText = new TextBlock { Text = track.TrackName, Foreground = (Brush)Application.Current.FindResource("MainTextColor"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(15, 0, 0, 0) };
-                    var trackLeft = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Child = headerText };
-
-                    // ✨ 修复：使用动态分配的 targetHeader，而不是写死的 TrackHeadersContainer！
+                    var headerText = new TextBlock
+                    {
+                        Text = track.TrackName,
+                        Foreground = (Brush)Application.Current.FindResource("MainTextColor"),
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(15, 0, 0, 0)
+                    };
+                    var trackLeft = new Border
+                    {
+                        Height = 40,
+                        BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                        BorderThickness = new Thickness(0, 0, 0, 1),
+                        Child = headerText
+                    };
                     targetHeader.Children.Add(trackLeft);
 
-                    // 右侧：万能 Canvas 画板
-                    var trackCanvas = new Canvas { Height = 40, Background = Brushes.Transparent, ClipToBounds = true, Width = _totalDurationSeconds * _pixelsPerSecond + 200 };
-                    var trackRight = new Border { Height = 40, BorderBrush = (Brush)Application.Current.FindResource("BorderColor"), BorderThickness = new Thickness(0, 0, 0, 1), Child = trackCanvas };
+                    var trackCanvas = new Canvas
+                    {
+                        Height = 40,
+                        Background = Brushes.Transparent,
+                        ClipToBounds = true,
+                        Width = _totalDurationSeconds * _pixelsPerSecond + 200
+                    };
+                    var trackRight = new Border
+                    {
+                        Height = 40,
+                        BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                        BorderThickness = new Thickness(0, 0, 0, 1),
+                        Child = trackCanvas
+                    };
 
-                    // ✨ 【精准追加】：把文字标签 (headerText) 也一并注册进隔离区雷达里！
-                    var registryItem = new TrackRegistryItem { TrackBorder = trackRight, HeaderTextBlock = headerText, Group = group, Track = track };
+                    var registryItem = new TrackRegistryItem
+                    {
+                        TrackBorder = trackRight,
+                        HeaderTextBlock = headerText,
+                        Group = group,
+                        Track = track
+                    };
                     if (group.GroupIndex >= 0) _upperTrackRegistry.Add(registryItem);
                     else _lowerTrackRegistry.Add(registryItem);
 
                     targetTrack.Children.Add(trackRight);
 
-                    // C. 🧩 将方块 (Clip) 渲染到对应的画板上
                     foreach (var clip in track.Clips)
                     {
                         var clipCtrl = new TimelineClipControl();
                         clipCtrl.Tag = clip;
+                        clipCtrl.Init(clip, _context, _pixelsPerSecond, clip.TrackIndex, 999, _noteVisualEngine);
 
-                        if (Window.GetWindow(this) is MainWindow mainWin)
-                        {
-                            clipCtrl.Init(clip, mainWin.Context, _pixelsPerSecond, clip.TrackIndex, 999);
-                        }
-
-                        clipCtrl.OnRequestDetailedEditMode += (targetModel) => { EnterDetailedEditMode(targetModel); };
-                        clipCtrl.OnClipSelected += (targetModel) => { OnTimelineObjectSelected?.Invoke(targetModel.AssociatedObject); };
-                        clipCtrl.OnRequestPropertyEditor += (targetModel) => { OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject); };
+                        clipCtrl.OnRequestDetailedEditMode += OnClipRequestDetailedEdit;
+                        clipCtrl.OnClipSelected += OnClipSelected;
+                        clipCtrl.OnRequestPropertyEditor += OnClipRequestPropertyEditor;
                         clipCtrl.OnMacroGridDrag += ClipCtrl_OnMacroGridDrag;
 
-                        // 🌟 【手术 B 时空神明排版】：识别控制器并霸占整轨
-                        bool isGlobalController = (clip.AssociatedObject is C2SceneController || clip.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(clip.AssociatedObject.TargetId);
+                        bool isGlobalController =
+                            (clip.AssociatedObject is C2SceneController || clip.AssociatedObject is C2NoteController) &&
+                            string.IsNullOrEmpty(clip.AssociatedObject.TargetId);
 
                         if (isGlobalController)
                         {
-                            Canvas.SetLeft(clipCtrl, 0); // 强制钉死在轨道最左端
+                            Canvas.SetLeft(clipCtrl, 0);
                             Canvas.SetTop(clipCtrl, 6);
-                            clipCtrl.Width = _totalDurationSeconds * _pixelsPerSecond + 200; // 强制撑满物理轨道
+                            clipCtrl.Width = _totalDurationSeconds * _pixelsPerSecond + 200;
                         }
                         else
                         {
-                            // 凡人方块，乖乖遵守时间法则
                             Canvas.SetLeft(clipCtrl, clip.StartTime * _pixelsPerSecond);
                             Canvas.SetTop(clipCtrl, 6);
 
@@ -185,18 +239,45 @@ namespace Naziki_Editor.Views
                         trackCanvas.Children.Add(clipCtrl);
                     }
                 }
-
             }
         }
 
+        // =========================================================================
+        // 🎨 ItemsControl 事件：当 TimelineClipControl 被加载时初始化
+        // =========================================================================
+        private void OnClipControlLoaded(object sender, RoutedEventArgs e)
+        {
+            var clipCtrl = (TimelineClipControl)sender;
+            var clipModel = clipCtrl.DataContext as TimelineClipModel;
+            if (clipModel == null) return;
 
+            // Skip if already initialized for this model
+            if (clipCtrl.Tag is TimelineClipModel lastModel && ReferenceEquals(lastModel, clipModel)) return;
+
+            clipCtrl.Tag = clipModel;
+            clipCtrl.Init(clipModel, _context, _pixelsPerSecond, clipModel.TrackIndex, 999, _noteVisualEngine);
+
+            clipCtrl.OnRequestDetailedEditMode -= OnClipRequestDetailedEdit;
+            clipCtrl.OnClipSelected -= OnClipSelected;
+            clipCtrl.OnRequestPropertyEditor -= OnClipRequestPropertyEditor;
+            clipCtrl.OnMacroGridDrag -= ClipCtrl_OnMacroGridDrag;
+
+            clipCtrl.OnRequestDetailedEditMode += OnClipRequestDetailedEdit;
+            clipCtrl.OnClipSelected += OnClipSelected;
+            clipCtrl.OnRequestPropertyEditor += OnClipRequestPropertyEditor;
+            clipCtrl.OnMacroGridDrag += ClipCtrl_OnMacroGridDrag;
+        }
+
+        private void OnClipRequestDetailedEdit(TimelineClipModel targetModel) => EnterDetailedEditMode(targetModel);
+        private void OnClipSelected(TimelineClipModel targetModel) => OnTimelineObjectSelected?.Invoke(targetModel.AssociatedObject);
+        private void OnClipRequestPropertyEditor(TimelineClipModel targetModel) => OnTimelineRequestPropertyEditor?.Invoke(targetModel.AssociatedObject);
 
         // =========================================================================
-        // 📡 ✨ 满配完全体：全景宏观换轨隔离雷达（核心换层与隔离防穿透盾落地！）
+        // 📡 ✨ 全景宏观换轨隔离雷达（核心换层与隔离防穿透盾落地！）
         // =========================================================================
         private void ClipCtrl_OnMacroGridDrag(TimelineClipControl clipCtrl, MouseEventArgs e, TimelineClipControl.MacroDragStage stage)
         {
-            if (_context == null || clipCtrl.Tag is not Models.TimelineClipModel clipModel) return;
+            if (_context == null || clipCtrl.Tag is not TimelineClipModel clipModel) return;
 
             var entity = clipModel.AssociatedObject;
             if (entity == null) return;
@@ -274,27 +355,14 @@ namespace Naziki_Editor.Views
                     {
                         int currentLayer = 0;
                         int currentOrder = clipModel.TrackIndex;
-                        if (Core.FastReflectionHelper.TryGetValue(baseState, "Layer", out object lObj))
+                        if (_propertyEditorService.TryGetValue(baseState, "Layer", out object lObj))
                             currentLayer = Convert.ToInt32(lObj);
 
                         // 只有当打谱师真的跨越了物理边界，才触发时空改写
                         if (currentLayer != targetLayer || currentOrder != targetOrder)
                         {
-                            var propLayer = baseState.GetType().GetProperty("Layer");
-                            var propOrder = baseState.GetType().GetProperty("Order");
-
-                            if (propLayer != null && propLayer.CanWrite)
-                            {
-                                Type t = Nullable.GetUnderlyingType(propLayer.PropertyType) ?? propLayer.PropertyType;
-                                propLayer.SetValue(baseState, Convert.ChangeType(targetLayer, t));
-                            }
-                            if (propOrder != null && propOrder.CanWrite)
-                            {
-                                Type t = Nullable.GetUnderlyingType(propOrder.PropertyType) ?? propOrder.PropertyType;
-                                propOrder.SetValue(baseState, Convert.ChangeType(targetOrder, t));
-                            }
-
-                            dataChanged = true;
+                            if (_propertyEditorService.TrySetValue(baseState, "Layer", targetLayer)) dataChanged = true;
+                            if (_propertyEditorService.TrySetValue(baseState, "Order", targetOrder)) dataChanged = true;
                         }
                     }
                 }
@@ -308,23 +376,12 @@ namespace Naziki_Editor.Views
                     if (root != null && currentIndex != targetIndex)
                     {
                         bool swapped = false;
-                        if (entity is Models.C2SceneController ctrl && root.controllers != null)
+                        if (entity is Models.C2SceneController || entity is Models.C2NoteController)
                         {
-                            if (currentIndex >= 0 && currentIndex < root.controllers.Count && targetIndex >= 0 && targetIndex < root.controllers.Count)
+                            var list = _storyboardRepository.GetListByType(root, entity.GetType()) as System.Collections.IList;
+                            if (list != null && currentIndex >= 0 && currentIndex < list.Count && targetIndex >= 0 && targetIndex < list.Count)
                             {
-                                var temp = root.controllers[targetIndex];
-                                root.controllers[targetIndex] = root.controllers[currentIndex];
-                                root.controllers[currentIndex] = temp;
-                                swapped = true;
-                            }
-                        }
-                        else if (entity is Models.C2NoteController noteCtrl && root.note_controllers != null)
-                        {
-                            if (currentIndex >= 0 && currentIndex < root.note_controllers.Count && targetIndex >= 0 && targetIndex < root.note_controllers.Count)
-                            {
-                                var temp = root.note_controllers[targetIndex];
-                                root.note_controllers[targetIndex] = root.note_controllers[currentIndex];
-                                root.note_controllers[currentIndex] = temp;
+                                _storyboardRepository.MoveEntityToIndex(root, entity, targetIndex);
                                 swapped = true;
                             }
                         }
@@ -367,7 +424,7 @@ namespace Naziki_Editor.Views
 
                                 // 同步更新两个方块的模型内驻留索引，并让方块自己刷新状态！
                                 clipModel.TrackIndex = targetIndex;
-                                if (otherClipCtrl?.Tag is Models.TimelineClipModel otherModel)
+                                if (otherClipCtrl?.Tag is TimelineClipModel otherModel)
                                 {
                                     otherModel.TrackIndex = currentIndex;
                                     otherClipCtrl.Init(otherModel, _context, _pixelsPerSecond, currentIndex, 999);
@@ -442,7 +499,7 @@ namespace Naziki_Editor.Views
         // 🔬 微观变身与退出
         // ==========================================
         // 🚀 多标签宇宙：微观变身引擎重写
-        private void EnterDetailedEditMode(Models.TimelineClipModel targetModel)
+        private void EnterDetailedEditMode(TimelineClipModel targetModel)
         {
 
 
@@ -474,7 +531,7 @@ namespace Naziki_Editor.Views
             newTab.Header = headerPanel;
 
             // 3. 召唤大大的微观神兵
-            var detailEditor = new TimelineClip.ClipDetailedEditor();
+            var detailEditor = new TimelineClip.ClipDetailedEditor(_messageBroker, _dialogService, _noteVisualEngine);
             // 直接让百叶窗自己去读数据画图，完全不污染主轴的 TrackGroups！
             detailEditor.LoadClipData(targetModel, _context, _pixelsPerSecond);
 
@@ -493,25 +550,25 @@ namespace Naziki_Editor.Views
 
         private void InitializeAudioEngine()
         {
-            Core.GlobalRenderEngine.Instance.OnRenderTick += () => {
-                if (Core.AudioSyncEngine.Instance.IsPlaying && !_isDraggingPlayhead)
-                    UpdatePlayheadPosition(Core.AudioSyncEngine.Instance.GetCurrentSmoothTime() * _pixelsPerSecond);
+            _renderEngine.OnRenderTick += () => {
+                if (_audioEngine.IsPlaying && !_isDraggingPlayhead)
+                    UpdatePlayheadPosition(_audioEngine.GetCurrentSmoothTime() * _pixelsPerSecond);
             };
 
-            Core.AudioSyncEngine.Instance.OnTimeChanged += (currentSeconds) => {
-                if (!Core.AudioSyncEngine.Instance.IsPlaying && !_isDraggingPlayhead)
+            _audioEngine.OnTimeChanged += (currentSeconds) => {
+                if (!_audioEngine.IsPlaying && !_isDraggingPlayhead)
                     UpdatePlayheadPosition(currentSeconds * _pixelsPerSecond);
             };
 
-            Core.AudioSyncEngine.Instance.OnPlayStateChanged += (isPlaying) => {
+            _audioEngine.OnPlayStateChanged += (isPlaying) => {
                 BtnPlay.Foreground = isPlaying ? Brushes.LightGreen : (Brush)Application.Current.Resources["MainTextColor"];
             };
 
-            Core.AudioSyncEngine.Instance.OnAudioLoaded += () => {
+            _audioEngine.OnAudioLoaded += () => {
                 if (BtnImportAudio != null) BtnImportAudio.Visibility = Visibility.Collapsed;
-                if (_totalDurationSeconds < Core.AudioSyncEngine.Instance.Duration)
+                if (_totalDurationSeconds < _audioEngine.Duration)
                 {
-                    _totalDurationSeconds = Core.AudioSyncEngine.Instance.Duration + 2.0;
+                    _totalDurationSeconds = _audioEngine.Duration + 2.0;
                     UpdateTimelineWidth();
                 }
                 // ✨ 小艾的终极补丁：不论是否拉长了时间轴，音乐加载完必须强制画波形！
@@ -546,7 +603,7 @@ namespace Naziki_Editor.Views
             UpdatePlaybackTimeDisplay(_currentPlayheadSeconds);
 
             // 4. ✨ 智能跟随摄像机（居中推流）
-            if (Core.AudioSyncEngine.Instance.IsPlaying && !_isDraggingPlayhead && ScrollTimelineTracks != null)
+            if (_audioEngine.IsPlaying && !_isDraggingPlayhead && ScrollTimelineTracks != null)
             {
                 double viewWidth = ScrollTimelineTracks.ViewportWidth;
                 if (viewWidth > 0)
@@ -593,7 +650,7 @@ namespace Naziki_Editor.Views
                 double offset = ScrollTimelineTracks != null ? ScrollTimelineTracks.HorizontalOffset : 0;
 
                 UpdatePlayheadPosition(visualX + offset);
-                Core.AudioSyncEngine.Instance.Seek(_currentPlayheadSeconds);
+                _audioEngine.Seek(_currentPlayheadSeconds);
             }
         }
 
@@ -623,25 +680,25 @@ namespace Naziki_Editor.Views
             {
                 _isDraggingPlayhead = false;
                 PlayheadMarker.ReleaseMouseCapture();
-                Core.AudioSyncEngine.Instance.Seek(_currentPlayheadSeconds);
+                _audioEngine.Seek(_currentPlayheadSeconds);
             }
         }
 
-        private void BtnPlay_Click(object sender, RoutedEventArgs e) => Core.AudioSyncEngine.Instance.Play();
-        private void BtnPause_Click(object sender, RoutedEventArgs e) => Core.AudioSyncEngine.Instance.Pause();
+        private void BtnPlay_Click(object sender, RoutedEventArgs e) => _audioEngine.Play();
+        private void BtnPause_Click(object sender, RoutedEventArgs e) => _audioEngine.Pause();
 
         private async void BtnImportAudio_Click(object sender, RoutedEventArgs e)
         {
             Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog { Filter = "音频文件 (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg", Title = "请选择关卡音乐" };
-            if (openFileDialog.ShowDialog() == true) { if (BtnImportAudio != null) BtnImportAudio.Visibility = Visibility.Collapsed; await Core.AudioSyncEngine.Instance.LoadAudioAsync(openFileDialog.FileName); }
+            if (openFileDialog.ShowDialog() == true) { if (BtnImportAudio != null) BtnImportAudio.Visibility = Visibility.Collapsed; await _audioEngine.LoadAudioAsync(openFileDialog.FileName); }
         }
 
         private void AudioMinimapGrid_SizeChanged(object sender, SizeChangedEventArgs e) { DrawWaveform(); UpdateAudioViewportBox(); }
 
         private void DrawWaveform()
         {
-            if (WaveformPath == null || Core.AudioSyncEngine.Instance.WaveformSamples == null || AudioMinimapGrid.ActualWidth <= 0) return;
-            var samples = Core.AudioSyncEngine.Instance.WaveformSamples;
+            if (WaveformPath == null || _audioEngine.WaveformSamples == null || AudioMinimapGrid.ActualWidth <= 0) return;
+            var samples = _audioEngine.WaveformSamples;
             double width = AudioMinimapGrid.ActualWidth, height = 40, midY = height / 2;
             int step = Math.Max(1, samples.Length / (int)width);
             var geometry = new StreamGeometry();
@@ -727,7 +784,7 @@ namespace Naziki_Editor.Views
             // 3. 重新读取并刷新整个时间轴宇宙！
             LoadStoryboardTimeline(_context);
 
-            MessageBox.Show("✨ 智能排版完成！\n所有挤在一起的方块已经根据时间自动分配到不同的 Order 轨道啦！", "排版大成功");
+            _dialogService.ShowMessage("✨ 智能排版完成！\n所有挤在一起的方块已经根据时间自动分配到不同的 Order 轨道啦！", "排版大成功");
         }
 
 
@@ -788,7 +845,7 @@ namespace Naziki_Editor.Views
             NotePreviewCanvas.Width = totalWidth;
 
             // 🚀 一键呼叫核心测绘工厂！最后一个参数传 false，代表宏观主轴模式
-            Core.Timeline.NoteVisualEngine.RenderNoteRuler(NotePreviewCanvas, _context.Chart.note_list, _context.TimeEngine, _pixelsPerSecond, false);
+            _noteVisualEngine.RenderNoteRuler(NotePreviewCanvas, _context.Chart.note_list, _context.TimeEngine, _pixelsPerSecond, false);
         }
 
 
@@ -850,18 +907,17 @@ namespace Naziki_Editor.Views
                 {
                     if (child is Border border && border.Child is Canvas trackCanvas)
                     {
-                        trackCanvas.Width = newWidth; // 延长轨道
+                        trackCanvas.Width = newWidth;
                         foreach (UIElement clipObj in trackCanvas.Children)
                         {
-                            if (clipObj is TimelineClipControl clipCtrl && clipCtrl.Tag is Models.TimelineClipModel clip)
+                            if (clipObj is TimelineClipControl clipCtrl && clipCtrl.Tag is TimelineClipModel clip)
                             {
-                                // 🌟 保证控制器在缩放时也能撑满！
                                 bool isGlobalController = (clip.AssociatedObject is C2SceneController || clip.AssociatedObject is C2NoteController) && string.IsNullOrEmpty(clip.AssociatedObject.TargetId);
 
                                 if (isGlobalController)
                                 {
                                     Canvas.SetLeft(clipCtrl, 0);
-                                    clipCtrl.Width = newWidth; // 使用新的轨道总宽撑满
+                                    clipCtrl.Width = newWidth;
                                 }
                                 else
                                 {

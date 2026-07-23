@@ -1,11 +1,12 @@
-﻿using Naziki_Editor.Models;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Models;
 using System.Collections.Generic;
 
 namespace Naziki_Editor.Core
 {
-    public static class TemplateManager
+    public class TemplateManager : ITemplateManager
     {
-        public static bool CheckForCircularDependency(StoryboardRoot root, string templateName, string targetTemplateToInject)
+        public bool CheckForCircularDependency(StoryboardRoot root, string templateName, string targetTemplateToInject)
         {
             if (string.IsNullOrEmpty(targetTemplateToInject)) return false;
             if (templateName == targetTemplateToInject) return true;
@@ -22,7 +23,7 @@ namespace Naziki_Editor.Core
             return false;
         }
 
-        public static void RenameTemplateGlobally(StoryboardRoot root, string oldName, string newName)
+        public void RenameTemplateGlobally(StoryboardRoot root, string oldName, string newName)
         {
             var allStates = GetAllStatesInStoryboard(root);
             foreach (var state in allStates)
@@ -34,7 +35,7 @@ namespace Naziki_Editor.Core
             }
         }
 
-        public static List<ObjectState> GetAllStatesInStoryboard(StoryboardRoot root)
+        public List<ObjectState> GetAllStatesInStoryboard(StoryboardRoot root)
         {
             var allStates = new List<ObjectState>();
             if (root == null) return allStates;
@@ -80,7 +81,7 @@ namespace Naziki_Editor.Core
         // ==========================================\
         // 🔮 智能法术 1：根据属性残留，推测模板的真实身份
         // ==========================================\
-        public static TemplateType InferTemplateType(C2Template template)
+        public TemplateType InferTemplateType(C2Template template)
         {
             var states = GetAllStatesFromTemplate(template);
             bool hasText = false, hasPath = false, hasPos = false;
@@ -119,7 +120,7 @@ namespace Naziki_Editor.Core
         // ==========================================\
         // 🛡️ 智能法术 2：为 8 大门派建立专属的属性白名单！
         // ==========================================\
-        public static HashSet<string> GetAllowedPropertiesForType(TemplateType type)
+        public HashSet<string> GetAllowedPropertiesForType(TemplateType type)
         {
             var baseProps = new[] { "Time", "Easing", "AddTime", "RelativeTime", "Destroy" };
 
@@ -198,7 +199,7 @@ namespace Naziki_Editor.Core
         // ==========================================\
         // 🔍 智能法术 3：判断某个属性是否允许出现在当前模板中
         // ==========================================\
-        public static bool IsPropertyAllowed(string propertyName, TemplateType type)
+        public bool IsPropertyAllowed(string propertyName, TemplateType type)
         {
             var allowedSet = GetAllowedPropertiesForType(type);
             if (allowedSet == null) return true; // Generic 放行所有

@@ -1,12 +1,14 @@
-﻿using System;
+using System;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Messaging;
 
 namespace Naziki_Editor.State
 {
     public class ProjectDataContext
     {
-        public event Action OnDataModified;
+        private readonly IMessageBroker _messageBroker;
 
         public string ProjectFilePath { get; set; }
         public NazikiProjectModel ProjectData { get; set; }
@@ -23,9 +25,14 @@ namespace Naziki_Editor.State
         public bool HasStoryboard => Storyboard != null;
         public bool HasChart => Chart != null;
 
+        public ProjectDataContext(IMessageBroker messageBroker)
+        {
+            _messageBroker = messageBroker;
+        }
+
         public void MarkAsModified()
         {
-            OnDataModified?.Invoke();
+            _messageBroker.Publish("DataModified");
             if (ProjectData != null)
             {
                 ProjectData.LastModifiedTime = DateTime.Now;

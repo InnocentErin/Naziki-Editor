@@ -1,5 +1,6 @@
-﻿using Naziki_Editor.Core.Timeline;
+using Naziki_Editor.Core.Timeline;
 using Naziki_Editor.Models;
+using Naziki_Editor.UI.ViewModels;
 using Naziki_Editor.State;
 using System;
 using System.Collections.Generic;
@@ -8,6 +9,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Naziki_Editor.Core;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Common;
+using Naziki_Editor.Core.Messaging;
+using Naziki_Editor.Core.Storyboard;
 
 namespace Naziki_Editor.Views.TimelineClip
 {
@@ -17,6 +22,13 @@ namespace Naziki_Editor.Views.TimelineClip
         private ProjectDataContext _context;
         private double _pixelsPerSecond;
         private double _lastCalculatedMaxTime = 0;
+
+        private ITimelineInteractionService _timelineService;
+        private IPropertyEditorService _propertyEditorService;
+        private IStoryboardRepository _storyboardRepository;
+        private readonly IMessageBroker _messageBroker;
+        private readonly IDialogService _dialogService;
+        private readonly UI.Rendering.NoteVisualEngine _noteVisualEngine;
 
         private Point _panStartPoint;
         private double _panStartOffset;
@@ -63,6 +75,13 @@ namespace Naziki_Editor.Views.TimelineClip
             this.PreviewMouseWheel += Editor_PreviewMouseWheel;
         }
 
+        public ClipDetailedEditor(IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine) : this()
+        {
+            _messageBroker = messageBroker;
+            _dialogService = dialogService;
+            _noteVisualEngine = noteVisualEngine;
+        }
+
         /// <summary>
         /// 🚀 【数据接线关口】：主轴双击方块后，此方法会被轰轰烈烈地激活！
         /// </summary>
@@ -71,6 +90,10 @@ namespace Naziki_Editor.Views.TimelineClip
             _clipModel = clipModel;
             _context = context;
             _pixelsPerSecond = pixelsPerSecond;
+
+            _timelineService = new TimelineInteractionService(context, new TimelineCoordEngine(pixelsPerSecond));
+            _propertyEditorService = new PropertyEditorService();
+            _storyboardRepository = new StoryboardRepository();
 
             PropHeadersStackPanel.Children.Clear();
             PropTracksStackPanel.Children.Clear();
@@ -84,11 +107,9 @@ namespace Naziki_Editor.Views.TimelineClip
             if (_context.Chart?.note_list != null && _context.Chart.note_list.Count > 0)
                 maxTime = _context.TimeEngine.TickToSeconds(_context.Chart.note_list[_context.Chart.note_list.Count - 1].tick) + 5;
 
-            double lastFrameAbs = StoryboardTimeConverter.CalculateEntityEndTime(
+            double lastFrameAbs = _timelineService.CalculateEntityEndTime(
                 _clipModel.AssociatedObject,
-                _clipModel.StartTime,
-                _context.TimeEngine,
-                _context.Chart?.note_list
+                _clipModel.StartTime
             );
 
             // 🚀 【性能防爆屏障】：如果计算出的结束时间是未初始化的极大值（如 float.MaxValue），直接强制截断！
@@ -142,20 +163,20 @@ namespace Naziki_Editor.Views.TimelineClip
             foreach (string prop in supportedProperties)
             {
                 bool hasAnim = false;
-                if (Core.FastReflectionHelper.TryGetValue(baseState, prop, out object bVal) && bVal != null) hasAnim = true;
+                if (_propertyEditorService.TryGetValue(baseState, prop, out object bVal) && bVal != null) hasAnim = true;
                 if (!hasAnim && keyframes != null)
                 {
                     foreach (var frame in keyframes)
                     {
-                        if (Core.FastReflectionHelper.TryGetValue(frame, prop, out object fVal) && fVal != null) { hasAnim = true; break; }
+                        if (_propertyEditorService.TryGetValue(frame, prop, out object fVal) && fVal != null) { hasAnim = true; break; }
                     }
                 }
                 if (hasAnim) mainAnimatedProps.Add(prop);
             }
 
             // B. 时空雷达：利用已有的时间解码引擎，找出所有触发了 Template 的绝对时间点！
-            var templateBoxes = Core.StoryboardTimeConverter.DecodeTimelineKeyframes(
-                _clipModel.AssociatedObject, "Template", _context.TimeEngine, _context.Chart?.note_list, _clipModel.StartTime);
+            var templateBoxes = _timelineService.DecodeKeyframes(
+                _clipModel.AssociatedObject, "Template", _clipModel.StartTime);
 
             // ✨ 【核心升级】：先按时间排序，然后用 GroupBy 强行把名字一样的模板合并到同一个维度里！
             var sortedTriggers = templateBoxes.Where(b => b.Value != null && !string.IsNullOrEmpty(b.Value.ToString()))
@@ -170,20 +191,20 @@ namespace Naziki_Editor.Views.TimelineClip
                 List<string> conflictProps = new List<string>();
                 Models.C2Template tData = null;
 
-                if (_context.Storyboard.templates != null && _context.Storyboard.templates.ContainsKey(tName))
+                tData = _storyboardRepository.GetTemplate(_context.Storyboard, tName);
+                if (tData != null)
                 {
-                    tData = _context.Storyboard.templates[tName];
                     var tProps = tData.GetBaseState().GetType().GetProperties();
                     foreach (var tp in tProps)
                     {
                         if (tp.Name == "Time" || tp.Name == "Easing" || tp.Name == "Template") continue;
 
                         bool tHasAnim = false;
-                        if (Core.FastReflectionHelper.TryGetValue(tData.GetBaseState(), tp.Name, out object tbVal) && tbVal != null) tHasAnim = true;
+                        if (_propertyEditorService.TryGetValue(tData.GetBaseState(), tp.Name, out object tbVal) && tbVal != null) tHasAnim = true;
                         if (!tHasAnim && tData.GetKeyframes() != null)
                         {
                             foreach (var tf in tData.GetKeyframes())
-                                if (Core.FastReflectionHelper.TryGetValue(tf, tp.Name, out object tfVal) && tfVal != null) { tHasAnim = true; break; }
+                                if (_propertyEditorService.TryGetValue(tf, tp.Name, out object tfVal) && tfVal != null) { tHasAnim = true; break; }
                         }
 
                         if (tHasAnim && mainAnimatedProps.Contains(tp.Name)) { hasConflict = true; conflictProps.Add(tp.Name); }
@@ -266,9 +287,9 @@ namespace Naziki_Editor.Views.TimelineClip
                     }
 
                     _context.MarkAsModified();
-                    if (Window.GetWindow(this) is MainWindow mainWin) mainWin.TimelineConsole.LoadStoryboardTimeline(mainWin.Context);
+                    _messageBroker.Publish("RefreshTimeline");
                     LoadClipData(_clipModel, _context, _pixelsPerSecond);
-                    MessageBox.Show($"✨ [{tName}] 的 {group.Count()} 次调用已全数降维剥离！", "批量解绑成功");
+                    _dialogService.ShowMessage($"✨ [{tName}] 的 {group.Count()} 次调用已全数降维剥离！", "批量解绑成功");
                 };
                 tplHeaderGrid.Children.Add(unbindBtn);
                 tplHeaderLeft.Child = tplHeaderGrid;
@@ -347,7 +368,7 @@ namespace Naziki_Editor.Views.TimelineClip
                 PropHeadersStackPanel.Children.Add(headerBorder);
 
                 // B. 右侧：降临单属性关键帧格线行！
-                ClipPropertyTrackRow trackRow = new ClipPropertyTrackRow();
+                ClipPropertyTrackRow trackRow = new ClipPropertyTrackRow(_messageBroker, _dialogService);
                 trackRow.Width = targetPhysicalWidth;
                 trackRow.HorizontalAlignment = HorizontalAlignment.Left;
 
@@ -527,7 +548,7 @@ namespace Naziki_Editor.Views.TimelineClip
         {
             // ✨ 1. 必须先召唤音符雷达！
             // 提前让引擎画好音符（并执行它的 Canvas.Clear()），绝不影响后续图层！
-            Core.Timeline.NoteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
+            _noteVisualEngine.RenderNoteRuler(MicroRulerCanvas, _context?.Chart?.note_list, _context?.TimeEngine, _pixelsPerSecond, true);
 
             int maxSeconds = (int)Math.Ceiling(maxTime);
 

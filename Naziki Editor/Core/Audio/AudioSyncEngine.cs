@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using NAudio.Wave;
@@ -36,7 +36,7 @@ namespace Naziki_Editor.Core
 
 
 
-        private AudioSyncEngine()
+        public AudioSyncEngine()
         {
             _player = new WaveOutEvent() { DesiredLatency = 80 };
             {

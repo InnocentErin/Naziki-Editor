@@ -1,6 +1,10 @@
-﻿using Naziki_Editor.Core;
+using Naziki_Editor.Core;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Chart;
+using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Timeline;
 using Naziki_Editor.Models;
+using Naziki_Editor.UI.ViewModels;
 using Naziki_Editor.State;
 using System;
 using System.Collections.Generic;
@@ -21,10 +25,14 @@ namespace Naziki_Editor.Views
         private TimelineClipModel _model;
         private ProjectDataContext _context;
         private double _pixelsPerSecond = 100.0;
+        private ITimelineInteractionService _timelineService;
+        private INoteSelectorService _noteSelectorService;
+        private readonly IMessageBroker _messageBroker;
+        private readonly IDialogService _dialogService;
+        private UI.Rendering.NoteVisualEngine _noteVisualEngine;
 
         private ClipViewMode _currentViewMode = ClipViewMode.Keyframe;
         private List<Thumb> _nodeThumbs = new List<Thumb>();
-        private Thumb _selectedNode = null;
 
         // 宏观平移状态锁
         private bool _isDraggingClip = false;
@@ -72,14 +80,14 @@ namespace Naziki_Editor.Views
                     {
                         double deltaStart = _model.StartTime - _originalStartTime;
                         object oldTime = timeProp.GetValue(baseState);
-                        object newTime = Core.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaStart);
+                        object newTime = _timelineService.UpdateTimeExpressionByDelta(oldTime, deltaStart);
                         timeProp.SetValue(baseState, newTime);
                     }
                 }
 
                 // 2. 🌌 触发空间折叠级联缩放：完美实现左边缘拉伸、内部所有关键帧等比例缩放缩放！
-                Core.StoryboardTimeConverter.ScaleInternalKeyframes(
-                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
+                _timelineService.ScaleKeyframes(
+                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, 0);
 
                 _context?.MarkAsModified();
                 EvaluateValidationWarning();
@@ -91,17 +99,19 @@ namespace Naziki_Editor.Views
             };
             ResizeRightThumb.DragCompleted += (s, ev) => {
                 // 🌌 触发空间折叠级联缩放：右边缘拉伸时，StartTime没变，EndTime变了，内部关键帧自动等比例拉伸！
-                Core.StoryboardTimeConverter.ScaleInternalKeyframes(
-                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, _context.TimeEngine, _context.Chart?.note_list);
+                _timelineService.ScaleKeyframes(
+                    _model.AssociatedObject, _originalStartTime, _originalEndTime, _model.StartTime, _model.EndTime, 0);
 
                 _context?.MarkAsModified();
                 EvaluateValidationWarning();
             };
+        }
 
-
-
-
-
+        public TimelineClipControl(IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine) : this()
+        {
+            _messageBroker = messageBroker;
+            _dialogService = dialogService;
+            _noteVisualEngine = noteVisualEngine;
         }
         private void DrawDiscreteRipples()
         {
@@ -110,48 +120,18 @@ namespace Naziki_Editor.Views
             // 🔍 1. 提取 NoteTarget 目标参数
             var targetProp = noteCtrl.BaseState?.GetType().GetProperty("NoteTarget");
             object targetObj = targetProp?.GetValue(noteCtrl.BaseState);
-            if (targetObj == null || _context?.Chart?.note_list == null) return;
+            if (targetObj == null || _context?.Chart == null) return;
 
-            var matchedNotes = new List<C2Note>();
             string targetStr = targetObj.ToString().Trim();
-            NoteSelectorModel selector = null;
+            var selector = _noteSelectorService.ParseSelector(targetStr);
+            if (selector == null) return;
 
-            // 🧠 2. 接入大大的音符选择器大脑！(智能解析 JSON 或 单一 ID)
-            if (targetStr.StartsWith("{"))
-            {
-                try { selector = Newtonsoft.Json.JsonConvert.DeserializeObject<NoteSelectorModel>(targetStr); } catch { }
-            }
-            else if (int.TryParse(targetStr, out int singleId))
-            {
-                selector = new NoteSelectorModel { Start = singleId, End = singleId };
-            }
-
-            // 🔬 3. 像素级过滤音符
-            if (selector != null)
-            {
-                foreach (var note in _context.Chart.note_list)
-                {
-                    int ndir = 1;
-                    if (note.page_index >= 0 && _context.Chart.page_list != null && note.page_index < _context.Chart.page_list.Count)
-                        ndir = _context.Chart.page_list[note.page_index].scan_line_direction;
-
-                    bool isMatch = true;
-                    if (selector.Type != null && !selector.Type.Contains(note.type)) isMatch = false;
-                    if (selector.Start.HasValue && note.id < selector.Start.Value) isMatch = false;
-                    if (selector.End.HasValue && note.id > selector.End.Value) isMatch = false;
-                    if (selector.Direction.HasValue && ndir != selector.Direction.Value) isMatch = false;
-                    if (selector.MinX.HasValue && note.x < selector.MinX.Value) isMatch = false;
-                    if (selector.MaxX.HasValue && note.x > selector.MaxX.Value) isMatch = false;
-
-                    if (isMatch) matchedNotes.Add(note);
-                }
-            }
-
+            // 🔬 2. 使用 Core 层音符选择器服务过滤音符
+            var matchedNotes = _noteSelectorService.SelectNotes(_context.Chart, selector);
             if (matchedNotes.Count == 0) return; // 没匹配到，保持方块安静
 
-            // 📐 4. 绘制高亮背景区间 (时空边界结界！)
-            double minSec = matchedNotes.Min(n => _context.TimeEngine.TickToSeconds(n.tick));
-            double maxSec = matchedNotes.Max(n => _context.TimeEngine.TickToSeconds(n.tick + (n.hold_tick > 0 ? n.hold_tick : 0)));
+            // 📐 3. 绘制高亮背景区间 (时空边界结界！)
+            var (minSec, maxSec) = _noteSelectorService.GetMatchedTimeRange(_context.Chart, selector, _context.TimeEngine);
 
             double startX = minSec * _pixelsPerSecond;
             double endX = maxSec * _pixelsPerSecond;
@@ -183,7 +163,7 @@ namespace Naziki_Editor.Views
 
             // 🎵 5. 终极偷天换日投影：召唤底部音符刻度工厂！
             var subCanvas = new Canvas { IsHitTestVisible = false };
-            Core.Timeline.NoteVisualEngine.RenderNoteRuler(subCanvas, matchedNotes, _context.TimeEngine, _pixelsPerSecond, false);
+            _noteVisualEngine.RenderNoteRuler(subCanvas, matchedNotes, _context.TimeEngine, _pixelsPerSecond, false);
             NodeCanvas.Children.Add(subCanvas);
         }
 
@@ -192,11 +172,14 @@ namespace Naziki_Editor.Views
         /// <summary>
         /// 📥 唯一交接关口：由父轨道将强类型模型、上下文基站以及缩放比例喂给方块
         /// </summary>
-        public void Init(TimelineClipModel model, ProjectDataContext context, double pixelsPerSecond, int trackIndex, int maxTrackIndex)
+        public void Init(TimelineClipModel model, ProjectDataContext context, double pixelsPerSecond, int trackIndex, int maxTrackIndex, UI.Rendering.NoteVisualEngine noteVisualEngine = null)
         {
             _model = model;
             _context = context;
             _pixelsPerSecond = pixelsPerSecond;
+            _noteVisualEngine = noteVisualEngine;
+            _timelineService = new TimelineInteractionService(context, new TimelineCoordEngine(pixelsPerSecond));
+            _noteSelectorService = new NoteSelectorService();
 
             CurrentTrackIndex = trackIndex;
             MaxTrackIndex = maxTrackIndex;
@@ -436,19 +419,18 @@ namespace Naziki_Editor.Views
                         if (timeProp != null)
                         {
                             object oldTime = timeProp.GetValue(baseState);
-                            object newTime = StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, finalDeltaTime);
+                            object newTime = _timelineService.UpdateTimeExpressionByDelta(oldTime, finalDeltaTime);
                             timeProp.SetValue(baseState, newTime);
                         }
                     }
 
-                    StoryboardTimeConverter.ScaleInternalKeyframes(
+                    _timelineService.ScaleKeyframes(
                         _model.AssociatedObject,
                         _originalStartTime,
                         _originalStartTime + (_model.EndTime - _model.StartTime), // 准确的旧终点快照
                         _model.StartTime,
                         _model.EndTime,
-                        _context.TimeEngine,
-                        _context.Chart?.note_list
+                        0
                     );
                 }
 
@@ -497,7 +479,7 @@ namespace Naziki_Editor.Views
         {
             if (_context == null || !_context.HasChart || _model.AssociatedObject == null)
             {
-                MessageBox.Show("纳尼？！必须先在主界面加载对应的谱面文件才能触发锚定雷达哦！", "重算失败");
+                _dialogService.ShowMessage("纳尼？！必须先在主界面加载对应的谱面文件才能触发锚定雷达哦！", "重算失败");
                 return;
             }
 
@@ -517,7 +499,7 @@ namespace Naziki_Editor.Views
                 if (baseState != null)
                 {
                     baseState.Time = newExpression; // 完美重写不可变模型的字符串！
-                    MessageBox.Show($"✨ 自动吸附配对成功！\\\\n\\\\n方块已被精准绑定至 [Note ID: {nearestNote.id}]\\\\n时间轴新表达式: {newExpression}", "时空锚定完毕");
+                    _dialogService.ShowMessage($"✨ 自动吸附配对成功！\\\\n\\\\n方块已被精准绑定至 [Note ID: {nearestNote.id}]\\\\n时间轴新表达式: {newExpression}", "时空锚定完毕");
 
                     _context.MarkAsModified();
                     InspectEntityGenetics(); // 重新刷新外壳形态
@@ -547,11 +529,8 @@ namespace Naziki_Editor.Views
                 propInfo.SetValue(lastFrame, Convert.ChangeType(true, t));
 
                 // 刷新大本营！
-                if (Window.GetWindow(this) is MainWindow mainWin)
-                {
-                    mainWin.Context.MarkAsModified();
-                    mainWin.TimelineConsole.LoadStoryboardTimeline(mainWin.Context); // 重新渲染时间轴，让方块变短！
-                }
+                _context?.MarkAsModified();
+                _messageBroker.Publish("RefreshTimeline");
             }
         }
 
@@ -698,7 +677,6 @@ namespace Naziki_Editor.Views
         private void DeselectAllNodes()
         {
             foreach (var t in _nodeThumbs) { t.Effect = null; t.Opacity = 0.8; }
-            _selectedNode = null;
         }
     }
 }

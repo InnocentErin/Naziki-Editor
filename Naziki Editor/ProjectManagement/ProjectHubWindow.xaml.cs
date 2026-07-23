@@ -1,4 +1,7 @@
-﻿using Microsoft.Win32;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Commands;
 using Naziki_Editor.Models;
 using Naziki_Editor.Views;
 using Newtonsoft.Json;
@@ -14,6 +17,10 @@ namespace Naziki_Editor.ProjectManagement
 {
     public partial class ProjectHubWindow : Window
     {
+        private readonly IDialogService _dialogService;
+        private readonly AppCommands _appCommands;
+        private readonly IServiceProvider _serviceProvider;
+
         // 💾 档案馆模型：专门用来存储单条历史足迹
         public class ProjectHistoryItem
         {
@@ -22,11 +29,15 @@ namespace Naziki_Editor.ProjectManagement
             public DateTime LastOpened { get; set; }
         }
 
-        public ProjectHubWindow()
+        public ProjectHubWindow(IDialogService dialogService, AppCommands appCommands, IServiceProvider serviceProvider)
         {
             InitializeComponent();
 
-            // 📡 在构造时死死拴住线缆：监听左侧历史列表的“点选”动作！
+            _dialogService = dialogService;
+            _appCommands = appCommands;
+            _serviceProvider = serviceProvider;
+
+            // 📡 在构造时死死拴住线缆：监听左侧历史列表的"点选"动作！
             HistoryListBox.SelectionChanged += HistoryListBox_SelectionChanged;
 
             LoadHistory();
@@ -156,20 +167,18 @@ namespace Naziki_Editor.ProjectManagement
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败");
+                        _dialogService.ShowMessage($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败", DialogMessageType.Error);
                     }
                 }
                 // 🛑 【安检 B 面】：纳尼？！项目玩失踪移形换位了！
                 else
                 {
                     // 强制弹出符合设计师设想的最终决断弹窗
-                    var result = MessageBox.Show(
+                    var result = _dialogService.ShowYesNo(
                         $"抱歉主人！无法在原路径找到该工程文件：\n［{historyItem.FilePath}］\n\n该工程可能已被手动移动、重命名或无情删除。\n\n是否直接从历史档案馆中［删除记录］？",
-                        "⚠️ 档案馆警报：检测到失效资产",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
+                        "⚠️ 档案馆警报：检测到失效资产");
 
-                    if (result == MessageBoxResult.Yes)
+                    if (result)
                     {
                         // 🧹 物理擦除除尘！
                         var list = GetHistoryList();
@@ -229,7 +238,7 @@ namespace Naziki_Editor.ProjectManagement
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"创世过程发生爆炸 QAQ：\n{ex.Message}", "创建失败");
+                    _dialogService.ShowMessage($"创世过程发生爆炸 QAQ：\n{ex.Message}", "创建失败", DialogMessageType.Error);
                 }
             }
         }
@@ -262,16 +271,16 @@ namespace Naziki_Editor.ProjectManagement
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败");
+                    _dialogService.ShowMessage($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败", DialogMessageType.Error);
                 }
             }
         }
 
         private void LaunchMainWindow(string projectFilePath, NazikiProjectModel projectData)
         {
-            MainWindow editorWindow = new MainWindow();
-            editorWindow.LoadProject(projectFilePath, projectData);
+            MainWindow editorWindow = _serviceProvider.GetRequiredService<MainWindow>();
             editorWindow.Show();
+            _appCommands.DoLoadProject(projectFilePath, projectData, editorWindow.Context);
             this.Close(); // 顺利进城，摧毁传送门
         }
     }

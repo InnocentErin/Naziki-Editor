@@ -1,4 +1,9 @@
-﻿using Naziki_Editor.Models;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Common;
+using Naziki_Editor.Core.Messaging;
+using Naziki_Editor.Core.Timeline;
+using Naziki_Editor.Models;
+using Naziki_Editor.UI.ViewModels;
 using Naziki_Editor.State;
 using System;
 using System.Collections.Generic;
@@ -15,10 +20,13 @@ namespace Naziki_Editor.Views.TimelineClip
     {
         private ProjectDataContext _context;
         private string _propertyName;              // 属性名字，比如 "X" 或 "Opacity"
-        private Models.TimelineClipModel _clipModel; // 所属的方块模型
+        private TimelineClipModel _clipModel; // 所属的方块模型
         private double _pixelsPerSecond = 100.0;
+        private ITimelineInteractionService _timelineService;
+        private IPropertyEditorService _propertyEditorService;
         private List<Thumb> _nodes = new List<Thumb>();
-
+        private readonly IMessageBroker _messageBroker;
+        private readonly IDialogService _dialogService;
 
         // 📋 全局时空剪贴板 (存放复制的关键帧状态)
         private static Models.ObjectState _clipboardState = null;
@@ -35,15 +43,23 @@ namespace Naziki_Editor.Views.TimelineClip
             KeyframeNodeCanvas.MouseRightButtonDown += TrackRow_MouseRightButtonDown;
         }
 
+        public ClipPropertyTrackRow(IMessageBroker messageBroker, IDialogService dialogService) : this()
+        {
+            _messageBroker = messageBroker;
+            _dialogService = dialogService;
+        }
 
 
 
-        public void Init(string propertyName, Models.TimelineClipModel clipModel, ProjectDataContext context, double pixelsPerSecond)
+
+        public void Init(string propertyName, TimelineClipModel clipModel, ProjectDataContext context, double pixelsPerSecond)
         {
             _propertyName = propertyName;
             _clipModel = clipModel;
             _context = context;
             _pixelsPerSecond = pixelsPerSecond;
+            _timelineService = new TimelineInteractionService(context, new TimelineCoordEngine(pixelsPerSecond));
+            _propertyEditorService = new PropertyEditorService();
 
             RenderTrackKeyframes();
         }
@@ -84,7 +100,7 @@ namespace Naziki_Editor.Views.TimelineClip
 
             if (_clipModel?.AssociatedObject == null) return;
 
-            var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
+            var rule = _propertyEditorService.GetConstraint(_propertyName);
             bool isSlider = rule != null && rule.UIType == Core.PropertyUIType.Slider;
 
             // 🚀 【性能优化 1】：将资源查找移出循环！WPF 查找资源的耗时在循环内是毁灭性的！
@@ -95,7 +111,7 @@ namespace Naziki_Editor.Views.TimelineClip
             // ==========================================
             double trueBaseTimeSec = GetTrueBaseTimeSec(); // 🌟 提取真实起跑线！
             var baseState = _clipModel.AssociatedObject.GetBaseState();
-            if (baseState != null && Core.FastReflectionHelper.TryGetValue(baseState, _propertyName, out object baseVal) && baseVal != null)
+            if (baseState != null && _propertyEditorService.TryGetValue(baseState, _propertyName, out object baseVal) && baseVal != null)
             {
                 double initialAbsX = trueBaseTimeSec * _pixelsPerSecond;
                 double initialY = 14;
@@ -133,11 +149,9 @@ namespace Naziki_Editor.Views.TimelineClip
             // ==========================================
             // 渲染其它解码后的普通关键帧
             // ==========================================
-            var decodedFrames = Core.StoryboardTimeConverter.DecodeTimelineKeyframes(
+            var decodedFrames = _timelineService.DecodeKeyframes(
                 _clipModel.AssociatedObject,
                 _propertyName,
-                _context.TimeEngine,
-                _context.Chart?.note_list,
                 trueBaseTimeSec
             );
 
@@ -243,15 +257,11 @@ namespace Naziki_Editor.Views.TimelineClip
                     }
 
                     var baseState = _clipModel.AssociatedObject.GetBaseState();
-                    if (baseState != null)
+                    if (baseState != null &&
+                        _propertyEditorService.TryGetValue(baseState, "Time", out object oldTime))
                     {
-                        var timeProp = baseState.GetType().GetProperty("Time");
-                        if (timeProp != null)
-                        {
-                            object oldTime = timeProp.GetValue(baseState);
-                            object newTimeStr = Core.StoryboardTimeConverter.UpdateTimeExpressionByDelta(oldTime, deltaSec);
-                            timeProp.SetValue(baseState, newTimeStr);
-                        }
+                        object newTimeStr = _timelineService.UpdateTimeExpressionByDelta(oldTime, deltaSec);
+                        _propertyEditorService.TrySetValue(baseState, "Time", newTimeStr);
                     }
                 }
                 else if (node.Tag is Models.ObjectState state)
@@ -274,12 +284,10 @@ namespace Naziki_Editor.Views.TimelineClip
                     // 🌟 计算视差相对时间，必须减去真实的起跑线！
                     double newVisualRelTime = newAbsTime - trueBaseTimeSec;
 
-                    Core.StoryboardTimeConverter.WriteBackVisualTime(
+                    _timelineService.WriteBackVisualTime(
                         _clipModel.AssociatedObject,
                         state,
                         newVisualRelTime,
-                        _context.TimeEngine,
-                        _context.Chart?.note_list,
                         trueBaseTimeSec             // 🌟 喂给底层的基准点！
                     );
                 }
@@ -287,7 +295,7 @@ namespace Naziki_Editor.Views.TimelineClip
                 // ==========================================
                 // 2. 🚦 Y 轴纵向拉扯（Slider 属性两路分流反写）
                 // ==========================================
-                var rule = Core.PropertyConstraintManager.GetConstraint(_propertyName);
+                var rule = _propertyEditorService.GetConstraint(_propertyName);
                 if (rule != null && rule.UIType == Core.PropertyUIType.Slider)
                 {
                     double currentY = Canvas.GetTop(node);
@@ -303,11 +311,11 @@ namespace Naziki_Editor.Views.TimelineClip
                     if (isBaseStateNode)
                     {
                         var baseState = _clipModel.AssociatedObject.GetBaseState();
-                        baseState?.GetType().GetProperty(_propertyName)?.SetValue(baseState, newValue);
+                        if (baseState != null) _propertyEditorService.TrySetValue(baseState, _propertyName, newValue);
                     }
                     else if (node.Tag is Models.ObjectState state)
                     {
-                        state.GetType().GetProperty(_propertyName)?.SetValue(state, newValue);
+                        _propertyEditorService.TrySetValue(state, _propertyName, newValue);
                     }
                 }
 
@@ -339,9 +347,9 @@ namespace Naziki_Editor.Views.TimelineClip
                 var editItem = new MenuItem { Header = "⚙️ 打开属性编辑器" };
                 editItem.Click += (s, ev) =>
                 {
-                    if (Window.GetWindow(this) is MainWindow main && _clipModel?.AssociatedObject != null)
+                    if (_clipModel?.AssociatedObject != null)
                     {
-                        main.OpenPropertyEditor(_clipModel.AssociatedObject);
+                        _messageBroker.Publish("RequestOpenPropertyEditor", (object)_clipModel.AssociatedObject);
                     }
                 };
                 menu.Items.Add(editItem);
@@ -358,7 +366,7 @@ namespace Naziki_Editor.Views.TimelineClip
                             string json = Newtonsoft.Json.JsonConvert.SerializeObject(state);
                             _clipboardState = Newtonsoft.Json.JsonConvert.DeserializeObject(json, state.GetType()) as Models.ObjectState;
                             _clipboardSourcePropertyName = _propertyName;
-                            MessageBox.Show("卡哇伊！属性信息复制成功啦！", "复制成功");
+                            _dialogService.ShowMessage("卡哇伊！属性信息复制成功啦！", "复制成功");
                         }
                     };
                     menu.Items.Add(copyItem);
@@ -393,23 +401,21 @@ namespace Naziki_Editor.Views.TimelineClip
         private void CheckAndPasteProperties(Models.ObjectState targetState)
         {
             // 尝试读取剪贴板里这个属性的值
-            if (Core.FastReflectionHelper.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
+            if (_propertyEditorService.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
             {
                 // 检查目标帧是不是已经有这个属性了
-                if (Core.FastReflectionHelper.TryGetValue(targetState, _propertyName, out object existingVal) && existingVal != null)
+                if (_propertyEditorService.TryGetValue(targetState, _propertyName, out object existingVal) && existingVal != null)
                 {
-                    var result = MessageBox.Show(
+                    var result = _dialogService.ShowYesNo(
                         $"纳尼？当前关键帧的 [{_propertyName}] 属性已经有值 ({existingVal}) 啦！\n是否要用复制的值 ({copiedVal}) 替换它？",
-                        "时空冲突确认", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        "时空冲突确认");
 
-                    if (result == MessageBoxResult.No) return;
+                    if (!result) return;
                 }
 
                 // 强行写入新值！
-                var propInfo = targetState.GetType().GetProperty(_propertyName);
-                if (propInfo != null && propInfo.CanWrite)
+                if (_propertyEditorService.TrySetValue(targetState, _propertyName, copiedVal))
                 {
-                    propInfo.SetValue(targetState, copiedVal);
                     // 呼叫大本营的 MarkAsModified 并重绘当前行
                     _context?.MarkAsModified();
                     RenderTrackKeyframes();
@@ -441,9 +447,9 @@ namespace Naziki_Editor.Views.TimelineClip
                 newFrame.RelativeTime = (float)newRelTime;
 
                 // 继承事件的初始属性 (BaseState)
-                if (Core.FastReflectionHelper.TryGetValue(_clipModel.AssociatedObject.GetBaseState(), _propertyName, out object baseVal) && baseVal != null)
+                if (_propertyEditorService.TryGetValue(_clipModel.AssociatedObject.GetBaseState(), _propertyName, out object baseVal) && baseVal != null)
                 {
-                    stateType.GetProperty(_propertyName)?.SetValue(newFrame, baseVal);
+                    _propertyEditorService.TrySetValue(newFrame, _propertyName, baseVal);
                 }
 
                 _clipModel.AssociatedObject.GetKeyframes().Add(newFrame);
@@ -470,9 +476,9 @@ namespace Naziki_Editor.Views.TimelineClip
                     var newFrame = Activator.CreateInstance(stateType) as Models.ObjectState;
                     newFrame.RelativeTime = (float)newRelTime;
 
-                    if (Core.FastReflectionHelper.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
+                    if (_propertyEditorService.TryGetValue(_clipboardState, _propertyName, out object copiedVal) && copiedVal != null)
                     {
-                        stateType.GetProperty(_propertyName)?.SetValue(newFrame, copiedVal);
+                        _propertyEditorService.TrySetValue(newFrame, _propertyName, copiedVal);
                     }
 
                     _clipModel.AssociatedObject.GetKeyframes().Add(newFrame);
@@ -558,6 +564,11 @@ namespace Naziki_Editor.Views.TimelineClip
             // 3. 存下新倍率，并极速重绘折线！
             _pixelsPerSecond = newPixelsPerSecond;
             RedrawPropertyCurves();
+        }
+
+        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

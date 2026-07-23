@@ -1,4 +1,5 @@
-﻿using Naziki_Editor.Models;
+using Naziki_Editor.Models;
+using Naziki_Editor.Core.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Windows;
@@ -18,10 +19,16 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         // 对外暴露的影子集合，方便父窗口最后拿去落盘
         public List<IStoryboardEntity> ControlBoards { get; private set; } = new List<IStoryboardEntity>();
+        private readonly IDialogService _dialogService;
 
         public PropertyEditor_ControlBoardTabs()
         {
             InitializeComponent();
+        }
+
+        public PropertyEditor_ControlBoardTabs(IDialogService dialogService) : this()
+        {
+            _dialogService = dialogService;
         }
 
         // 📥 唯一入口：父窗口把纯净的主对象和克隆好的影子兵团交接给它
@@ -103,8 +110,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             if (_currentActiveObject != _mainObject)
             {
-                var res = MessageBox.Show($"确定要将控制板 [{_currentActiveObject.Id}] 彻底抹杀吗？\n此操作不可撤销！", "物理销毁确认", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (res == MessageBoxResult.Yes)
+                var res = _dialogService.ShowYesNo($"确定要将控制板 [{_currentActiveObject.Id}] 彻底抹杀吗？\n此操作不可撤销！", "物理销毁确认");
+                if (res)
                 {
                     ControlBoards.Remove(_currentActiveObject);
                     RefreshTabs();

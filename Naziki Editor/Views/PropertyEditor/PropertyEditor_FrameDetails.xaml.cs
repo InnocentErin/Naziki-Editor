@@ -1,4 +1,7 @@
-﻿using Naziki_Editor.Core;
+using Naziki_Editor.Core;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Common;
+using Naziki_Editor.UI.ViewModels;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using System;
@@ -103,7 +106,15 @@ namespace Naziki_Editor.Views.PropertyEditor
         private IStoryboardEntity _mainObject;
         private string _lastAutoInjectedProp = null;
 
+        /// <summary>
+        /// 由父窗口设置，替代 Window.GetWindow 反射获取 _currentActiveObject
+        /// </summary>
+        public IStoryboardEntity? CurrentActiveObject { get; set; }
+
         private Dictionary<string, C2Template> _globalTemplates;
+        private IPropertyEditorService _propertyEditorService;
+        private readonly IDialogService _dialogService;
+        private PropertyEditorViewModel _viewModel;
         private HashSet<string> _invalidProperties = new HashSet<string>();
 
         public void InitTemplates(Dictionary<string, C2Template> templates)
@@ -111,9 +122,27 @@ namespace Naziki_Editor.Views.PropertyEditor
             _globalTemplates = templates;
         }
 
+        /// <summary>
+        /// 由父窗口在 InitializeComponent() 后调用，注入 DI 依赖（XAML 创建的无参构造器无法直接注入）
+        /// </summary>
+        public void InitializeServices(IPropertyEditorService propertyEditorService, IMessageBroker messageBroker)
+        {
+            _propertyEditorService = propertyEditorService;
+            _viewModel = new PropertyEditorViewModel(messageBroker, _propertyEditorService);
+        }
+
         public PropertyEditor_FrameDetails()
         {
             InitializeComponent();
+        }
+
+        public PropertyEditor_FrameDetails(IDialogService dialogService, IMessageBroker messageBroker, IPropertyEditorService propertyEditorService) : this()
+        {
+            _dialogService = dialogService;
+            _propertyEditorService = propertyEditorService;
+            _viewModel = new PropertyEditorViewModel(
+                messageBroker,
+                _propertyEditorService);
         }
 
         // ==========================================
@@ -175,6 +204,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 var targetProp = targetState?.GetType().GetProperty("Easing") ?? easingProp;
 
                 var easingPicker = new EasingPickerControl(targetProp, targetState, AttachValidationProbe);
+                easingPicker.OnModified = () => _context?.MarkAsModified();
 
                 // 🔒 置灰控制：只有初始核心属性允许编辑，后续状态一律变灰锁死，绝对不写盘！
                 easingPicker.IsEnabled = _isRoot;
@@ -233,6 +263,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             TxtLayer.IsEnabled = _isRoot;
             TxtOrder.IsEnabled = _isRoot;
 
+            // 🌟 ViewModel 集成：将状态数据同步到 PropertyEditorViewModel
+            _viewModel.LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context, _mainObject);
+            _viewModel.CurrentActiveObject = CurrentActiveObject;
 
             BuildDynamicPanel();
 
@@ -258,19 +291,10 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                     // 🌟 1. 【黑魔法】：从父窗口偷看当前激活的对象！
                     _isControlBoard = false;
-                    IStoryboardEntity currentActiveEntity = null;
-                    var parentWin = Window.GetWindow(this);
-                    if (parentWin != null)
+                    IStoryboardEntity currentActiveEntity = CurrentActiveObject;
+                    if (currentActiveEntity != null && !string.IsNullOrEmpty(currentActiveEntity.TargetId))
                     {
-                        var field = parentWin.GetType().GetField("_currentActiveObject", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (field != null)
-                        {
-                            currentActiveEntity = field.GetValue(parentWin) as IStoryboardEntity;
-                            if (currentActiveEntity != null && !string.IsNullOrEmpty(currentActiveEntity.TargetId))
-                            {
-                                _isControlBoard = true;
-                            }
-                        }
+                        _isControlBoard = true;
                     }
 
                     // 🌟 1.5 【神圣雷达】：嗅探当前是否处于模板编辑模式！
@@ -377,10 +401,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             btnDel.Click += (s, e) => {
                 if (prop.PropertyType.IsValueType && Nullable.GetUnderlyingType(prop.PropertyType) == null)
                 {
-                    MessageBox.Show($"设计师，底层模型中的【{prop.Name}】不是可空类型，无法被删除！", "底层限制");
+                    _dialogService.ShowMessage($"设计师，底层模型中的【{prop.Name}】不是可空类型，无法被删除！", "底层限制");
                     return;
                 }
-                prop.SetValue(_currentState, null);
+                _propertyEditorService.TrySetValue(_currentState, prop.Name, null);
                 LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
             };
             Grid.SetColumn(btnDel, 2);
@@ -430,7 +454,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 }
 
                 // 反查当前帧被赋予的模板值并挂载初值
-                string currentTemplateVal = prop.GetValue(_currentState) as string;
+                string currentTemplateVal = _propertyEditorService.TryGetValue(_currentState, prop.Name, out object tVal) ? tVal as string : null;
                 cmbTemplateBox.SelectedIndex = 0;
                 if (!string.IsNullOrEmpty(currentTemplateVal))
                 {
@@ -449,7 +473,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 {
                     if (cmbTemplateBox.SelectedItem is ComboBoxItem selectItem)
                     {
-                        prop.SetValue(_currentState, selectItem.Tag as string);
+                        _propertyEditorService.TrySetValue(_currentState, prop.Name, selectItem.Tag as string);
                         // 时空同步：重新走一遍 LoadState 刷洗变灰状态！
                         LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
                     }
@@ -465,7 +489,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             Type uType = Nullable.GetUnderlyingType(pType) ?? pType;
 
             // 1. ⚖️ 询问《参数限制大管家》，获取当前属性的至高展现形态
-            var constraint = Core.PropertyConstraintManager.GetConstraint(prop.Name);
+            var constraint = _propertyEditorService.GetConstraint(prop.Name);
 
             // 🔒 2. 模板死锁机制
             if (isLocked)
@@ -476,13 +500,17 @@ namespace Naziki_Editor.Views.PropertyEditor
             // 🎚️ 3. 【核心进化一】：如果是滑块形态属性 (如 Opacity)，一键降临离散滑块组件！
             if (constraint.UIType == Core.PropertyUIType.Slider)
             {
-                return new BoundedSliderControl(prop, _currentState, AttachValidationProbe);
+                var slider = new BoundedSliderControl(prop, _currentState, AttachValidationProbe);
+                slider.OnModified = () => _context?.MarkAsModified();
+                return slider;
             }
 
             // 🎨 4. 【核心进化二】：如果是单体选色器属性 (如 ScanlineColor)，一键召唤单体选色框！
             if (constraint.UIType == Core.PropertyUIType.ColorPicker)
             {
-                return new SingleColorPickerControl(prop, _currentState, AttachValidationProbe);
+                var picker = new SingleColorPickerControl(prop, _currentState, AttachValidationProbe);
+                picker.OnModified = () => _context?.MarkAsModified();
+                return picker;
             }
 
             // 🔘 5. 常规布尔值开关
@@ -516,7 +544,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             // 🌈 7. 【核心进化三】：如果是12色列表阵列 (List<string>)，一键铺开 2x6 矩阵调色盘！
             else if (uType == typeof(System.Collections.Generic.List<string>))
             {
-                return new TwelveColorPickerControl(prop, _currentState);
+                return new TwelveColorPickerControl(prop, _currentState) { OnModified = () => _context?.MarkAsModified() };
             }
             // 📝 8. 其余普通的纯文本/数值属性 (兜底保留原生双向 Binding)
             else
@@ -571,6 +599,19 @@ namespace Naziki_Editor.Views.PropertyEditor
                 // ✨【控制板防御拦截】：如果是控制板叠加对象，其余任何诸如 Layer, Font, Align 等静态非动画属性一律不准在面板里露脸！
                 if (_isControlBoard && IsStaticDnaProperty(prop.Name)) continue;
 
+                // 🔒 模板模式：只允许动画状态属性，彻底屏蔽实体DNA
+                bool isTemplateState = _currentState != null && _currentState.GetType().Name == "TemplateState";
+                if (isTemplateState)
+                {
+                    // 模板白名单：只允许动画相关属性（X, Y, Z, RotX, RotY, RotZ, ScaleX, ScaleY, ScaleZ, Alpha, Color, Width, Height, etc.）
+                    // 禁止实体DNA：Path, TextContent, Pos, NoteTarget, Layer, Order, Id, TargetId, ParentId
+                    var forbiddenProps = new HashSet<string> { "Path", "TextContent", "Pos", "NoteTarget", "Layer", "Order", "Id", "TargetId", "ParentId", "Template" };
+                    if (forbiddenProps.Contains(prop.Name))
+                    {
+                        continue;
+                    }
+                }
+
                 // 🌟 【小艾的终极防线】：如果处于模板编辑模式，且该属性不属于此门派，直接蒸发！
                 if (_rootState != null && _rootState.GetType().Name == "TemplateState") // 只要是模板类
                 {
@@ -580,14 +621,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 // 🎛️ 【神圣隔离 2】：场景控制器的降维大门！根据 EditorMode 屏蔽不相干属性！
                 if (_currentState is ControllerState)
                 {
-                    // 同样用黑魔法拿到 activeEntity
-                    IStoryboardEntity activeEntity = null;
-                    var parentWin = Window.GetWindow(this);
-                    if (parentWin != null)
-                    {
-                        var field = parentWin.GetType().GetField("_currentActiveObject", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (field != null) activeEntity = field.GetValue(parentWin) as IStoryboardEntity;
-                    }
+                    IStoryboardEntity activeEntity = CurrentActiveObject;
 
                     if (activeEntity is C2SceneController sceneCtrl)
                     {
@@ -609,7 +643,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     }
                 }
 
-                object val = prop.GetValue(_currentState);
+                object val = _propertyEditorService.TryGetValue(_currentState, prop.Name, out object v) ? v : null;
                 // ==========================================
                 // 🚀 核心修复：给 Template 发放永久 VIP 通行证！
                 // 因为默认它是 null，会被系统无情地扔进“未激活”的下拉菜单里。
@@ -631,7 +665,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 // 🌟 小艾的完美分拣法术：确保没有任何一个属性流浪！
                 // ==========================================
                 // 🌟【解耦对接】：呼叫我们在公共 Core 文件夹里造出来的公共分拣大脑！
-                var category = Core.PropertyClassifier.GetCategory(prop.Name);
+                var category = _propertyEditorService.GetCategory(prop.Name);
                 StackPanel targetPanel = null;
                 ComboBox targetComboBox = null;
 
@@ -681,7 +715,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (cmb.SelectedItem is ComboBoxItem item && item.Tag is PropertyInfo prop)
             {
                 // 1. 去大管家那里要默认约束
-                var rule = Core.PropertyConstraintManager.GetConstraint(prop.Name);
+                var rule = _propertyEditorService.GetConstraint(prop.Name);
 
                 Type uType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 object defaultVal = null;
@@ -699,7 +733,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 }
 
                 // 2. 赋予当前正在编辑的关键帧
-                prop.SetValue(_currentState, defaultVal);
+                _propertyEditorService.TrySetValue(_currentState, prop.Name, defaultVal);
 
                 // ==========================================
                 // 🌟 3. 静默探测并注入 BaseState (初始属性兜底)
@@ -710,16 +744,11 @@ namespace Naziki_Editor.Views.PropertyEditor
                     var baseState = _mainObject.GetBaseState();
                     if (baseState != null && baseState != _currentState) // 确保不是初始帧本身
                     {
-                        var baseProp = baseState.GetType().GetProperty(prop.Name);
-                        if (baseProp != null)
+                        if (_propertyEditorService.TryGetValue(baseState, prop.Name, out object baseVal) && baseVal == null)
                         {
-                            object baseVal = baseProp.GetValue(baseState);
-                            if (baseVal == null)
-                            {
-                                // 💥 初始帧没有这个属性！静默注入默认值！
-                                baseProp.SetValue(baseState, defaultVal);
-                                _lastAutoInjectedProp = prop.Name; // 盖上印记，通知 UI 弹出提示！
-                            }
+                            // 💥 初始帧没有这个属性！静默注入默认值！
+                            _propertyEditorService.TrySetValue(baseState, prop.Name, defaultVal);
+                            _lastAutoInjectedProp = prop.Name; // 盖上印记，通知 UI 弹出提示！
                         }
                     }
                 }
@@ -735,7 +764,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             CmbTemplate.Items.Clear();
             CmbTemplate.Items.Add(new ComboBoxItem { Content = "🚫 不使用模板", Tag = null });
 
-            string currentTemplate = _currentState.GetType().GetProperty("Template")?.GetValue(_currentState) as string;
+            string currentTemplate = _propertyEditorService.TryGetValue(_currentState, "Template", out object ctObj) ? ctObj as string : null;
             int selectedIndex = 0;
 
             if (_globalTemplates != null)
@@ -757,10 +786,8 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (CmbTemplate.SelectedItem is ComboBoxItem item)
             {
                 string newTemplate = item.Tag as string;
-                var prop = _currentState.GetType().GetProperty("Template");
-                if (prop != null)
+                if (_propertyEditorService.TrySetValue(_currentState, "Template", newTemplate))
                 {
-                    prop.SetValue(_currentState, newTemplate);
                     LoadState(_currentState, _currentTitle, _rootState, _isRoot, _context);
                 }
             }
@@ -772,7 +799,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (propName == "Time" || propName == "RelativeTime" || propName == "AddTime" || propName == "Template") return false;
             if (_currentState == null || _globalTemplates == null) return false;
 
-            if (!FastReflectionHelper.TryGetValue(_currentState, "Template", out object currentTemplateNameObj) ||
+            if (!_propertyEditorService.TryGetValue(_currentState, "Template", out object currentTemplateNameObj) ||
                 !(currentTemplateNameObj is string currentTemplateName) ||
                 string.IsNullOrEmpty(currentTemplateName) ||
                 !_globalTemplates.ContainsKey(currentTemplateName))
@@ -781,7 +808,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             }
 
             var templateObj = _globalTemplates[currentTemplateName];
-            if (templateObj?.BaseState != null && FastReflectionHelper.TryGetValue(templateObj.BaseState, propName, out object val) && val != null)
+            if (templateObj?.BaseState != null && _propertyEditorService.TryGetValue(templateObj.BaseState, propName, out object val) && val != null)
             {
                 templateValue = val;
                 return true;
@@ -794,10 +821,10 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (_invalidProperties.Count > 0)
             {
                 string errorList = string.Join(", ", _invalidProperties);
-                MessageBox.Show($"设计师，发现 {_invalidProperties.Count} 个参数填写错误哦！\n\n" +
+                _dialogService.ShowMessage($"设计师，发现 {_invalidProperties.Count} 个参数填写错误哦！\n\n" +
                                 $"【异常参数】: {errorList}\n\n" +
                                 $"带有红框的输入框必须修改正确，否则达咩（绝对不行）！请修改后再保存吧！",
-                                "小艾的严肃拦截", MessageBoxButton.OK, MessageBoxImage.Error);
+                                "小艾的严肃拦截", DialogMessageType.Error);
                 return false;
             }
             return true;
@@ -843,7 +870,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (txtValue == null) return;
 
             // 1. ⚖️ 提前向《属性宪法》大管家拿到该参数的合法规则
-            var rule = Core.PropertyConstraintManager.GetConstraint(propName);
+            var rule = _propertyEditorService.GetConstraint(propName);
 
             // 2. ⚡ 挂载 TextChanged 实时审查视线
             txtValue.TextChanged += (s, e) =>
@@ -945,12 +972,14 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (prop.Name == "NoteTarget")
             {
                 var selectorCtrl = new NoteSelectorBuilderControl(prop, _currentState, _context);
+                selectorCtrl.OnModified = () => _context?.MarkAsModified();
                 Grid.SetColumn(selectorCtrl, 1);
                 grid.Children.Add(selectorCtrl);
             }
             else if (prop.Name == "Pos") // ✨ 新增：拦截 Pos，降临线条端点矩阵！
             {
                 var lineCtrl = new LinePointsEditorControl(prop, _currentState, _context);
+                lineCtrl.OnModified = () => _context?.MarkAsModified();
                 Grid.SetColumn(lineCtrl, 1);
                 grid.Children.Add(lineCtrl);
             }

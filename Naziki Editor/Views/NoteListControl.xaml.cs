@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using Naziki_Editor.Core;
 using Naziki_Editor.Models;
 using System;
@@ -10,6 +10,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media; // 🌟 解决 Brushes 报错
 using System.Windows.Shapes; // 🌟 解决 Rectangle 报错
 using Naziki_Editor.State;
+using Naziki_Editor.Core.Abstractions;
 
 namespace Naziki_Editor.Views
 {
@@ -23,6 +24,7 @@ namespace Naziki_Editor.Views
         public double _maxChartTime = 0;
         // 🔌 全局万能数据包接口
         public ProjectDataContext Context { get; private set; }
+        private readonly IDialogService _dialogService;
         // 
         public void LoadContext(ProjectDataContext context)
         {
@@ -33,6 +35,11 @@ namespace Naziki_Editor.Views
         public NoteListControl()
         {
             InitializeComponent();
+        }
+
+        public NoteListControl(IDialogService dialogService) : this()
+        {
+            _dialogService = dialogService;
         }
 
         // ==========================================
@@ -265,7 +272,7 @@ namespace Naziki_Editor.Views
         {
             if (_selectedNotes.Count == 0)
             {
-                MessageBox.Show("还没有选择音符哦！设计师快去勾选几个吧~", "提示");
+                _dialogService.ShowMessage("还没有选择音符哦！设计师快去勾选几个吧~", "提示");
                 return;
             }
 
@@ -275,7 +282,7 @@ namespace Naziki_Editor.Views
             // 📡 呼叫主窗口基站接收数据包
             OnNotesImportRequested?.Invoke(sortedNotes);
 
-            MessageBox.Show($"成功将 {sortedNotes.Count} 个音符打包并传送至故事板核心账本！(๑•̀ㅂ•́)و✧", "传送成功");
+            _dialogService.ShowMessage($"成功将 {sortedNotes.Count} 个音符打包并传送至故事板核心账本！(๑•̀ㅂ•́)و✧", "传送成功");
         }
 
 

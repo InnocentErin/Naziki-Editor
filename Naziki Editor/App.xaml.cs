@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Windows;
 using Newtonsoft.Json;
 using Naziki_Editor.Models;
 using Naziki_Editor.Views;
 using Naziki_Editor.ProjectManagement;
+using Naziki_Editor.Core.Commands;
 
 namespace Naziki_Editor
 {
@@ -15,6 +16,9 @@ namespace Naziki_Editor
         // =========================================
         protected override void OnStartup(StartupEventArgs e)
         {
+            // 🔧 依赖注入容器初始化
+            AppServices.ConfigureServices();
+
             // 👇 🟢【源头级增量注入】：在所有业务、哨兵启动前，率先全量张开时空安全网！
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -96,9 +100,10 @@ namespace Naziki_Editor
 
                         if (project != null)
                         {
-                            MainWindow mainWindow = new MainWindow();
-                            mainWindow.LoadProject(nepPath, project);
+                            MainWindow mainWindow = AppServices.GetService<Views.MainWindow>();
                             mainWindow.Show();
+                            AppCommands appCommands = AppServices.GetService<AppCommands>();
+                            appCommands.DoLoadProject(nepPath, project, mainWindow.Context);
                             return;
                         }
                     }
@@ -107,7 +112,7 @@ namespace Naziki_Editor
             }
 
             // 🕒 核心驱动 3：【普通启动流程】（设计师你之前删掉的窗口，小艾帮你加回来啦！）
-            ProjectHubWindow hubWindow = new ProjectHubWindow();
+            ProjectHubWindow hubWindow = AppServices.GetService<ProjectManagement.ProjectHubWindow>();
             hubWindow.Show();
         }
 

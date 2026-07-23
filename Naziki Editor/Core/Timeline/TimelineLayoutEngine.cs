@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 
@@ -8,6 +9,9 @@ namespace Naziki_Editor.Core.Timeline
 {
     public static class TimelineLayoutEngine
     {
+        private static IDialogService? _dialogService;
+
+        public static void Initialize(IDialogService dialogService) { _dialogService = dialogService; }
         /// <summary>
         /// 🧙‍♂️ 俄罗斯方块智能排版引擎：基于“类型图层”与“时间碰撞”，分配无重叠的 Order！
         /// </summary>
@@ -143,9 +147,9 @@ namespace Naziki_Editor.Core.Timeline
 
             if (maxOrderGenerated > 15)
             {
-                System.Windows.MessageBox.Show(
+                _dialogService?.ShowMessage(
                     $"⚠️ 纳尼？！排版检测到极端情况！\n在同一时间点内，最多出现了 {maxOrderGenerated + 1} 个重叠对象！\n建议打谱师检查是否忘记勾选 Destroy，以防游戏卡顿哦！",
-                    "性能预警", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                    "性能预警", DialogMessageType.Warning);
             }
 
 

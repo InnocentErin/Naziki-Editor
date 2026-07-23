@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,6 +8,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tutorial\**" />
+    <Compile Remove="before\**" />
+    <Page Remove="before\**" />
+    <None Remove="before\**" />
+    <Resource Remove="before\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Remove="Resources\NoteSkins\Cytus2_Default\CDrag.png" />
@@ -22,6 +30,7 @@
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="NAudio" Version="2.3.0" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -6,6 +6,8 @@ using System.Windows.Controls;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Naziki_Editor.Core; // 🌟 引入核心库，使用 ChartLogic 门派转换器
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Storyboard;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
@@ -15,6 +17,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private string _originalId;
         private ProjectDataContext _context;
         private bool _isTemplateMode = false;
+        private readonly IStoryboardRepository _storyboardRepository = new StoryboardRepository();
         public event Action<TemplateType> OnTemplateTypeChanged;
 
         public PropertyEditor_Identity()
@@ -281,7 +284,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     int count = 1;
                     string newName = $"{prefix}_{count}";
 
-                    while (_context.Storyboard.templates != null && _context.Storyboard.templates.ContainsKey(newName) && newName != _originalId)
+                    while (_storyboardRepository.ContainsTemplate(_context.Storyboard, newName) && newName != _originalId)
                     {
                         count++;
                         newName = $"{prefix}_{count}";
@@ -299,7 +302,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 string newTplId = TxtObjectId.Text.Trim();
                 if (string.IsNullOrEmpty(newTplId)) { TxtIdWarning.Text = "⚠️ 模板名不能为空！"; TxtIdWarning.Visibility = Visibility.Visible; return false; }
-                if (newTplId != _originalId && _context.Storyboard.templates != null && _context.Storyboard.templates.ContainsKey(newTplId)) { TxtIdWarning.Text = "⚠️ 模板名冲突！"; TxtIdWarning.Visibility = Visibility.Visible; return false; }
+                if (newTplId != _originalId && _storyboardRepository.ContainsTemplate(_context.Storyboard, newTplId)) { TxtIdWarning.Text = "⚠️ 模板名冲突！"; TxtIdWarning.Visibility = Visibility.Visible; return false; }
                 TxtIdWarning.Visibility = Visibility.Collapsed;
                 return true;
             }
@@ -338,16 +341,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private bool IsIdConflict(string id)
         {
             if (_context == null || !_context.HasStoryboard) return false;
-            var root = _context.Storyboard;
-
-            if (root.sprites?.Any(x => x.Id == id) == true) return true;
-            if (root.texts?.Any(x => x.Id == id) == true) return true;
-            if (root.lines?.Any(x => x.Id == id) == true) return true;
-            if (root.videos?.Any(x => x.Id == id) == true) return true;
-            if (root.controllers?.Any(x => x.Id == id) == true) return true;
-            if (root.note_controllers?.Any(x => x.Id == id) == true) return true;
-
-            return false;
+            return new Core.Common.EntityIdService().IsIdConflict(id, _originalId, _context.Storyboard);
         }
     }
 }

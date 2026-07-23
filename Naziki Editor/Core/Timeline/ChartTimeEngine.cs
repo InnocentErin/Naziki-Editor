@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Models;
 
 namespace Naziki_Editor.Core
@@ -8,7 +9,7 @@ namespace Naziki_Editor.Core
     // 🌟 定义一下 JSON 里的 Tempo 对象长什么样
 
     // 🌟 我们的核心时空引擎！
-    public class ChartTimeEngine
+    public class ChartTimeEngine : ITimeEngine
     {
         private List<TempoEvent> _tempoList;
         private int _timeBase;
@@ -71,47 +72,64 @@ namespace Naziki_Editor.Core
             return totalSeconds;
         }
 
-
-
-
-
         // ==========================================\
         // 🌟 终极翻译官：把 "start:1134:2" 或 "12.5" 统一翻译成绝对秒数！
         // ==========================================\
-        public double ParseCytoidTimeExpression(object timeObj, List<Models.C2Note> allNotes)
+        public double ParseCytoidTimeExpression(object timeObj, List<C2Note> allNotes)
         {
             if (timeObj == null) return 0;
+
+            // 🚨 【Bug 修复核心】：如果时间对象是一个 JArray（JSON 数组），则取其第一个元素进行解析！
+            // 这样至少能保证方块正确显示在它的第一个时间点位置。
+            if (timeObj is Newtonsoft.Json.Linq.JArray jArray && jArray.Count > 0)
+            {
+                timeObj = jArray[0];
+                System.Diagnostics.Debug.WriteLine($"[时间轴雷达 2] 检测到时间数组，已取第一个元素: '{timeObj}'");
+            }
+            else if (timeObj is System.Collections.IList list && list.Count > 0)
+            {
+                timeObj = list[0]; // 兼容普通 List
+            }
+
             string str = timeObj.ToString().Trim();
 
             // 1. 如果是纯绝对秒数，直接秒解
             if (double.TryParse(str, out double directVal)) return directVal;
 
-            // 2. 遇到锚点魔法，呼叫内部 TickToSeconds 引擎算账！
-            if (allNotes != null)
+            // 2. 如果没有谱面数据...
+            if (allNotes == null || allNotes.Count == 0) return double.NaN;
+
+            try
             {
-                try
+                string[] parts = str.Split(':');
+                int noteId = -1;
+                double offset = 0;
+
+                if (parts.Length == 1) { if (int.TryParse(parts[0], out noteId)) offset = 0; }
+                else if (parts.Length >= 2)
                 {
-                    string[] parts = str.Split(':');
-                    int noteId = -1;
-                    double offset = 0;
-
-                    if (parts.Length == 1) { if (int.TryParse(parts[0], out noteId)) offset = 0; }
-                    else if (parts.Length >= 2)
-                    {
-                        int.TryParse(parts[1], out noteId);
-                        if (parts.Length == 3) double.TryParse(parts[2], out offset);
-                    }
-
-                    var targetNote = allNotes.FirstOrDefault(n => n.id == noteId);
-                    if (targetNote != null)
-                    {
-                        double baseSeconds = this.TickToSeconds(targetNote.tick); // 直接调用自己的引擎
-                        return baseSeconds + offset;
-                    }
+                    int.TryParse(parts[1], out noteId);
+                    if (parts.Length == 3) double.TryParse(parts[2], out offset);
                 }
-                catch { /* 解析失败则兜底返回0 */ }
+
+                // 🟢 雷达 3：打印当前谱面的总音符数，以及故事板试图寻找的 NoteID
+                System.Diagnostics.Debug.WriteLine($"[时间轴雷达 2] 谱面总音符数: {allNotes.Count}");
+                System.Diagnostics.Debug.WriteLine($"[时间轴雷达 2] 故事板请求寻找 Note ID: {noteId}");
+
+                var targetNote = allNotes.FirstOrDefault(n => n.id == noteId);
+                if (targetNote == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❗ [时间轴雷达 2] 严重失配！谱面中不存在 ID 为 {noteId} 的音符！");
+                    return double.NaN;
+                }
+
+                double baseSeconds = this.TickToSeconds(targetNote.tick);
+                return baseSeconds + offset;
             }
-            return 0;
+            catch
+            {
+                return double.NaN;
+            }
         }
 
 

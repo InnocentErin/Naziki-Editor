@@ -1,4 +1,6 @@
-﻿using Naziki_Editor.Core;
+using Naziki_Editor.Core;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Common;
 using Naziki_Editor.Models;
 using Newtonsoft.Json.Linq;
 using System;
@@ -16,11 +18,75 @@ namespace Naziki_Editor.Views.PropertyEditor
     // ==========================================================
     public class BoundedSliderControl : Grid
     {
+        internal static IDialogService? DialogService;
+
+        public static void Initialize(IDialogService dialogService) { DialogService = dialogService; }
+        private static readonly IPropertyEditorService _propertyEditorService = new PropertyEditorService();
+
         private Slider _slider;
         private TextBox _textBox;
         private PropertyInfo _prop;
         private object _state;
         private bool _isUpdatingLocal = false;
+
+        public Action? OnModified { get; set; }
+
+        // ==========================================================
+        // 🔗 DependencyProperty 支持 (XAML/数据绑定)
+        // ==========================================================
+        public static readonly DependencyProperty ValueProperty =
+            DependencyProperty.Register(nameof(Value), typeof(double), typeof(BoundedSliderControl),
+                new PropertyMetadata(0.0, OnValueChanged));
+
+        public static readonly DependencyProperty PropertyNameProperty =
+            DependencyProperty.Register(nameof(PropertyName), typeof(string), typeof(BoundedSliderControl),
+                new PropertyMetadata(string.Empty));
+
+        public static readonly DependencyProperty MinimumProperty =
+            DependencyProperty.Register(nameof(Minimum), typeof(double), typeof(BoundedSliderControl),
+                new PropertyMetadata(0.0));
+
+        public static readonly DependencyProperty MaximumProperty =
+            DependencyProperty.Register(nameof(Maximum), typeof(double), typeof(BoundedSliderControl),
+                new PropertyMetadata(1.0));
+
+        public double Value
+        {
+            get => (double)GetValue(ValueProperty);
+            set => SetValue(ValueProperty, value);
+        }
+
+        public string PropertyName
+        {
+            get => (string)GetValue(PropertyNameProperty);
+            set => SetValue(PropertyNameProperty, value);
+        }
+
+        public double Minimum
+        {
+            get => (double)GetValue(MinimumProperty);
+            set => SetValue(MinimumProperty, value);
+        }
+
+        public double Maximum
+        {
+            get => (double)GetValue(MaximumProperty);
+            set => SetValue(MaximumProperty, value);
+        }
+
+        private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is BoundedSliderControl control && control._slider != null && !control._isUpdatingLocal)
+            {
+                control._isUpdatingLocal = true;
+                double newVal = (double)e.NewValue;
+                control._slider.Value = newVal;
+                control._textBox.Text = Math.Round(newVal, 3).ToString();
+                control._isUpdatingLocal = false;
+            }
+        }
+
+        public BoundedSliderControl() { }
 
         public BoundedSliderControl(PropertyInfo prop, object state, Action<TextBox, string> attachProbeAction)
         {
@@ -30,7 +96,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });
 
-            var rule = Core.PropertyConstraintManager.GetConstraint(prop.Name);
+            var rule = _propertyEditorService.GetConstraint(prop.Name);
 
             _slider = new Slider
             {
@@ -94,11 +160,10 @@ namespace Naziki_Editor.Views.PropertyEditor
         {
             if (float.TryParse(_textBox.Text.Trim(), out float res))
             {
-                var rule = Core.PropertyConstraintManager.GetConstraint(_prop.Name);
+                var rule = _propertyEditorService.GetConstraint(_prop.Name);
                 if (res >= rule.Min && res <= rule.Max)
                 {
-                    Type targetType = Nullable.GetUnderlyingType(_prop.PropertyType) ?? _prop.PropertyType;
-                    _prop.SetValue(_state, Convert.ChangeType(res, targetType));
+                    _propertyEditorService.TrySetValue(_state, _prop.Name, res);
 
                     // 📢 惊醒大宇宙时光机记账
                     NotifyModification();
@@ -108,15 +173,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
         private void NotifyModification()
         {
-            if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-            {
-                var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (ctxProp != null)
-                {
-                    dynamic ctx = ctxProp.GetValue(parentWin);
-                    ctx?.MarkAsModified();
-                }
-            }
+            OnModified?.Invoke();
         }
     }
 
@@ -130,6 +187,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         private PropertyInfo _prop;
         private object _state;
         private bool _isUpdatingLocal = false;
+
+        public Action? OnModified { get; set; }
 
         public SingleColorPickerControl(PropertyInfo prop, object state, Action<TextBox, string> attachProbeAction)
         {
@@ -217,11 +276,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private void SaveToMemory(string hex)
         {
             _prop.SetValue(_state, string.IsNullOrEmpty(hex) ? null : hex);
-            if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-            {
-                var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
-            }
+            OnModified?.Invoke();
         }
     }
 
@@ -230,6 +285,8 @@ namespace Naziki_Editor.Views.PropertyEditor
     // ==========================================================
     public class TwelveColorPickerControl : Border
     {
+        public Action? OnModified { get; set; }
+
         public TwelveColorPickerControl(PropertyInfo prop, object state)
         {
             BorderBrush = Brushes.DimGray; BorderThickness = new Thickness(1); CornerRadius = new CornerRadius(4);
@@ -281,15 +338,11 @@ namespace Naziki_Editor.Views.PropertyEditor
                     }
                     else
                     {
-                        if (MessageBox.Show("是否恢复为游戏默认配色？", "提示", MessageBoxButton.YesNo) == MessageBoxResult.Yes) colorList[index] = null;
+                        if (BoundedSliderControl.DialogService?.ShowYesNo("是否恢复为游戏默认配色？", "提示") == true) colorList[index] = null;
                     }
                     refreshSkin();
 
-                    if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-                    {
-                        var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
-                    }
+                    OnModified?.Invoke();
                 };
 
                 var txt = new TextBlock { Text = noteNames[index], FontSize = 9, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0), Foreground = Brushes.Gray };
@@ -308,6 +361,32 @@ namespace Naziki_Editor.Views.PropertyEditor
         private Button _btnEase;
         private PropertyInfo _prop;
         private object _state;
+
+        public Action? OnModified { get; set; }
+
+        // ==========================================================
+        // 🔗 DependencyProperty 支持 (XAML/数据绑定)
+        // ==========================================================
+        public static readonly DependencyProperty EasingTypeProperty =
+            DependencyProperty.Register(nameof(EasingType), typeof(int), typeof(EasingPickerControl),
+                new PropertyMetadata(0, OnEasingTypeChanged));
+
+        public int EasingType
+        {
+            get => (int)GetValue(EasingTypeProperty);
+            set => SetValue(EasingTypeProperty, value);
+        }
+
+        private static void OnEasingTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is EasingPickerControl control && control._btnEase != null)
+            {
+                int newVal = (int)e.NewValue;
+                control.UpdateBtnVisual(newVal.ToString());
+            }
+        }
+
+        public EasingPickerControl() { }
 
         public EasingPickerControl(PropertyInfo prop, object state, Action<TextBox, string> attachProbeAction)
         {
@@ -358,11 +437,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
                     UpdateBtnVisual(selectedEaseStr);
 
-                    if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-                    {
-                        var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
-                    }
+                    OnModified?.Invoke();
                 }
             };
         }
@@ -1056,6 +1131,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         private readonly State.ProjectDataContext _context;
         private NoteSelectorModel _currentSelector;
 
+        public Action? OnModified { get; set; }
+
         // UI 部件
         private ComboBox _cmbMode;
         private TextBox _txtSingleId;
@@ -1256,7 +1333,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     {
                         if (_currentSelector.Type.Count <= 1)
                         {
-                            MessageBox.Show("指挥官，不能全都不选哦！至少得保留一种音符类型呀！", "防呆拦截");
+                            BoundedSliderControl.DialogService?.ShowMessage("指挥官，不能全都不选哦！至少得保留一种音符类型呀！", "防呆拦截");
                             chk.IsChecked = true; return; // 拦截！
                         }
                         _currentSelector.Type.Remove(typeVal);
@@ -1319,7 +1396,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 if (chkUp.IsChecked == false && chkDown.IsChecked == false)
                 {
-                    MessageBox.Show("指挥官，不能全都不选哦！扫描线方向至少得保留一个呀！", "防呆拦截");
+                    BoundedSliderControl.DialogService?.ShowMessage("指挥官，不能全都不选哦！扫描线方向至少得保留一个呀！", "防呆拦截");
                     ((CheckBox)s).IsChecked = true; return; // 拦截！
                 }
 
@@ -1405,11 +1482,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             }
 
             // 惊醒大宇宙
-            if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-            {
-                var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
-            }
+            OnModified?.Invoke();
         }
 
         private void RefreshRadar()
@@ -1476,6 +1549,8 @@ namespace Naziki_Editor.Views.PropertyEditor
         private JArray _pointsArray;
         private StackPanel _pointsContainer;
         private bool _isInternalUpdating = false;
+
+        public Action? OnModified { get; set; }
 
         public LinePointsEditorControl(PropertyInfo prop, object state, State.ProjectDataContext context)
         {
@@ -1624,11 +1699,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                 var modelValue = _pointsArray.ToObject(_prop.PropertyType);
                 _prop.SetValue(_state, modelValue);
 
-                if (Window.GetWindow(this) is PropertyEditorWindow parentWin)
-                {
-                    var ctxProp = parentWin.GetType().GetProperty("_context", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (ctxProp != null) { dynamic ctx = ctxProp.GetValue(parentWin); ctx?.MarkAsModified(); }
-                }
+                OnModified?.Invoke();
             }
             catch { }
         }
