@@ -51,18 +51,40 @@ namespace Naziki_Editor.Core.Compilation
         {
             if (entities == null) return;
             foreach (var entity in entities)
-                entity.Keyframes = FlattenStates<TState>(entity.Keyframes);
+            {
+                // 🌟 提取基准状态的时间作为相对时间计算的起点
+                float baseTime = 0f;
+                if (entity.BaseState?.Time != null && entity.BaseState.Time.ToString() != float.MaxValue.ToString())
+                {
+                    var absTimes = ResolveAbsoluteTimes(entity.BaseState.Time);
+                    if (absTimes.Count > 0) baseTime = absTimes[0];
+                }
+
+                // 🌟 如果基准状态中引用了模板，且关键帧列表为空，则从基准状态展开模板
+                if (!string.IsNullOrEmpty(entity.BaseState?.Template)
+                    && (entity.Keyframes == null || entity.Keyframes.Count == 0))
+                {
+                    var templateKeyframe = new TState();
+                    // 复制基准状态的Template属性
+                    typeof(TState).GetProperty("Template")?.SetValue(templateKeyframe, entity.BaseState.Template);
+                    templateKeyframe.Time = baseTime; // 使用实体的基准时间
+                    entity.Keyframes = new List<TState> { templateKeyframe };
+                    entity.BaseState.Template = null; // 清除基准状态中的模板引用，避免重复展开
+                }
+
+                entity.Keyframes = FlattenStates<TState>(entity.Keyframes, baseTime);
+            }
         }
 
         // ==========================================
         // 🧬 1. 顶层对象展平引擎 (遵循官方时间推算规范)
         // ==========================================
-        private List<TState> FlattenStates<TState>(List<TState> originalStates) where TState : ObjectState, new()
+        private List<TState> FlattenStates<TState>(List<TState> originalStates, float baseStateTime = 0f) where TState : ObjectState, new()
         {
             if (originalStates == null || originalStates.Count == 0) return originalStates;
 
             var flattenedList = new List<TState>();
-            float lastStateTime = 0f;
+            float lastStateTime = baseStateTime;
 
             foreach (var state in originalStates)
             {
@@ -79,7 +101,7 @@ namespace Naziki_Editor.Core.Compilation
                 }
                 else if (state.RelativeTime.HasValue)
                 {
-                    triggerTimes.Add(0f + state.RelativeTime.Value);
+                    triggerTimes.Add(lastStateTime + state.RelativeTime.Value);
                 }
                 else if (state.Time != null && state.Time.ToString() != float.MaxValue.ToString())
                 {
@@ -159,7 +181,8 @@ namespace Naziki_Editor.Core.Compilation
                 }
                 else if (tState.RelativeTime.HasValue)
                 {
-                    currentTriggerTime = baseTime + tState.RelativeTime.Value;
+                    // 🌟 修复：模板子帧的相对时间应基于上一个子帧的时间（lastStateTime），而非模板基准时间
+                    currentTriggerTime = lastStateTime + tState.RelativeTime.Value;
                 }
                 else if (tState.Time != null && tState.Time.ToString() != float.MaxValue.ToString())
                 {
@@ -174,7 +197,8 @@ namespace Naziki_Editor.Core.Compilation
 
                 if (currentTriggerTime != float.MaxValue) lastStateTime = currentTriggerTime;
 
-                TState mergedState = MergeProperties<TState>(inheritedBaseState, tState);
+                // 🌟 子帧覆盖术：模板关键帧的值应覆盖继承的基准状态
+                TState mergedState = ApplyKeyframeOverrides<TState>(inheritedBaseState, tState);
                 mergedState.Template = null;
 
                 if (string.IsNullOrEmpty(tState.Template) || _templates == null || !_templates.ContainsKey(tState.Template))
@@ -280,6 +304,34 @@ namespace Naziki_Editor.Core.Compilation
                 }
             }
             return merged;
+        }
+
+        // 🌟 子帧覆盖术：将模板关键帧的值覆盖到继承的基准状态上
+        private TState ApplyKeyframeOverrides<TState>(TState baseState, TemplateState keyframeState) where TState : ObjectState, new()
+        {
+            TState result = DeepClone(baseState);
+            if (keyframeState == null) return result;
+            PropertyInfo[] props = typeof(TState).GetProperties();
+            Type templateType = typeof(TemplateState);
+
+            foreach (var prop in props)
+            {
+                if (prop.Name == "Time" || prop.Name == "RelativeTime" || prop.Name == "AddTime" || prop.Name == "Template") continue;
+
+                PropertyInfo tProp = templateType.GetProperty(prop.Name);
+                if (tProp != null)
+                {
+                    object tVal = tProp.GetValue(keyframeState);
+                    if (tVal != null)
+                    {
+                        // 模板关键帧的值直接覆盖继承的基准状态
+                        string tJson = JsonConvert.SerializeObject(tVal);
+                        object clonedTVal = JsonConvert.DeserializeObject(tJson, prop.PropertyType);
+                        prop.SetValue(result, clonedTVal);
+                    }
+                }
+            }
+            return result;
         }
 
         // ==========================================

@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Naziki_Editor.Models;
 
 namespace Naziki_Editor.Core
 {
@@ -13,15 +14,32 @@ namespace Naziki_Editor.Core
         // ==========================================
         public static (bool IsValid, string ErrorMessage) ValidateStateConflicts(object editingObj)
         {
-            var statesProp = editingObj.GetType().GetProperty("States");
-            var statesList = statesProp?.GetValue(editingObj) as System.Collections.IList;
+            // 🌟 适配实体模型：优先从 IStoryboardEntity 获取 BaseState 和 Keyframes
+            System.Collections.IList statesList = null;
+            object baseState = editingObj;
+
+            if (editingObj is IStoryboardEntity entity)
+            {
+                baseState = entity.GetBaseState();
+                statesList = entity.GetKeyframes();
+            }
+            else
+            {
+                var statesProp = editingObj.GetType().GetProperty("States");
+                statesList = statesProp?.GetValue(editingObj) as System.Collections.IList;
+            }
 
             Dictionary<string, HashSet<string>> timePropMap = new Dictionary<string, HashSet<string>>();
-            List<object> allFrames = new List<object> { editingObj };
+            List<object> allFrames = new List<object>();
+
+            if (baseState != null) allFrames.Add(baseState);
 
             if (statesList != null)
             {
-                foreach (var state in statesList) allFrames.Add(state);
+                foreach (var state in statesList)
+                {
+                    if (state != null) allFrames.Add(state);
+                }
             }
 
             // 防呆白名单：静态 DNA 或底层系统锚点

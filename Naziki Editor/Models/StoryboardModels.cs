@@ -106,9 +106,17 @@ namespace Naziki_Editor.Models
         [JsonProperty("rot_x")] public float? RotX { get; set; }
         [JsonProperty("rot_y")] public float? RotY { get; set; }
         [JsonProperty("rot_z")] public float? RotZ { get; set; }
+        [JsonProperty("scale_x")] public float? ScaleX { get; set; }
+        [JsonProperty("scale_y")] public float? ScaleY { get; set; }
+        [JsonProperty("scale")] public float? Scale { get; set; }
+        [JsonProperty("pivot_x")] public float? PivotX { get; set; }
+        [JsonProperty("pivot_y")] public float? PivotY { get; set; }
         [JsonProperty("opacity")] public float? Opacity { get; set; }
         [JsonProperty("layer")] public int? Layer { get; set; }
         [JsonProperty("order")] public int? Order { get; set; }
+        [JsonProperty("fill_width")] public bool? FillWidth { get; set; }
+        [JsonProperty("width")] public UnitFloat Width { get; set; }
+        [JsonProperty("height")] public UnitFloat Height { get; set; }
     }
 
     public class SpriteState : StageObjectState
@@ -124,11 +132,14 @@ namespace Naziki_Editor.Models
     {
         [JsonProperty("text")] public string TextContent { get; set; }
         [JsonProperty("size")] public float? Size { get; set; }
-        [JsonProperty("align")] public int? Align { get; set; }
+        // 🌟 P0修复：官方规范 align 为字符串类型 ("upperLeft", "middleCenter" 等)
+        [JsonProperty("align")] public string Align { get; set; }
         [JsonProperty("letter_spacing")] public float? LetterSpacing { get; set; }
         [JsonProperty("line_spacing")] public float? LineSpacing { get; set; }
         [JsonProperty("font")] public string Font { get; set; }
         [JsonProperty("font_style")] public int? FontStyle { get; set; }
+        // 🌟 P0修复：补充官方规范的 font_weight 属性
+        [JsonProperty("font_weight")] public string FontWeight { get; set; }
         [JsonProperty("color")] public string Color { get; set; }
     }
 
@@ -263,25 +274,39 @@ namespace Naziki_Editor.Models
         [JsonProperty("vignette_start")] public float? VignetteStart { get; set; }
         [JsonProperty("note_fill_colors")] public List<string> NoteFillColors { get; set; } // 补上遗漏的音符色彩阵列
 
-        // 6. 音符控制器 (Note Controller)
+        // 6. 音符控制器 (Note Controller) - 全属性收录
         public bool? OverrideX { get; set; }
         public bool? OverrideY { get; set; }
         public bool? OverrideZ { get; set; }
         public bool? OverrideRotX { get; set; }
         public bool? OverrideRotY { get; set; }
         public bool? OverrideRotZ { get; set; }
+        public float? XMultiplier { get; set; }
+        public float? Dx { get; set; }
+        public float? YMultiplier { get; set; }
+        public float? Dy { get; set; }
+        public bool? OverrideRingColor { get; set; }
+        public string RingColor { get; set; }
+        public bool? OverrideFillColor { get; set; }
+        public string FillColor { get; set; }
+        public int? HoldDirection { get; set; }
+        public int? Style { get; set; }
         [JsonProperty("note")] public object NoteTarget { get; set; } // 🌟 强制牵线别名，并改为 object 兼容占位符
         public float? NoteSizeMultiplier { get; set; }
         public float? HitboxMultiplier { get; set; }
     }
 
-    // 🌟 核心：音符控制器规格
+    // 🌟 核心：音符控制器规格 (官方全属性收录)
     public class NoteControllerState : ObjectState
     {
         [JsonProperty("override_x")] public bool? OverrideX { get; set; }
         [JsonProperty("x")] public UnitFloat X { get; set; }
+        [JsonProperty("x_multiplier")] public float? XMultiplier { get; set; }
+        [JsonProperty("dx")] public float? Dx { get; set; } // X轴偏移量 (官方已知BUG: 扫线方向-1时需+1)
         [JsonProperty("override_y")] public bool? OverrideY { get; set; }
         [JsonProperty("y")] public UnitFloat Y { get; set; }
+        [JsonProperty("y_multiplier")] public float? YMultiplier { get; set; }
+        [JsonProperty("dy")] public float? Dy { get; set; } // Y轴偏移量
         [JsonProperty("override_z")] public bool? OverrideZ { get; set; }
         [JsonProperty("z")] public UnitFloat Z { get; set; }
 
@@ -292,8 +317,19 @@ namespace Naziki_Editor.Models
         [JsonProperty("override_rot_z")] public bool? OverrideRotZ { get; set; }
         [JsonProperty("rot_z")] public float? RotZ { get; set; }
 
-        [JsonProperty("note_opacity_multiplier")] public float? NoteOpacityMultiplier { get; set; }
-        [JsonProperty("note_size_multiplier")] public float? NoteSizeMultiplier { get; set; }
+        [JsonProperty("override_ring_color")] public bool? OverrideRingColor { get; set; }
+        [JsonProperty("ring_color")] public string RingColor { get; set; }
+        [JsonProperty("override_fill_color")] public bool? OverrideFillColor { get; set; }
+        [JsonProperty("fill_color")] public string FillColor { get; set; }
+
+        // 🌟 P0修复：官方 NoteController 使用 opacity_multiplier / size_multiplier（无 note_ 前缀）
+        // 与 SceneController 的 note_opacity_multiplier（全局）不同
+        [JsonProperty("opacity_multiplier")] public float? NoteOpacityMultiplier { get; set; }
+        [JsonProperty("size_multiplier")] public float? NoteSizeMultiplier { get; set; }
+        [JsonProperty("hitbox_multiplier")] public float? HitboxMultiplier { get; set; }
+
+        [JsonProperty("hold_direction")] public int? HoldDirection { get; set; }
+        [JsonProperty("style")] public int? Style { get; set; }
 
         // Target (通常写在外面，但状态里有时用于动态绑定)
         [JsonProperty("note")] public object NoteTarget { get; set; }

@@ -30,6 +30,9 @@ namespace Naziki_Editor.Core
 
             _errorHandler.TryExecute(() =>
             {
+                // 🌟 P0修复：先处理 $note 占位符，确保后续逻辑能正确处理
+                ResolveNotePlaceholders(root);
+
                 // 依次全量洗盘 6 大场景对象数组
                 ProcessList(root.sprites, "sprite", root, project);
                 ProcessList(root.texts, "text", root, project);
@@ -38,6 +41,53 @@ namespace Naziki_Editor.Core
                 ProcessList(root.controllers, "controller", root, project);
                 ProcessList(root.note_controllers, "note", root, project);
             }, "DataValidation", "StoryboardParser.StandardizeStoryboardIds");
+        }
+
+        // 🌟 P0修复：$note 占位符处理
+        // 当 note_controller 的 note 字段为具体数字时，替换 $note 占位符
+        private static void ResolveNotePlaceholders(StoryboardRoot root)
+        {
+            if (root?.note_controllers == null) return;
+
+            foreach (var nc in root.note_controllers)
+            {
+                // 只处理 note 为具体数字的情况（非选择器）
+                if (nc.BaseState?.NoteTarget is long noteId || nc.BaseState?.NoteTarget is int noteIdInt)
+                {
+                    string noteIdStr = (nc.BaseState.NoteTarget is long l) ? l.ToString() : ((int)nc.BaseState.NoteTarget).ToString();
+                    ReplaceNotePlaceholder(nc, noteIdStr);
+                }
+                // 对于 note 选择器 {}，保留 $note 占位符不变（游戏运行时会展开）
+            }
+        }
+
+        private static void ReplaceNotePlaceholder(IStoryboardEntity entity, string noteId)
+        {
+            const string placeholder = "$note";
+
+            if (entity.Id?.Contains(placeholder) == true)
+                entity.Id = entity.Id.Replace(placeholder, noteId);
+
+            if (entity.ParentId?.Contains(placeholder) == true)
+                entity.ParentId = entity.ParentId.Replace(placeholder, noteId);
+
+            if (entity.TargetId?.Contains(placeholder) == true)
+                entity.TargetId = entity.TargetId.Replace(placeholder, noteId);
+
+            // 处理 BaseState 中的 time 字段
+            var baseState = entity.GetBaseState();
+            if (baseState != null)
+            {
+                var timeProp = baseState.GetType().GetProperty("Time");
+                if (timeProp != null)
+                {
+                    var timeVal = timeProp.GetValue(baseState);
+                    if (timeVal is string timeStr && timeStr.Contains(placeholder))
+                    {
+                        timeProp.SetValue(baseState, timeStr.Replace(placeholder, noteId));
+                    }
+                }
+            }
         }
 
         private static void ProcessList<T>(List<T> list, string typePrefix, StoryboardRoot root, NazikiProjectModel project) where T : IStoryboardEntity

@@ -11,11 +11,15 @@ using System.Windows.Media; // 🌟 解决 Brushes 报错
 using System.Windows.Shapes; // 🌟 解决 Rectangle 报错
 using Naziki_Editor.State;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Shortcuts;
 
 namespace Naziki_Editor.Views
 {
-    public partial class NoteListControl : UserControl
+    public partial class NoteListControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.NoteList;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
         // 🌟 换成小艾的卡哇伊纯数据流专线：
         public event Action<List<C2Note>> OnNotesImportRequested;
         // 🌟 重要缓存：当前谱面里被选中的音符集合（通过勾选框维护），用来批量导出事件时打包数据！
@@ -25,6 +29,7 @@ namespace Naziki_Editor.Views
         // 🔌 全局万能数据包接口
         public ProjectDataContext Context { get; private set; }
         private readonly IDialogService _dialogService;
+        private readonly INotificationService _notificationService;
         // 
         public void LoadContext(ProjectDataContext context)
         {
@@ -37,9 +42,10 @@ namespace Naziki_Editor.Views
             InitializeComponent();
         }
 
-        public NoteListControl(IDialogService dialogService) : this()
+        public NoteListControl(IDialogService dialogService, INotificationService notificationService) : this()
         {
             _dialogService = dialogService;
+            _notificationService = notificationService;
         }
 
         // ==========================================
@@ -272,7 +278,7 @@ namespace Naziki_Editor.Views
         {
             if (_selectedNotes.Count == 0)
             {
-                _dialogService.ShowMessage("还没有选择音符哦！设计师快去勾选几个吧~", "提示");
+                _notificationService.ShowWarning("还没有选择音符哦！设计师快去勾选几个吧~");
                 return;
             }
 
@@ -282,7 +288,107 @@ namespace Naziki_Editor.Views
             // 📡 呼叫主窗口基站接收数据包
             OnNotesImportRequested?.Invoke(sortedNotes);
 
-            _dialogService.ShowMessage($"成功将 {sortedNotes.Count} 个音符打包并传送至故事板核心账本！(๑•̀ㅂ•́)و✧", "传送成功");
+            _notificationService.ShowSuccess($"成功将 {sortedNotes.Count} 个音符打包并传送至故事板核心账本！(๑•̀ㅂ•́)و✧");
+        }
+
+        // ==========================================
+        // ⌨️ 音符列表导航操作（供快捷键系统调用）
+        // ==========================================
+
+        /// <summary>
+        /// 导航到上一个可见音符。
+        /// </summary>
+        public void NavigateUp()
+        {
+            if (NoteTreeView == null || NoteTreeView.Items.Count == 0) return;
+
+            var selectedItem = NoteTreeView.SelectedItem as TreeViewItem;
+            if (selectedItem == null)
+            {
+                // 没有选中项，选中最后一个可见项
+                for (int i = NoteTreeView.Items.Count - 1; i >= 0; i--)
+                {
+                    if (NoteTreeView.Items[i] is TreeViewItem item && item.Visibility == Visibility.Visible)
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // 在当前选中项之前查找上一个可见项
+            int currentIndex = -1;
+            for (int i = 0; i < NoteTreeView.Items.Count; i++)
+            {
+                if (ReferenceEquals(NoteTreeView.Items[i], selectedItem))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            if (currentIndex > 0)
+            {
+                for (int i = currentIndex - 1; i >= 0; i--)
+                {
+                    if (NoteTreeView.Items[i] is TreeViewItem item && item.Visibility == Visibility.Visible)
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                        return;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 导航到下一个可见音符。
+        /// </summary>
+        public void NavigateDown()
+        {
+            if (NoteTreeView == null || NoteTreeView.Items.Count == 0) return;
+
+            var selectedItem = NoteTreeView.SelectedItem as TreeViewItem;
+            if (selectedItem == null)
+            {
+                // 没有选中项，选中第一个可见项
+                for (int i = 0; i < NoteTreeView.Items.Count; i++)
+                {
+                    if (NoteTreeView.Items[i] is TreeViewItem item && item.Visibility == Visibility.Visible)
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // 在当前选中项之后查找下一个可见项
+            int currentIndex = -1;
+            for (int i = 0; i < NoteTreeView.Items.Count; i++)
+            {
+                if (ReferenceEquals(NoteTreeView.Items[i], selectedItem))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            if (currentIndex >= 0 && currentIndex < NoteTreeView.Items.Count - 1)
+            {
+                for (int i = currentIndex + 1; i < NoteTreeView.Items.Count; i++)
+                {
+                    if (NoteTreeView.Items[i] is TreeViewItem item && item.Visibility == Visibility.Visible)
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                        return;
+                    }
+                }
+            }
         }
 
 

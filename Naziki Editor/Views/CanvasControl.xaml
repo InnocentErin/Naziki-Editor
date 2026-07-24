@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Naziki_Editor.Views.CanvasControl"
+<UserControl x:Class="Naziki_Editor.Views.CanvasControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -13,8 +13,8 @@
                 SelectionChanged="TabControl_SelectionChanged">
 
         <TabItem Header="画面实时预览 (Canvas)">
-            <Border Background="#333333">
-                <Viewbox>
+            <Border x:Name="CanvasPreviewBorder" Background="#333333">
+                <Viewbox x:Name="CanvasPreviewViewbox">
                     <Canvas Width="800" Height="600" Background="Black" ClipToBounds="True">
                         <TextBlock Text="预览画布 800x600" Foreground="White" Canvas.Left="350" Canvas.Top="280"/>
                     </Canvas>

@@ -167,7 +167,7 @@ namespace Naziki_Editor.ProjectManagement
                     }
                     catch (Exception ex)
                     {
-                        _dialogService.ShowMessage($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败", DialogMessageType.Error);
+                        _dialogService.ShowErrorDialog($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败", ex.ToString());
                     }
                 }
                 // 🛑 【安检 B 面】：纳尼？！项目玩失踪移形换位了！
@@ -238,7 +238,7 @@ namespace Naziki_Editor.ProjectManagement
                 }
                 catch (Exception ex)
                 {
-                    _dialogService.ShowMessage($"创世过程发生爆炸 QAQ：\n{ex.Message}", "创建失败", DialogMessageType.Error);
+                    _dialogService.ShowErrorDialog($"创世过程发生爆炸 QAQ：\n{ex.Message}", "创建失败", ex.ToString());
                 }
             }
         }
@@ -271,7 +271,7 @@ namespace Naziki_Editor.ProjectManagement
                 }
                 catch (Exception ex)
                 {
-                    _dialogService.ShowMessage($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败", DialogMessageType.Error);
+                    _dialogService.ShowErrorDialog($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败", ex.ToString());
                 }
             }
         }
@@ -280,6 +280,11 @@ namespace Naziki_Editor.ProjectManagement
         {
             MainWindow editorWindow = _serviceProvider.GetRequiredService<MainWindow>();
             editorWindow.Show();
+
+            // 🛡️ 关键修复：将 Application.Current.MainWindow 显式指向编辑器主窗口，
+            // 防止后续 ErrorDialog 等弹窗将 Owner 设置为已关闭的 ProjectHubWindow 而触发穿模崩溃。
+            Application.Current.MainWindow = editorWindow;
+
             _appCommands.DoLoadProject(projectFilePath, projectData, editorWindow.Context);
             this.Close(); // 顺利进城，摧毁传送门
         }

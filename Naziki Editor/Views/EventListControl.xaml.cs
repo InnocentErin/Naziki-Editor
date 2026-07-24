@@ -5,6 +5,7 @@ using Naziki_Editor.Core.Services;
 using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Project;
 using Naziki_Editor.Core.Storyboard;
+using Naziki_Editor.Core.Shortcuts;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json.Linq;
@@ -16,8 +17,12 @@ using System.Windows.Media;
 
 namespace Naziki_Editor.Views
 {
-    public partial class EventListControl : UserControl
+    public partial class EventListControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.EventList;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
+
         public event Action<string, StoryboardRoot> OnStoryboardLoaded;
         public event Action<AssetBundle> OnAssetScanned;
         public event Action<object> OnEventNodeSelected;
@@ -41,6 +46,7 @@ namespace Naziki_Editor.Views
         private IStoryboardRepository _storyboardRepository;
         private IMessageBroker _messageBroker;
         private IDialogService _dialogService;
+        private INotificationService _notificationService;
 
         public void LoadContext(ProjectDataContext context) => Context = context;
 
@@ -51,18 +57,19 @@ namespace Naziki_Editor.Views
         }
 
         // 修改点 1：将原本带参数的构造函数逻辑提取成公开的 InitDependencies 方法
-        public void InitDependencies(IMessageBroker messageBroker, IDialogService dialogService, IProjectService projectService, IStoryboardRepository storyboardRepository)
+        public void InitDependencies(IMessageBroker messageBroker, IDialogService dialogService, IProjectService projectService, IStoryboardRepository storyboardRepository, INotificationService notificationService)
         {
             _messageBroker = messageBroker;
             _dialogService = dialogService;
             _projectService = projectService;
             _storyboardRepository = storyboardRepository;
+            _notificationService = notificationService;
         }
 
         // 修改点 2：原有的带参构造改为调用该方法（保持向后兼容）
-        public EventListControl(IMessageBroker messageBroker, IDialogService dialogService, IProjectService projectService, IStoryboardRepository storyboardRepository) : this()
+        public EventListControl(IMessageBroker messageBroker, IDialogService dialogService, IProjectService projectService, IStoryboardRepository storyboardRepository, INotificationService notificationService) : this()
         {
-            InitDependencies(messageBroker, dialogService, projectService, storyboardRepository);
+            InitDependencies(messageBroker, dialogService, projectService, storyboardRepository, notificationService);
         }
 
         // ==========================================
@@ -96,7 +103,7 @@ namespace Naziki_Editor.Views
                 }
                 catch (Exception ex)
                 {
-                    _dialogService.ShowMessage(ex.Message, "加载失败", DialogMessageType.Error);
+                    _dialogService.ShowErrorDialog(ex.Message, "加载失败", ex.ToString());
                     ClearAllDrawers();
                     UpdateEmptyHintVisibility();
                 }
@@ -251,12 +258,20 @@ namespace Naziki_Editor.Views
 
         private void BtnDeleteEvent_Click(object sender, RoutedEventArgs e)
         {
+            ExecuteDeleteSelected();
+        }
+
+        /// <summary>
+        /// 公开的删除入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecuteDeleteSelected()
+        {
             if (Context == null || !Context.HasStoryboard) return;
 
             ListBox activeList = GetCurrentActiveListBox();
             if (activeList == null || activeList.SelectedItems.Count == 0)
             {
-                _dialogService.ShowMessage("你还没有在列表中选择要删除的事件哦！", "小艾的提示", DialogMessageType.Info);
+                _notificationService.ShowWarning("你还没有在列表中选择要删除的事件哦！");
                 return;
             }
 

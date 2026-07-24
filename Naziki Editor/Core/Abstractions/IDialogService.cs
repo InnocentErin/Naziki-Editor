@@ -32,6 +32,9 @@ namespace Naziki_Editor.Core.Abstractions
         /// <summary>显示二选一确认对话框</summary>
         bool ShowYesNo(string message, string title);
 
+        /// <summary>显示错误对话框（含详细错误信息，可折叠查看）</summary>
+        void ShowErrorDialog(string message, string title, string? errorDetails = null);
+
         /// <summary>打开文件选择对话框，返回选中路径或 null</summary>
         string? ShowOpenFileDialog(string title, string filter);
 

@@ -327,14 +327,14 @@ namespace Naziki_Editor.Views
                 return; // 直接退出，绝不执行下面的单点逻辑！
             }
 
-            // 🚀 【新增】：拦截 Ctrl+单击！
+            // 🚀 Ctrl+单击：通过消息总线请求打开属性编辑器
             if (e.ClickCount == 1 && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 _isDraggingClip = false;
                 ClipBackground.Opacity = 1.0;
-                OnRequestPropertyEditor?.Invoke(_model); // 发射信号！
+                _messageBroker.Publish("RequestOpenPropertyEditor", (object)_model.AssociatedObject);
                 e.Handled = true;
-                return; // 直接退出，不执行普通的拖拽和单机选中！
+                return;
             }
 
 

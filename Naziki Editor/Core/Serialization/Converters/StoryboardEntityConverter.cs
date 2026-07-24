@@ -49,6 +49,15 @@ namespace Naziki_Editor.Core.Serialization.Converters
                     // 🌟 核心修复：放行 time 和 easing，只拦截特权属性 note！彻底修复初始属性时间无法保存的 Bug！
                     if (prop.Value.Type != JTokenType.Null && prop.Name != "note")
                     {
+                        // 🌟 P0修复：跳过 float.MaxValue 的 time 值（表示"未设置"，不应序列化）
+                        if (prop.Name == "time")
+                        {
+                            if (prop.Value.Type == JTokenType.Float && Math.Abs((float)prop.Value - float.MaxValue) < 0.01f)
+                                continue;
+                            // 也检查字符串形式的 float.MaxValue
+                            if (prop.Value.Type == JTokenType.String && prop.Value.ToString() == float.MaxValue.ToString())
+                                continue;
+                        }
                         rootObj[prop.Name] = prop.Value;
                     }
                 }

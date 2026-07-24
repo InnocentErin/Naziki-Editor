@@ -1,4 +1,4 @@
-﻿using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Abstractions;
 
 namespace Naziki_Editor.Tests.Mocks
 {
@@ -6,6 +6,7 @@ namespace Naziki_Editor.Tests.Mocks
     {
         // 模拟弹窗：什么都不做，直接返回“确定”
         public void ShowMessage(string message, string title = "", DialogMessageType type = DialogMessageType.Info) { }
+        public void ShowErrorDialog(string message, string title = "错误", string? errorDetails = null) { }
         public ConfirmResult ShowConfirm(string message, string title, DialogMessageType type = DialogMessageType.Question) => ConfirmResult.Yes;
         public bool ShowYesNo(string message, string title) => true;
         public string? ShowOpenFileDialog(string title, string filter) => @"C:\Test\sample.nep"; // 测试时直接返回固定路径

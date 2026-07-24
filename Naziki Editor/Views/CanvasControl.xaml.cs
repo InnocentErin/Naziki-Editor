@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -7,12 +7,18 @@ using Newtonsoft.Json;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core;
 using Naziki_Editor.State;
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Shortcuts;
 using System.Linq;
 
 namespace Naziki_Editor.Views
 {
-    public partial class CanvasControl : UserControl
+    public partial class CanvasControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.Canvas;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
+
         public Action<StoryboardRoot> OnApplyJsonSuccess;
         public Func<bool> OnBeforeActionCheckConflict;
 
@@ -222,6 +228,56 @@ namespace Naziki_Editor.Views
                     }), System.Windows.Threading.DispatcherPriority.Background);
                 }
             }
+        }
+
+        // ==========================================
+        // 🔍 画布缩放操作（供快捷键系统调用）
+        // ==========================================
+        private double _canvasZoomLevel = 1.0;
+        private const double MinCanvasZoom = 0.25;
+        private const double MaxCanvasZoom = 4.0;
+        private const double CanvasZoomStep = 0.2;
+
+        /// <summary>
+        /// 画布放大。
+        /// </summary>
+        public void ZoomIn()
+        {
+            _canvasZoomLevel = Math.Min(MaxCanvasZoom, _canvasZoomLevel + CanvasZoomStep);
+            ApplyCanvasZoom();
+        }
+
+        /// <summary>
+        /// 画布缩小。
+        /// </summary>
+        public void ZoomOut()
+        {
+            _canvasZoomLevel = Math.Max(MinCanvasZoom, _canvasZoomLevel - CanvasZoomStep);
+            ApplyCanvasZoom();
+        }
+
+        /// <summary>
+        /// 重置画布缩放至默认大小。
+        /// </summary>
+        public void ResetZoom()
+        {
+            _canvasZoomLevel = 1.0;
+            ApplyCanvasZoom();
+        }
+
+        private void ApplyCanvasZoom()
+        {
+            if (CanvasPreviewViewbox == null) return;
+
+            var scaleTransform = CanvasPreviewViewbox.LayoutTransform as ScaleTransform;
+            if (scaleTransform == null)
+            {
+                scaleTransform = new ScaleTransform();
+                CanvasPreviewViewbox.LayoutTransform = scaleTransform;
+            }
+
+            scaleTransform.ScaleX = _canvasZoomLevel;
+            scaleTransform.ScaleY = _canvasZoomLevel;
         }
     }
 }

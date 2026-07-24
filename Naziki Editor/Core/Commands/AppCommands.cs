@@ -15,19 +15,22 @@ namespace Naziki_Editor.Core.Commands
         private readonly IMessageBroker _messageBroker;
         private readonly IHistoryService _historyService;
         private readonly ICompilationService _compilationService;
+        private readonly INotificationService _notificationService;
 
         public AppCommands(
             IProjectService projectService,
             IDialogService dialogService,
             IMessageBroker messageBroker,
             IHistoryService historyService,
-            ICompilationService compilationService)
+            ICompilationService compilationService,
+            INotificationService notificationService)
         {
             _projectService = projectService;
             _dialogService = dialogService;
             _messageBroker = messageBroker;
             _historyService = historyService;
             _compilationService = compilationService;
+            _notificationService = notificationService;
         }
 
         // ==========================================
@@ -94,7 +97,7 @@ namespace Naziki_Editor.Core.Commands
                     }
                     catch (Exception ex)
                     {
-                        _dialogService.ShowMessage($"读取工程内关联的故事板文件失败 QAQ：\n{ex.Message}", "同步失败");
+                        _dialogService.ShowErrorDialog($"读取工程内关联的故事板文件失败 QAQ：\n{ex.Message}", "同步失败", ex.ToString());
                         context.Storyboard = new StoryboardRoot();
                     }
                 }
@@ -137,7 +140,7 @@ namespace Naziki_Editor.Core.Commands
             }
             catch (Exception ex)
             {
-                _dialogService.ShowMessage($"物理写入工程配置文件 (.nep) 失败 QAQ：\n{ex.Message}", "工程记账失败");
+                _dialogService.ShowErrorDialog($"物理写入工程配置文件 (.nep) 失败 QAQ：\n{ex.Message}", "工程记账失败", ex.ToString());
             }
         }
 
@@ -173,11 +176,11 @@ namespace Naziki_Editor.Core.Commands
                 // 保存原本的工程配置文件 `.nep`
                 SaveProjectNepFile(context);
 
-                _dialogService.ShowMessage("故事板已完美展平，元数据小账本也已同步写入硬盘！(๑>ᴗ<๑)✧", "全盘保存成功");
+                _notificationService.ShowSuccess("故事板已完美展平，元数据小账本也已同步写入硬盘！(๑>ᴗ<๑)✧");
             }
             catch (Exception ex)
             {
-                _dialogService.ShowMessage("时空网关在写入磁盘时爆炸啦 QAQ：\n" + ex.Message, "物理写盘错误");
+                _dialogService.ShowErrorDialog("时空网关在写入磁盘时爆炸啦 QAQ：\n" + ex.Message, "物理写盘错误", ex.ToString());
             }
         }
 
@@ -204,12 +207,12 @@ namespace Naziki_Editor.Core.Commands
                     }
 
                     string bpmText = ChartLogic.GetBpmText(chart.tempo_list);
-                    _dialogService.ShowMessage($"谱面加载成功！\n🎵 音符数：{chart.note_list.Count} 个\n📄 谱面页数：{chart.page_list.Count} 页\n⏱️ 歌曲 BPM：{bpmText}", "情报解析成功");
+                    _notificationService.ShowSuccess($"谱面加载成功！🎵 音符数：{chart.note_list.Count} 个 | 📄 谱面页数：{chart.page_list.Count} 页 | ⏱️ 歌曲 BPM：{bpmText}");
 
                     // 通知 UI 层刷新音符列表、事件锁定状态等
                     _messageBroker.Publish("ChartImported");
                 }
-                catch (Exception ex) { _dialogService.ShowMessage($"解析发生爆炸 QAQ：\n{ex.Message}"); }
+                catch (Exception ex) { _dialogService.ShowErrorDialog($"解析发生爆炸 QAQ：\n{ex.Message}", "解析发生爆炸", ex.ToString()); }
             }
         }
 
@@ -241,7 +244,7 @@ namespace Naziki_Editor.Core.Commands
                 }
                 catch (Exception ex)
                 {
-                    _dialogService.ShowMessage($"解析 .nep 工程文件时发生爆炸 QAQ：\n{ex.Message}", "读取错误");
+                    _dialogService.ShowErrorDialog($"解析 .nep 工程文件时发生爆炸 QAQ：\n{ex.Message}", "读取错误", ex.ToString());
                 }
             }
         }

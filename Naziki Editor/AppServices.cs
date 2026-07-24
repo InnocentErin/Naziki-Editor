@@ -15,6 +15,8 @@ using Naziki_Editor.Core.Workspace;
 using Naziki_Editor.Core.Timeline;
 using Naziki_Editor.Core.Compilation;
 using Naziki_Editor.Core.ErrorHandling;
+using Naziki_Editor.Core.Notifications;
+using Naziki_Editor.Core.Shortcuts;
 using Naziki_Editor.Views.Services;
 using Naziki_Editor.Views.PropertyEditor;
 
@@ -40,6 +42,7 @@ namespace Naziki_Editor
             services.AddSingleton<IMessageBroker>(MessageBroker.Default);
             services.AddSingleton<ICompilationService, CompilationService>();
             services.AddSingleton<ICompilationNotifier, DialogCompilationNotifier>();
+            services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<ITemplateManager, TemplateManager>();
             services.AddSingleton<IStoryboardParser, StoryboardParser>();
             services.AddSingleton<ITrackBlueprintManager, TrackBlueprintManager>();
@@ -54,6 +57,9 @@ namespace Naziki_Editor
 
             // 命令服务 - 单例
             services.AddSingleton<AppCommands>();
+
+            // 快捷键系统 - 单例（依赖 ICommandDispatcher）
+            services.AddSingleton<IShortcutManager, ShortcutManager>();
 
             // 窗口 - 瞬态
             services.AddTransient<Views.MainWindow>();

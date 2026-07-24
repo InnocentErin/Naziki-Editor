@@ -1,147 +1,131 @@
 using Microsoft.Win32;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Views.Dialogs;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 
 namespace Naziki_Editor.Views.Services
 {
     /// <summary>
-    /// WPF 平台对话框服务实现，封装 MessageBox 和 OpenFileDialog/SaveFileDialog。
+    /// WPF 平台对话框服务实现，封装自定义 ErrorDialog 和 OpenFileDialog/SaveFileDialog。
     /// 通过 IDialogService 接口注入，彻底解耦 View 层与 Core 层的对话框依赖。
     /// </summary>
     public class WpfDialogService : IDialogService
     {
+        #region 消息 / 错误 / 确认对话框
+
         public void ShowMessage(string message, string title = "", DialogMessageType type = DialogMessageType.Info)
         {
-            try
+            string iconType = type switch
             {
-                var icon = type switch
-                {
-                    DialogMessageType.Warning => MessageBoxImage.Warning,
-                    DialogMessageType.Error => MessageBoxImage.Error,
-                    DialogMessageType.Question => MessageBoxImage.Question,
-                    _ => MessageBoxImage.Information
-                };
+                DialogMessageType.Warning => "warning",
+                DialogMessageType.Error => "error",
+                DialogMessageType.Question => "question",
+                _ => "info"
+            };
 
-                var button = type == DialogMessageType.Question ? MessageBoxButton.YesNo : MessageBoxButton.OK;
-
-                if (Application.Current?.Dispatcher != null)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(message, string.IsNullOrEmpty(title) ? "Naziki Editor" : title, button, icon);
-                    });
-                }
-            }
-            catch (Exception ex)
+            ExecuteOnUIThread(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[WpfDialogService.ShowMessage] Error: {ex.Message}");
-            }
+                ErrorDialog.ShowMessage(message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
+                    iconType);
+            }, nameof(ShowMessage));
+        }
+
+        public void ShowErrorDialog(string message, string title = "错误", string? errorDetails = null)
+        {
+            ExecuteOnUIThread(() =>
+            {
+                ErrorDialog.ShowError(message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
+                    errorDetails);
+            }, nameof(ShowErrorDialog));
         }
 
         public ConfirmResult ShowConfirm(string message, string title, DialogMessageType type = DialogMessageType.Question)
         {
-            try
+            string iconType = type switch
             {
-                var icon = type switch
-                {
-                    DialogMessageType.Warning => MessageBoxImage.Warning,
-                    DialogMessageType.Error => MessageBoxImage.Error,
-                    _ => MessageBoxImage.Question
-                };
+                DialogMessageType.Warning => "warning",
+                DialogMessageType.Error => "error",
+                _ => "question"
+            };
 
-                MessageBoxResult result = MessageBoxResult.Cancel;
-                Application.Current?.Dispatcher?.Invoke(() =>
-                {
-                    result = MessageBox.Show(message, string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
-                        MessageBoxButton.YesNoCancel, icon);
-                });
+            ErrorDialogResult result = ErrorDialogResult.Cancel;
 
-                return result switch
-                {
-                    MessageBoxResult.Yes => ConfirmResult.Yes,
-                    MessageBoxResult.No => ConfirmResult.No,
-                    _ => ConfirmResult.Cancel
-                };
-            }
-            catch (Exception ex)
+            ExecuteOnUIThread(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[WpfDialogService.ShowConfirm] Error: {ex.Message}");
-                return ConfirmResult.Cancel;
-            }
+                result = ErrorDialog.ShowConfirm(message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
+                    iconType);
+            }, nameof(ShowConfirm));
+
+            return result switch
+            {
+                ErrorDialogResult.Yes => ConfirmResult.Yes,
+                ErrorDialogResult.No => ConfirmResult.No,
+                _ => ConfirmResult.Cancel
+            };
         }
 
         public bool ShowYesNo(string message, string title)
         {
-            try
+            bool result = false;
+
+            ExecuteOnUIThread(() =>
             {
-                MessageBoxResult result = MessageBoxResult.No;
-                Application.Current?.Dispatcher?.Invoke(() =>
-                {
-                    result = MessageBox.Show(message, string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
-                        MessageBoxButton.YesNo, MessageBoxImage.Question);
-                });
-                return result == MessageBoxResult.Yes;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[WpfDialogService.ShowYesNo] Error: {ex.Message}");
-                return false;
-            }
+                result = ErrorDialog.ShowYesNo(message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title);
+            }, nameof(ShowYesNo));
+
+            return result;
         }
+
+        #endregion
+
+        #region 文件对话框
 
         public string? ShowOpenFileDialog(string title, string filter)
         {
-            try
+            string? filePath = null;
+
+            ExecuteOnUIThread(() =>
             {
-                string? filePath = null;
-                Application.Current?.Dispatcher?.Invoke(() =>
+                var dialog = new OpenFileDialog
                 {
-                    var dialog = new OpenFileDialog
-                    {
-                        Title = title,
-                        Filter = filter
-                    };
-                    if (dialog.ShowDialog() == true)
-                    {
-                        filePath = dialog.FileName;
-                    }
-                });
-                return filePath;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[WpfDialogService.ShowOpenFileDialog] Error: {ex.Message}");
-                return null;
-            }
+                    Title = title,
+                    Filter = filter
+                };
+                if (dialog.ShowDialog() == true)
+                {
+                    filePath = dialog.FileName;
+                }
+            }, nameof(ShowOpenFileDialog));
+
+            return filePath;
         }
 
         public string? ShowSaveFileDialog(string title, string filter, string defaultFileName = "")
         {
-            try
+            string? filePath = null;
+
+            ExecuteOnUIThread(() =>
             {
-                string? filePath = null;
-                Application.Current?.Dispatcher?.Invoke(() =>
+                var dialog = new SaveFileDialog
                 {
-                    var dialog = new SaveFileDialog
-                    {
-                        Title = title,
-                        Filter = filter,
-                        FileName = defaultFileName
-                    };
-                    if (dialog.ShowDialog() == true)
-                    {
-                        filePath = dialog.FileName;
-                    }
-                });
-                return filePath;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[WpfDialogService.ShowSaveFileDialog] Error: {ex.Message}");
-                return null;
-            }
+                    Title = title,
+                    Filter = filter,
+                    FileName = defaultFileName
+                };
+                if (dialog.ShowDialog() == true)
+                {
+                    filePath = dialog.FileName;
+                }
+            }, nameof(ShowSaveFileDialog));
+
+            return filePath;
         }
 
         public Task<string?> ShowOpenFileDialogAsync(string title, string filter)
@@ -158,5 +142,45 @@ namespace Naziki_Editor.Views.Services
         {
             return Task.FromResult(ShowYesNo(message, title));
         }
+
+        #endregion
+
+        #region 内部辅助
+
+        /// <summary>
+        /// 在 UI 线程上安全执行 Action。
+        /// 如果已在 UI 线程，直接执行；否则通过 Dispatcher 调度。
+        /// 异常会记录到 Trace 并重新抛出，确保问题可追踪。
+        /// </summary>
+        private static void ExecuteOnUIThread(Action action, string callerName)
+        {
+            try
+            {
+                if (Application.Current?.Dispatcher == null)
+                {
+                    Trace.TraceError($"[WpfDialogService.{callerName}] 错误：Application.Current 为 null，无法调度到 UI 线程。");
+                    return;
+                }
+
+                if (Application.Current.Dispatcher.CheckAccess())
+                {
+                    // 已在 UI 线程，直接执行
+                    action();
+                }
+                else
+                {
+                    // 非 UI 线程，调度到 UI 线程
+                    Application.Current.Dispatcher.Invoke(action);
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"[WpfDialogService.{callerName}] 未捕获异常：{ex}");
+                // 重新抛出，让调用方感知异常
+                throw;
+            }
+        }
+
+        #endregion
     }
 }

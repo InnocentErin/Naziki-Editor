@@ -1,0 +1,53 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================
+         通知气泡颜色主题资源
+         ============================================ -->
+
+    <!-- 成功 (Success) - 绿色系 -->
+    <Color x:Key="NotificationSuccessColor">#4CAF50</Color>
+    <SolidColorBrush x:Key="NotificationSuccessBrush" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="NotificationSuccessBgBrush" Color="#E8F5E9"/>
+    <SolidColorBrush x:Key="NotificationSuccessBorderBrush" Color="#A5D6A7"/>
+
+    <!-- 警告 (Warning) - 橙色系 -->
+    <Color x:Key="NotificationWarningColor">#FF9800</Color>
+    <SolidColorBrush x:Key="NotificationWarningBrush" Color="#FF9800"/>
+    <SolidColorBrush x:Key="NotificationWarningBgBrush" Color="#FFF3E0"/>
+    <SolidColorBrush x:Key="NotificationWarningBorderBrush" Color="#FFCC80"/>
+
+    <!-- 错误 (Error) - 红色系 -->
+    <Color x:Key="NotificationErrorColor">#F44336</Color>
+    <SolidColorBrush x:Key="NotificationErrorBrush" Color="#F44336"/>
+    <SolidColorBrush x:Key="NotificationErrorBgBrush" Color="#FFEBEE"/>
+    <SolidColorBrush x:Key="NotificationErrorBorderBrush" Color="#EF9A9A"/>
+
+    <!-- 信息 (Info) - 蓝色系 -->
+    <Color x:Key="NotificationInfoColor">#2196F3</Color>
+    <SolidColorBrush x:Key="NotificationInfoBrush" Color="#2196F3"/>
+    <SolidColorBrush x:Key="NotificationInfoBgBrush" Color="#E3F2FD"/>
+    <SolidColorBrush x:Key="NotificationInfoBorderBrush" Color="#90CAF9"/>
+
+    <!-- 通用样式 -->
+    <SolidColorBrush x:Key="NotificationTextBrush" Color="#212121"/>
+    <SolidColorBrush x:Key="NotificationCloseBrush" Color="#757575"/>
+    <SolidColorBrush x:Key="NotificationCloseHoverBrush" Color="#424242"/>
+    <SolidColorBrush x:Key="NotificationShadowBrush" Color="#40000000"/>
+
+    <!-- 通知气泡基础样式 -->
+    <Style x:Key="NotificationBubbleStyle" TargetType="Border">
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="MinWidth" Value="280"/>
+        <Setter Property="MaxWidth" Value="420"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#40000000" BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

@@ -4,6 +4,7 @@ using System.Windows;
 using Newtonsoft.Json;
 using Naziki_Editor.Models;
 using Naziki_Editor.Views;
+using Naziki_Editor.Views.Dialogs;
 using Naziki_Editor.ProjectManagement;
 using Naziki_Editor.Core.Commands;
 
@@ -163,14 +164,27 @@ namespace Naziki_Editor
                 realException = realException.InnerException;
             }
 
-            // 格式化案发现场报告
+            // 格式化案发现场报告（主消息）
             string errorMsg = $"{errorSource}\n\n" +
                               $"⚠️ 异常真名: {realException.GetType().FullName}\n" +
-                              $"💬 报错原因: {realException.Message}\n\n" +
-                              $"📍 崩溃精准定位 (StackTrace):\n{realException.StackTrace}";
+                              $"💬 报错原因: {realException.Message}";
 
-            // 祭出最高优先级的报错警告框
-            MessageBox.Show(errorMsg, "Naziki 核心物理引擎安检警报", MessageBoxButton.OK, MessageBoxImage.Error);
+            // 完整堆栈作为可折叠详情
+            string errorDetails = $"📍 崩溃精准定位 (StackTrace):\n{realException.StackTrace}";
+
+            try
+            {
+                // 优先使用自定义 ErrorDialog，提供详情折叠和复制功能
+                ErrorDialog.ShowError(errorMsg, "Naziki 核心物理引擎安检警报", errorDetails);
+            }
+            catch
+            {
+                // 当进程处于极限崩溃状态、Dispatcher 已死或资源不可用时，
+                // 回退到系统原生 MessageBox 保证弹窗能独立运行
+                string fullMsg = $"{errorMsg}\n\n{errorDetails}";
+                MessageBox.Show(fullMsg, "Naziki 核心物理引擎安检警报",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 

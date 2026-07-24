@@ -10,6 +10,10 @@ using Naziki_Editor.Core.Project;
 using Naziki_Editor.Core.Storyboard;
 using Naziki_Editor.Core.Storyboard.Compilation;
 using Naziki_Editor.Core.Workspace;
+using Naziki_Editor.Core.Animation;
+using Naziki_Editor.Core.Notifications;
+using Naziki_Editor.Core.Shortcuts;
+using Naziki_Editor.Views.Notifications;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
@@ -53,7 +57,23 @@ namespace Naziki_Editor.Views
         private readonly IPropertyEditorService _propertyEditorService;
         private readonly UI.Rendering.GlobalRenderEngine _renderEngine;
         private readonly IErrorHandler _errorHandler;
+        private readonly INotificationService _notificationService;
+        private readonly IShortcutManager _shortcutManager;
+        private ShortcutContext _activeContext = ShortcutContext.Global;
         private bool _isVisualDirty = false;
+
+        // ==========================================
+        // 🎯 焦点 → 快捷键上下文映射表（控件未实现 IShortcutAware 时的回退方案）
+        // ==========================================
+        private readonly Dictionary<string, ShortcutContext> _focusContextMap = new()
+        {
+            { "EventList", ShortcutContext.EventList },
+            { "NoteList", ShortcutContext.NoteList },
+            { "AssetList", ShortcutContext.AssetList },
+            { "TimelineConsole", ShortcutContext.Timeline },
+            { "CanvasArea", ShortcutContext.Canvas },
+            { "PropertyPanel", ShortcutContext.PropertyPanel }
+        };
 
         // ==========================================
         // 📥 顶部菜单栏：共享职能的音频导入法术
@@ -73,7 +93,7 @@ namespace Naziki_Editor.Views
                     {
                         Context.ProjectData.AudioFilePath = audioFile;
                         SaveProjectNepFile();
-                        _dialogService.ShowMessage("音频文件路径已自动同步保存至工程文件 (.nep)！", "路径同步成功");
+                        _notificationService.ShowSuccess("音频文件路径已自动同步保存至工程文件 (.nep)！");
                     }
                 }
             }, "UserInteraction", "MainWindow.MenuImportAudio_Click");
@@ -157,7 +177,9 @@ namespace Naziki_Editor.Views
             UI.Rendering.NoteVisualEngine noteVisualEngine,
             IPropertyEditorService propertyEditorService,
             UI.Rendering.GlobalRenderEngine renderEngine,
-            IErrorHandler errorHandler)
+            IErrorHandler errorHandler,
+            INotificationService notificationService,
+            IShortcutManager shortcutManager)
         {
             _historyService = historyService;
             _entityFactory = entityFactory;
@@ -175,10 +197,17 @@ namespace Naziki_Editor.Views
             _propertyEditorService = propertyEditorService;
             _renderEngine = renderEngine;
             _errorHandler = errorHandler;
+            _notificationService = notificationService;
+            _shortcutManager = shortcutManager;
 
             Context = new ProjectDataContext(_messageBroker);
 
             InitializeComponent();
+
+            // =========================================================
+            // 🔔 通知气泡叠加层：覆盖整个窗口，始终在右下角显示
+            // =========================================================
+            InitializeNotificationOverlay();
 
             // =========================================================
             // 🌟 依赖注入分发：将依赖注入到 XAML 创建的子控件
@@ -189,6 +218,13 @@ namespace Naziki_Editor.Views
             // 🎛️ 菜单命令路由注册：把菜单入口统一挂到命令调度器
             // =========================================================
             RegisterMenuCommands();
+
+            // =========================================================
+            // ⌨️ 快捷键系统初始化：注册默认快捷键 + 焦点上下文跟踪
+            // =========================================================
+            InitializeShortcuts();
+            this.AddHandler(Keyboard.GotKeyboardFocusEvent,
+                (KeyboardFocusChangedEventHandler)OnGlobalFocusChanged);
 
             // =========================================================
             // 🎧 校园广播站：MainWindow 专属对讲机耳机接线处 (解耦核心)
@@ -349,7 +385,7 @@ namespace Naziki_Editor.Views
                     _historyService.RecordSnapshot(Context.Storyboard);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
-                    _dialogService.ShowMessage("属性修改已成功应用并同步至源代码！(๑•̀ㅂ•́)و✧", "应用成功");
+                    _notificationService.ShowSuccess("属性修改已成功应用并同步至源代码！(๑•̀ㅂ•́)و✧");
                 }
             };
 
@@ -371,11 +407,11 @@ namespace Naziki_Editor.Views
                 {
                     string filePath = _projectService.SaveAssetCapsule(Context, entity, matType);
                     string fileName = Path.GetFileName(filePath);
-                    _dialogService.ShowMessage($"素材制造成功！(≧∇≦)ﾉ\n已安全存入沙盒：\n{fileName}", "纯净资产封装完成");
+                    _notificationService.ShowSuccess($"素材制造成功！(≧∇≦)ﾉ\n已安全存入沙盒：\n{fileName}");
 
                     RefreshAllAssets();
                 }
-                catch (Exception ex) { _dialogService.ShowMessage($"胶囊压制失败 QAQ：{ex.Message}"); }
+                catch (Exception ex) { _dialogService.ShowErrorDialog($"胶囊压制失败 QAQ：{ex.Message}", "胶囊压制失败", ex.ToString()); }
             };
 
             EventList.OnAddTextRequested += AddNewTextEvent;
@@ -426,8 +462,14 @@ namespace Naziki_Editor.Views
         // =========================================================
         private void RegisterMenuCommands()
         {
-            _commandDispatcher.Register("Undo", ExecuteGlobalUndo);
-            _commandDispatcher.Register("Redo", ExecuteGlobalRedo);
+            // ==========================================
+            // 📂 文件操作
+            // ==========================================
+            _commandDispatcher.Register("NewProject", () =>
+            {
+                if (!ResolveDataConflictIfNeeded()) return;
+                _notificationService.Show("新建项目功能将在后续版本中通过项目中心实现。\n当前请先关闭并重新启动应用以创建新项目。", NotificationType.Info);
+            });
             _commandDispatcher.Register("OpenProject", async () =>
             {
                 if (!ResolveDataConflictIfNeeded()) return;
@@ -440,8 +482,207 @@ namespace Naziki_Editor.Views
                 _isVisualDirty = false;
                 CanvasArea.RefreshJsonView();
             });
+            _commandDispatcher.Register("SaveProjectAs", async () =>
+            {
+                if (!ResolveDataConflictIfNeeded()) return;
+                // 强制另存为：清空当前路径，触发 DoSaveProject 的文件选择对话框
+                string? originalPath = Context.StoryboardPath;
+                try
+                {
+                    Context.StoryboardPath = null;
+                    await _appCommands.DoSaveProject(Context);
+                    _isVisualDirty = false;
+                    CanvasArea.RefreshJsonView();
+                }
+                catch
+                {
+                    Context.StoryboardPath = originalPath; // 恢复原路径
+                }
+            });
+
+            // ==========================================
+            // ✏️ 编辑操作
+            // ==========================================
+            _commandDispatcher.Register("Undo", ExecuteGlobalUndo);
+            _commandDispatcher.Register("Redo", ExecuteGlobalRedo);
+
+            // ⌨️ 全选：根据当前焦点上下文分发
+            _commandDispatcher.Register("SelectAll", () =>
+            {
+                switch (_activeContext)
+                {
+                    case ShortcutContext.EventList:
+                        _notificationService.Show("请在事件列表中使用 Ctrl+A 全选项目。", NotificationType.Info);
+                        break;
+                    case ShortcutContext.AssetList:
+                        _notificationService.Show("请在素材库中使用 Ctrl+A 全选素材。", NotificationType.Info);
+                        break;
+                    case ShortcutContext.NoteList:
+                        _notificationService.Show("请在音符列表中使用 Ctrl+A 全选音符。", NotificationType.Info);
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            // ⌨️ 复制选中对象：在当前上下文中复制
+            _commandDispatcher.Register("DuplicateSelected", () =>
+            {
+                if (!Context.HasStoryboard) { _notificationService.ShowWarning("请先导入故事板文件！"); return; }
+                _historyService.RecordSnapshot(Context.Storyboard);
+                _notificationService.ShowSuccess("已复制选中对象。(功能完善中)");
+            });
+
+            // ⌨️ 快捷键系统专属命令：删除选中对象
+            _commandDispatcher.Register("DeleteSelected", () => ExecuteDeleteSelected());
+
+            // ⌨️ 快捷键系统专属命令：素材库操作
+            _commandDispatcher.Register("CopyAsset", () => AssetList.ExecuteCopy());
+            _commandDispatcher.Register("PasteAsset", () => AssetList.ExecutePaste());
+            _commandDispatcher.Register("RenameAsset", () =>
+            {
+                _notificationService.Show("请在素材库中右键点击素材，选择「重命名素材」来编辑名称。", NotificationType.Info);
+            });
+
+            // ==========================================
+            // 🎬 导入操作
+            // ==========================================
             _commandDispatcher.Register("ImportChart", async () => await _appCommands.DoImportChart(Context));
             _commandDispatcher.Register("ImportStoryboard", DoImportStoryboard);
+            _commandDispatcher.Register("ImportAudio", () =>
+            {
+                _errorHandler.TryExecute(() =>
+                {
+                    string? audioFile = _dialogService.ShowOpenFileDialog("选择关卡音乐", "音频文件 (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg");
+                    if (audioFile != null)
+                    {
+                        _ = _audioEngine.LoadAudioAsync(audioFile);
+                        if (Context.ProjectData != null && Context.ProjectFilePath != null)
+                        {
+                            Context.ProjectData.AudioFilePath = audioFile;
+                            SaveProjectNepFile();
+                            _notificationService.ShowSuccess("音频文件路径已自动同步保存至工程文件 (.nep)！");
+                        }
+                    }
+                }, "UserInteraction", "MainWindow.ImportAudio");
+            });
+
+            // ==========================================
+            // 🎛️ 工具操作
+            // ==========================================
+            _commandDispatcher.Register("OpenPropertyEditor", () =>
+            {
+                // 获取属性面板当前跟踪的选中对象（通过 EventList/Timeline 事件同步）
+                var selectedObj = PropertyPanel.GetSelectedObject();
+                if (selectedObj is IStoryboardEntity entity)
+                {
+                    OpenPropertyEditor(entity);
+                }
+                else
+                {
+                    _notificationService.Show("请先在事件列表或时间轴中选中一个对象，再使用 Ctrl+E 打开属性编辑器。", NotificationType.Info);
+                }
+            });
+
+            _commandDispatcher.Register("AddNewText", () =>
+            {
+                if (!Context.HasStoryboard) { _notificationService.ShowWarning("请先导入故事板文件！"); return; }
+                AddNewTextEvent();
+            });
+            _commandDispatcher.Register("AddNewLine", () =>
+            {
+                if (!Context.HasStoryboard) { _notificationService.ShowWarning("请先导入故事板文件！"); return; }
+                AddNewLineEvent();
+            });
+            _commandDispatcher.Register("AddNewSceneController", () =>
+            {
+                if (!Context.HasStoryboard) { _notificationService.ShowWarning("请先导入故事板文件！"); return; }
+                AddNewSceneControllerEvent();
+            });
+
+            // ==========================================
+            // ▶️ 播放控制（由 TimelineControl 暴露）
+            // ==========================================
+            _commandDispatcher.Register("TimelinePlayPause", () => TimelineConsole.TogglePlayPause());
+            _commandDispatcher.Register("TimelineGoToStart", () => TimelineConsole.GoToStart());
+            _commandDispatcher.Register("TimelineGoToEnd", () => TimelineConsole.GoToEnd());
+
+            // ==========================================
+            // 🧭 缩放控制（由 TimelineControl 暴露）
+            // ==========================================
+            _commandDispatcher.Register("TimelineZoomIn", () => TimelineConsole.ZoomIn());
+            _commandDispatcher.Register("TimelineZoomOut", () => TimelineConsole.ZoomOut());
+            _commandDispatcher.Register("TimelineZoomReset", () => TimelineConsole.ResetZoom());
+
+            // ==========================================
+            // 🖥️ 视图与系统操作
+            // ==========================================
+            _commandDispatcher.Register("RefreshView", () =>
+            {
+                CanvasArea.RefreshJsonView();
+                EventList.LoadStoryboardUI();
+                TimelineConsole.LoadStoryboardTimeline(Context);
+                RefreshAllAssets();
+                _notificationService.ShowSuccess("视图已刷新！(๑•̀ㅂ•́)و✧");
+            });
+            _commandDispatcher.Register("ToggleFullScreen", () =>
+            {
+                if (WindowStyle == WindowStyle.None)
+                {
+                    // 退出全屏
+                    WindowStyle = WindowStyle.SingleBorderWindow;
+                    WindowState = WindowState.Normal;
+                    _notificationService.ShowSuccess("已退出全屏模式。");
+                }
+                else
+                {
+                    // 进入全屏
+                    WindowStyle = WindowStyle.None;
+                    WindowState = WindowState.Maximized;
+                    _notificationService.ShowSuccess("已进入全屏模式。按 F11 退出。");
+                }
+            });
+
+            // ==========================================
+            // 🔍 搜索与帮助
+            // ==========================================
+            _commandDispatcher.Register("Find", () =>
+            {
+                _notificationService.Show("搜索功能将在后续版本中实现。\n敬请期待！(๑•̀ㅂ•́)و✧", NotificationType.Info);
+            });
+            _commandDispatcher.Register("Help", () => DoAbout());
+
+            // ==========================================
+            // 🎨 画布缩放操作（Canvas 上下文）
+            // ==========================================
+            _commandDispatcher.Register("CanvasZoomIn", () =>
+            {
+                CanvasArea?.ZoomIn();
+                _notificationService.Show("画布已放大。", NotificationType.Info);
+            });
+            _commandDispatcher.Register("CanvasZoomOut", () =>
+            {
+                CanvasArea?.ZoomOut();
+                _notificationService.Show("画布已缩小。", NotificationType.Info);
+            });
+            _commandDispatcher.Register("CanvasZoomReset", () =>
+            {
+                CanvasArea?.ResetZoom();
+                _notificationService.Show("画布缩放已重置。", NotificationType.Info);
+            });
+
+            // ==========================================
+            // 🎵 音符列表导航操作（NoteList 上下文）
+            // ==========================================
+            _commandDispatcher.Register("NoteListNavigateUp", () =>
+            {
+                NoteList?.NavigateUp();
+            });
+            _commandDispatcher.Register("NoteListNavigateDown", () =>
+            {
+                NoteList?.NavigateDown();
+            });
+
             _commandDispatcher.Register("About", DoAbout);
             _commandDispatcher.Register("Exit", DoExit);
         }
@@ -451,39 +692,94 @@ namespace Naziki_Editor.Views
         // =========================================================
         private void InitializeChildControls()
         {
-            TimelineConsole.Initialize(_audioEngine, _messageBroker, _dialogService, _noteVisualEngine, _storyboardRepository, _propertyEditorService, _renderEngine);
+            TimelineConsole.Initialize(_audioEngine, _messageBroker, _dialogService, _noteVisualEngine, _storyboardRepository, _propertyEditorService, _renderEngine, _notificationService);
             // 粮草押运官给 EventList 投喂服务！
-            EventList.InitDependencies(_messageBroker, _dialogService, _projectService, _storyboardRepository);
+            EventList.InitDependencies(_messageBroker, _dialogService, _projectService, _storyboardRepository, _notificationService);
+        }
+
+        // =========================================================
+        // 🔔 通知气泡叠加层初始化
+        // =========================================================
+        private void InitializeNotificationOverlay()
+        {
+            var overlay = new NotificationOverlay(_notificationService);
+
+            // 设置跨越所有行，始终在最顶层
+            Grid.SetRowSpan(overlay, 5);
+            Panel.SetZIndex(overlay, 9999);
+            overlay.IsHitTestVisible = false;
+
+            // 将叠加层添加到主 Grid 的顶层
+            var mainGrid = this.Content as Grid;
+            mainGrid?.Children.Add(overlay);
         }
 
         // ==========================================
-        // 🚨 全局快捷键监听：Ctrl+Z / Ctrl+Y 的撤销重做逻辑
+        // ⌨️ 全局快捷键监听：委托给统一 ShortcutManager 处理
         // ==========================================
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            // 当 JSON 编辑器获得焦点时，不拦截全局快捷键（让 AvalonEdit 自行处理）
+            if (CanvasArea?.JsonEditor?.IsKeyboardFocusWithin == true)
+                return;
+
+            // 🛡️ 当焦点在文本编辑控件内时，放行标准文本编辑快捷键
+            if (IsTextEditingFocused() && IsStandardTextShortcut(e.Key, Keyboard.Modifiers))
+                return;
+
+            if (_shortcutManager.HandleKeyDown(e.Key, Keyboard.Modifiers, _activeContext))
             {
-                if (e.Key == Key.Z)
-                {
-                    if (CanvasArea != null && CanvasArea.JsonEditor != null && CanvasArea.JsonEditor.IsKeyboardFocusWithin)
-                        return;
-
-                    e.Handled = true;
-                    ExecuteGlobalUndo();
-                }
-                else if (e.Key == Key.Y)
-                {
-                    if (CanvasArea != null && CanvasArea.JsonEditor != null && CanvasArea.JsonEditor.IsKeyboardFocusWithin)
-                        return;
-
-                    e.Handled = true;
-                    ExecuteGlobalRedo();
-                }
+                e.Handled = true;
             }
+        }
+
+        /// <summary>
+        /// 判断当前焦点是否在文本编辑控件中（TextBox, RichTextBox, PasswordBox 等）。
+        /// </summary>
+        private static bool IsTextEditingFocused()
+        {
+            var focused = Keyboard.FocusedElement;
+            return focused is TextBox || focused is RichTextBox || focused is PasswordBox;
+        }
+
+        /// <summary>
+        /// 判断是否为标准文本编辑快捷键（Ctrl+C/V/A/Z/Y/X 等）。
+        /// 这些快捷键在文本编辑控件中应由控件自身处理，不应被全局快捷键系统拦截。
+        /// </summary>
+        private static bool IsStandardTextShortcut(Key key, ModifierKeys modifiers)
+        {
+            if ((modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+                return false;
+
+            return key == Key.C || key == Key.V || key == Key.X ||
+                   key == Key.Z || key == Key.Y || key == Key.A ||
+                   key == Key.F; // Ctrl+F 查找
         }
 
         private void MenuUndo_Click(object sender, RoutedEventArgs e) => _commandDispatcher.Execute("Undo");
         private void MenuRedo_Click(object sender, RoutedEventArgs e) => _commandDispatcher.Execute("Redo");
+
+        /// <summary>
+        /// 全局删除选中对象：根据当前焦点上下文分发到对应控件。
+        /// </summary>
+        private void ExecuteDeleteSelected()
+        {
+            // 根据当前焦点上下文决定删除哪个控件中的选中项
+            switch (_activeContext)
+            {
+                case ShortcutContext.AssetList:
+                    AssetList.ExecuteDelete();
+                    break;
+                case ShortcutContext.EventList:
+                    EventList.ExecuteDeleteSelected();
+                    break;
+                case ShortcutContext.Timeline:
+                    // 时间轴删除由 TimelineControl 内部处理
+                    break;
+                default:
+                    break;
+            }
+        }
 
         private void ExecuteGlobalUndo()
         {
@@ -500,7 +796,7 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                _dialogService.ShowMessage("已经没有更古老的修改痕迹可以撤回啦~", "时空尽头");
+                _notificationService.ShowWarning("已经没有更古老的修改痕迹可以撤回啦~");
             }
         }
 
@@ -519,8 +815,144 @@ namespace Naziki_Editor.Views
             }
             else
             {
-                _dialogService.ShowMessage("设计师，这已经是当前宇宙最前沿的最新数据啦！", "时空尽头");
+                _notificationService.ShowWarning("设计师，这已经是当前宇宙最前沿的最新数据啦！");
             }
+        }
+
+        // ==========================================
+        // ⌨️ 快捷键系统：焦点上下文自动切换
+        // ==========================================
+        /// <summary>
+        /// 全局焦点变化事件处理。当焦点在子控件间切换时，
+        /// 自动检测控件类型并更新快捷键上下文。
+        /// 优先检查 IShortcutAware 接口，其次使用名称映射。
+        /// </summary>
+        private void OnGlobalFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            var focused = e.NewFocus as DependencyObject;
+
+            // 向上遍历可视化树，查找 IShortcutAware 或已知控件
+            while (focused != null)
+            {
+                // 优先：检查是否实现了 IShortcutAware 接口
+                if (focused is IShortcutAware aware)
+                {
+                    _activeContext = aware.ShortcutContext;
+                    return;
+                }
+
+                // 回退：通过控件名称映射上下文
+                if (focused is FrameworkElement fe && !string.IsNullOrEmpty(fe.Name))
+                {
+                    if (_focusContextMap.TryGetValue(fe.Name, out var ctx))
+                    {
+                        _activeContext = ctx;
+                        return;
+                    }
+                }
+
+                focused = VisualTreeHelper.GetParent(focused);
+            }
+
+            // 未匹配到任何已知上下文，恢复为全局模式
+            _activeContext = ShortcutContext.Global;
+        }
+
+        // ==========================================
+        // ⌨️ 快捷键系统初始化：注册默认快捷键 + 菜单绑定
+        // ==========================================
+        /// <summary>
+        /// 初始化快捷键系统。清除旧绑定，重新注册默认快捷键，
+        /// 并自动同步菜单栏的 InputGestureText 显示。
+        /// 此方法可被多次调用，支持用户自定义快捷键后的动态重载。
+        /// </summary>
+        public void InitializeShortcuts()
+        {
+            _shortcutManager.Clear();
+            _shortcutManager.RegisterBatch(DefaultShortcuts.GetAll());
+            BindMenuGestureTexts();
+        }
+
+        // ==========================================
+        // ⌨️ 菜单 InputGestureText 自动绑定
+        // ==========================================
+        /// <summary>
+        /// 扫描所有菜单项，根据快捷键绑定自动设置 InputGestureText。
+        /// 使用 MenuItem 的 Name 属性映射到命令名：
+        ///   MenuSave → SaveProject, MenuUndo → Undo, 等。
+        /// </summary>
+        private void BindMenuGestureTexts()
+        {
+            // 菜单项名称 → 命令名 映射表
+            var menuCommandMap = new Dictionary<string, string>
+            {
+                { "MenuSave", "SaveProject" },
+                { "MenuSaveAs", "SaveProjectAs" },
+                { "MenuOpen", "OpenProject" },
+                { "MenuNew", "NewProject" },
+                { "MenuUndo", "Undo" },
+                { "MenuRedo", "Redo" },
+                { "MenuImportChart", "ImportChart" },
+                { "MenuImportStoryboard", "ImportStoryboard" },
+                { "MenuImportAudio", "ImportAudio" },
+                { "MenuExit", "Exit" },
+                { "MenuAbout", "About" },
+                { "MenuRefresh", "RefreshView" },
+                { "MenuFind", "Find" },
+                { "MenuHelp", "Help" }
+            };
+
+            // 遍历所有菜单项并设置 InputGestureText
+            var menu = FindFirstVisualChild<Menu>(this);
+            if (menu == null) return;
+
+            foreach (var menuItem in FindAllMenuItems(menu))
+            {
+                if (string.IsNullOrEmpty(menuItem.Name)) continue;
+
+                if (menuCommandMap.TryGetValue(menuItem.Name, out var commandName))
+                {
+                    var binding = _shortcutManager.FindBinding(commandName);
+                    if (binding != null)
+                    {
+                        menuItem.InputGestureText = binding.ToGestureText();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 递归查找 Menu 中所有的 MenuItem（包括嵌套子菜单）。
+        /// </summary>
+        private static IEnumerable<MenuItem> FindAllMenuItems(ItemsControl parent)
+        {
+            foreach (var item in parent.Items)
+            {
+                if (item is MenuItem menuItem)
+                {
+                    yield return menuItem;
+                    foreach (var child in FindAllMenuItems(menuItem))
+                        yield return child;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 在可视化树中查找第一个指定类型的子元素。
+        /// </summary>
+        private static T? FindFirstVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typed)
+                    return typed;
+
+                var result = FindFirstVisualChild<T>(child);
+                if (result != null)
+                    return result;
+            }
+            return null;
         }
 
         private void MenuAbout_Click(object sender, RoutedEventArgs e) => _commandDispatcher.Execute("About");
@@ -747,7 +1179,7 @@ namespace Naziki_Editor.Views
                     EventList.UpdateEmptyHintVisibility(); // ✨ 完美的直接施法！
 
                     // 4. 完美收尾，温馨提示
-                    _dialogService.ShowMessage($"自动联姻成功！已完美挂钩 {linkedCount} 个音符事件！", "配对成功");
+                    _notificationService.ShowSuccess($"自动联姻成功！已完美挂钩 {linkedCount} 个音符事件！");
 
                     // 别忘了标记数据已被修改，激活时光机存档哦！
                     Context.MarkAsModified();

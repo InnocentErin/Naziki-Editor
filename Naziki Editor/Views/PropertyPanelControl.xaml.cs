@@ -7,11 +7,16 @@ using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Shortcuts;
 
 namespace Naziki_Editor.Views
 {
-    public partial class PropertyPanelControl : UserControl
+    public partial class PropertyPanelControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.PropertyPanel;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
+
         public event Action<object> OnEditPropertiesRequested;
         public event Action<object> OnSaveAsMaterialRequested;
         public event Action OnApplyPropertiesRequested;
@@ -40,6 +45,11 @@ namespace Naziki_Editor.Views
             _currentObject = obj;
             RefreshPropertyDisplay();
         }
+
+        /// <summary>
+        /// 获取当前属性面板中选中的对象（供快捷键系统调用）。
+        /// </summary>
+        public object GetSelectedObject() => _currentObject;
 
         private void RefreshPropertyDisplay()
         {

@@ -2,6 +2,7 @@ using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Common;
 using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Storyboard;
+using Naziki_Editor.Core.Shortcuts;
 using Naziki_Editor.Models;
 using Naziki_Editor.UI.ViewModels;
 using System;
@@ -16,8 +17,12 @@ using System.Windows.Shapes;
 
 namespace Naziki_Editor.Views
 {
-    public partial class TimelineControl : UserControl
+    public partial class TimelineControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.Timeline;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
+
         // ==========================================
         // 🌟 核心引擎与基建锁
         // ==========================================
@@ -39,6 +44,7 @@ namespace Naziki_Editor.Views
         private IStoryboardRepository _storyboardRepository;
         private IPropertyEditorService _propertyEditorService;
         private UI.Rendering.GlobalRenderEngine _renderEngine;
+        private INotificationService _notificationService;
 
         // ✨ 追加：时空隔离注册表结构，记住每个轨道在全局的物理辖区边界
         private class TrackRegistryItem
@@ -62,12 +68,12 @@ namespace Naziki_Editor.Views
             InitializeComponent();
         }
 
-        public TimelineControl(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine) : this()
+        public TimelineControl(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine, INotificationService notificationService) : this()
         {
-            Initialize(audioEngine, messageBroker, dialogService, noteVisualEngine, storyboardRepository, propertyEditorService, renderEngine);
+            Initialize(audioEngine, messageBroker, dialogService, noteVisualEngine, storyboardRepository, propertyEditorService, renderEngine, notificationService);
         }
 
-        public void Initialize(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine)
+        public void Initialize(IAudioSyncEngine audioEngine, IMessageBroker messageBroker, IDialogService dialogService, UI.Rendering.NoteVisualEngine noteVisualEngine, IStoryboardRepository storyboardRepository, IPropertyEditorService propertyEditorService, UI.Rendering.GlobalRenderEngine renderEngine, INotificationService notificationService)
         {
             _audioEngine = audioEngine;
             _messageBroker = messageBroker;
@@ -76,6 +82,7 @@ namespace Naziki_Editor.Views
             _storyboardRepository = storyboardRepository;
             _propertyEditorService = propertyEditorService;
             _renderEngine = renderEngine;
+            _notificationService = notificationService;
             _viewModel = new TimelineViewModel(_messageBroker);
             DataContext = _viewModel;
             InitializeAudioEngine();
@@ -756,14 +763,96 @@ namespace Naziki_Editor.Views
 
         private void OnTimelineMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            // 🛡️ 史诗级修复：如果当前是在微观时光屋里（标签页索引 > 0），大本营绝对不拦截滚轮事件！放行给微观世界！
+            // 🛡️ 如果当前在微观时光屋里，不拦截滚轮事件
             if (TimelineTabs != null && TimelineTabs.SelectedIndex > 0) return;
 
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 e.Handled = true;
-                double newPixels = _pixelsPerSecond * (e.Delta > 0 ? 1.2 : (1.0 / 1.2));
-                if (Math.Abs(newPixels - _pixelsPerSecond) > 0.01) { _pixelsPerSecond = Math.Max(MinPixelsPerSecond, Math.Min(MaxPixelsPerSecond, newPixels)); UpdateTimelineWidth(); }
+                if (e.Delta > 0)
+                    ZoomIn();
+                else
+                    ZoomOut();
+            }
+        }
+
+        /// <summary>
+        /// 时间轴放大（供快捷键系统调用）。
+        /// </summary>
+        public void ZoomIn()
+        {
+            double newPixels = _pixelsPerSecond * 1.2;
+            if (Math.Abs(newPixels - _pixelsPerSecond) > 0.01)
+            {
+                _pixelsPerSecond = Math.Min(MaxPixelsPerSecond, newPixels);
+                UpdateTimelineWidth();
+            }
+        }
+
+        /// <summary>
+        /// 时间轴缩小（供快捷键系统调用）。
+        /// </summary>
+        public void ZoomOut()
+        {
+            double newPixels = _pixelsPerSecond / 1.2;
+            if (Math.Abs(newPixels - _pixelsPerSecond) > 0.01)
+            {
+                _pixelsPerSecond = Math.Max(MinPixelsPerSecond, newPixels);
+                UpdateTimelineWidth();
+            }
+        }
+
+        /// <summary>
+        /// 重置缩放至默认值（供快捷键系统调用）。
+        /// </summary>
+        public void ResetZoom()
+        {
+            if (Math.Abs(_pixelsPerSecond - 100.0) > 0.01)
+            {
+                _pixelsPerSecond = 100.0;
+                UpdateTimelineWidth();
+            }
+        }
+
+        // ==========================================
+        // ▶️ 播放控制（供快捷键系统调用）
+        // ==========================================
+
+        /// <summary>
+        /// 切换播放/暂停状态（供快捷键系统调用）。
+        /// </summary>
+        public void TogglePlayPause()
+        {
+            if (_audioEngine == null) return;
+
+            if (_audioEngine.IsPlaying)
+                _audioEngine.Pause();
+            else
+                _audioEngine.Play();
+        }
+
+        /// <summary>
+        /// 跳转到时间轴开头（供快捷键系统调用）。
+        /// </summary>
+        public void GoToStart()
+        {
+            if (_audioEngine != null)
+            {
+                _audioEngine.Seek(0);
+                _currentPlayheadSeconds = 0;
+            }
+        }
+
+        /// <summary>
+        /// 跳转到时间轴结尾（供快捷键系统调用）。
+        /// </summary>
+        public void GoToEnd()
+        {
+            if (_audioEngine != null && _audioEngine.IsLoaded)
+            {
+                double endTime = _audioEngine.Duration;
+                _audioEngine.Seek(endTime);
+                _currentPlayheadSeconds = endTime;
             }
         }
 
@@ -784,7 +873,7 @@ namespace Naziki_Editor.Views
             // 3. 重新读取并刷新整个时间轴宇宙！
             LoadStoryboardTimeline(_context);
 
-            _dialogService.ShowMessage("✨ 智能排版完成！\n所有挤在一起的方块已经根据时间自动分配到不同的 Order 轨道啦！", "排版大成功");
+            _notificationService.ShowSuccess("✨ 智能排版完成！所有挤在一起的方块已经根据时间自动分配到不同的 Order 轨道啦！");
         }
 
 

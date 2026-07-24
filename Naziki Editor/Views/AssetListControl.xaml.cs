@@ -3,6 +3,7 @@ using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Services;
 using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Storyboard;
+using Naziki_Editor.Core.Shortcuts;
 using Naziki_Editor.Models;
 using Naziki_Editor.UI.ViewModels;
 using System.Windows;
@@ -13,8 +14,12 @@ using System.Collections.Specialized;
 
 namespace Naziki_Editor.Views
 {
-    public partial class AssetListControl : UserControl
+    public partial class AssetListControl : UserControl, IShortcutAware
     {
+        public ShortcutContext ShortcutContext => ShortcutContext.AssetList;
+        public bool OnShortcutFocusGained() => true;
+        public void OnShortcutFocusLost() { }
+
         // 🌟 正式接入粮仓！再也不用强行认主窗口当爹啦！
         public State.ProjectDataContext Context { get; private set; }
         public void LoadContext(State.ProjectDataContext context) => Context = context;
@@ -69,6 +74,21 @@ namespace Naziki_Editor.Views
         private void CommandPaste_Executed(object sender, ExecutedRoutedEventArgs e) => ExecutePaste();
         private void CommandDelete_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteDelete(GetSelectedAsset());
 
+        /// <summary>
+        /// 公开的复制入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecuteCopy() => ExecuteCopy(GetSelectedAsset());
+
+        /// <summary>
+        /// 公开的粘贴入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecutePaste() => ExecutePasteInternal();
+
+        /// <summary>
+        /// 公开的删除入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecuteDelete() => ExecuteDelete(GetSelectedAsset());
+
         private AssetItemViewModel GetSelectedAsset()
         {
             if (MediaListBox.IsKeyboardFocusWithin) return MediaListBox.SelectedItem as AssetItemViewModel;
@@ -83,7 +103,7 @@ namespace Naziki_Editor.Views
             if (item != null && File.Exists(item.FilePath)) Clipboard.SetFileDropList(new StringCollection { item.FilePath });
         }
 
-        private void ExecutePaste()
+        private void ExecutePasteInternal()
         {
             if (Context == null || string.IsNullOrEmpty(Context.ProjectFilePath)) return;
 
@@ -125,7 +145,7 @@ namespace Naziki_Editor.Views
                 if (result)
                 {
                     try { if (File.Exists(item.FilePath)) File.Delete(item.FilePath); _messageBroker.Publish("RequestRefreshAssets"); }
-                    catch (System.Exception ex) { _dialogService.ShowMessage($"呜哇！删除被阻挡了 QAQ：\n{ex.Message}", "删除失败"); }
+                    catch (System.Exception ex) { _dialogService.ShowErrorDialog($"呜哇！删除被阻挡了 QAQ：\n{ex.Message}", "删除失败", ex.ToString()); }
                 }
             }
         }
@@ -177,7 +197,7 @@ namespace Naziki_Editor.Views
 
                         if (newEvent != null) newEvent.Id = newEvent.Id + "_nem_" + System.DateTime.Now.Ticks;
                     }
-                    catch (System.Exception ex) { _dialogService.ShowMessage($"解析胶囊失败啦！\n原因：{ex.Message}", "小艾的报错提醒"); }
+                    catch (System.Exception ex) { _dialogService.ShowErrorDialog($"解析胶囊失败啦！\n原因：{ex.Message}", "小艾的报错提醒", ex.ToString()); }
                 }
 
                 if (newEvent != null)

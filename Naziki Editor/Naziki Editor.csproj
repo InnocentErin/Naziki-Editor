@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Remove="tutorial\**" />
     <Compile Remove="before\**" />
+    <Compile Remove="NazikiEditor.Tests\**" />
     <Page Remove="before\**" />
     <None Remove="before\**" />
     <Resource Remove="before\**" />
