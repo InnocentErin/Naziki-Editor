@@ -13,6 +13,7 @@
     <Compile Remove="tutorial\**" />
     <Compile Remove="before\**" />
     <Compile Remove="NazikiEditor.Tests\**" />
+    <Compile Remove="Tests\**" />
     <Page Remove="before\**" />
     <None Remove="before\**" />
     <Resource Remove="before\**" />
@@ -40,6 +41,12 @@
 
   <ItemGroup>
     <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Core\Serialization\storyboard-properties.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
@@ -8,6 +9,7 @@ using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Core.Project
 {
@@ -20,12 +22,24 @@ namespace Naziki_Editor.Core.Project
         private readonly IMessageBroker _messageBroker;
         private readonly IErrorHandler _errorHandler;
         private readonly IStoryboardParser _storyboardParser;
+        private readonly IStoryboardDocumentReader _storyboardReader;
+        private readonly IStoryboardDocumentWriter _storyboardWriter;
+        private readonly IStoryboardDocumentValidator _storyboardValidator;
 
-        public ProjectService(IMessageBroker messageBroker, IErrorHandler errorHandler, IStoryboardParser storyboardParser)
+        public ProjectService(
+            IMessageBroker messageBroker,
+            IErrorHandler errorHandler,
+            IStoryboardParser storyboardParser,
+            IStoryboardDocumentReader storyboardReader,
+            IStoryboardDocumentWriter storyboardWriter,
+            IStoryboardDocumentValidator storyboardValidator)
         {
             _messageBroker = messageBroker;
             _errorHandler = errorHandler;
             _storyboardParser = storyboardParser;
+            _storyboardReader = storyboardReader;
+            _storyboardWriter = storyboardWriter;
+            _storyboardValidator = storyboardValidator;
         }
 
         public Task<ProjectDataContext?> LoadProjectAsync(string filePath)
@@ -40,15 +54,22 @@ namespace Naziki_Editor.Core.Project
             return Task.CompletedTask;
         }
 
-        public Task ExportCytoidStoryboardAsync(StoryboardRoot storyboard, string outputPath)
+        public Task ExportCytoidStoryboardAsync(
+            StoryboardRoot storyboard,
+            string outputPath,
+            ProjectDataContext? context = null)
         {
             if (storyboard == null) throw new ArgumentNullException(nameof(storyboard));
             if (string.IsNullOrEmpty(outputPath)) throw new ArgumentException("输出路径不能为空", nameof(outputPath));
 
             try
             {
-                string json = JsonConvert.SerializeObject(storyboard, Formatting.Indented, StoryboardSerializer.GetSettings());
-                File.WriteAllText(outputPath, json);
+                var diagnostics = _storyboardValidator.Validate(storyboard, context);
+                var errors = diagnostics.Where(d => d.Severity == StoryboardDiagnosticSeverity.Error).ToArray();
+                if (errors.Length > 0)
+                    throw new JsonSerializationException(string.Join(Environment.NewLine,
+                        errors.Select(error => $"{error.Path}: {error.Message}")));
+                WriteAllTextAtomic(outputPath, _storyboardWriter.Write(storyboard));
             }
             catch (JsonException ex)
             {
@@ -101,6 +122,9 @@ namespace Naziki_Editor.Core.Project
                         $"FilePath: {filePath}");
                     return null;
                 }
+                if (projectData.FormatVersion != 2)
+                    throw new JsonSerializationException(
+                        $"不支持的项目格式版本 {projectData.FormatVersion}；当前版本仅支持 .nep v2。");
 
                 var context = new ProjectDataContext(_messageBroker)
                 {
@@ -141,7 +165,7 @@ namespace Naziki_Editor.Core.Project
             {
                 context.ProjectData.LastModifiedTime = DateTime.Now;
                 string json = JsonConvert.SerializeObject(context.ProjectData, Formatting.Indented);
-                File.WriteAllText(targetPath, json);
+                WriteAllTextAtomic(targetPath, json);
             }
             catch (JsonException ex)
             {
@@ -186,10 +210,18 @@ namespace Naziki_Editor.Core.Project
             else if (entity is C2NoteController nc) miniRoot.note_controllers = new List<C2NoteController> { nc };
             else throw new InvalidOperationException($"不支持的实体类型：{entity.GetType().Name}");
 
-            string pureJson = StoryboardSerializer.ToJson(miniRoot);
+            var capsule = new NemDocument
+            {
+                MaterialType = materialType,
+                MaterialName = Path.GetFileNameWithoutExtension(fileName),
+                Payload = miniRoot
+            };
+            var capsuleJson = JObject.FromObject(capsule);
+            capsuleJson["payload"] = JObject.Parse(_storyboardWriter.Write(miniRoot));
+            string pureJson = capsuleJson.ToString(Formatting.Indented);
             try
             {
-                File.WriteAllText(filePath, pureJson);
+                WriteAllTextAtomic(filePath, pureJson);
             }
             catch (IOException ex)
             {
@@ -213,7 +245,7 @@ namespace Naziki_Editor.Core.Project
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var storyboard = JsonConvert.DeserializeObject<StoryboardRoot>(jsonText, StoryboardSerializer.GetSettings());
+                var storyboard = _storyboardReader.Read(jsonText);
                 if (storyboard == null)
                 {
                     _errorHandler.HandleException(
@@ -223,6 +255,7 @@ namespace Naziki_Editor.Core.Project
                         $"FilePath: {filePath}");
                     throw new InvalidOperationException("故事板文件解析结果为空");
                 }
+                _storyboardValidator.Validate(storyboard);
                 return storyboard;
             }
             catch (JsonException ex)
@@ -298,7 +331,7 @@ namespace Naziki_Editor.Core.Project
 
             string metaPath = storyboardPath + "_meta.json";
             string metaJson = JsonConvert.SerializeObject(context.StoryboardMeta, Formatting.Indented);
-            File.WriteAllText(metaPath, metaJson);
+            WriteAllTextAtomic(metaPath, metaJson);
         }
 
         /// <summary>
@@ -336,6 +369,24 @@ namespace Naziki_Editor.Core.Project
                     "读取谱面文件时发生 I/O 错误", "ProjectService.SilentImportChart",
                     $"FilePath: {chartPath}");
                 return null;
+            }
+        }
+
+        private static void WriteAllTextAtomic(string targetPath, string content)
+        {
+            var fullPath = Path.GetFullPath(targetPath);
+            var directory = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"Cannot resolve output directory for '{targetPath}'.");
+            Directory.CreateDirectory(directory);
+            var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+            try
+            {
+                File.WriteAllText(temporaryPath, content, new System.Text.UTF8Encoding(false));
+                File.Move(temporaryPath, fullPath, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
         }
     }

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Common;
@@ -12,13 +12,25 @@ using Naziki_Editor.Core.Storyboard;
 using Naziki_Editor.Core.Storyboard.Compilation;
 using Naziki_Editor.Core.Audio;
 using Naziki_Editor.Core.Workspace;
-using Naziki_Editor.Core.Timeline;
+using Naziki_Editor.Core.Timeline.Abstractions;
+using Naziki_Editor.Core.Timeline.Services;
+using Naziki_Editor.Core.Timeline.Shared;
+using Naziki_Editor.Core.Timeline.EventBlocks.Abstractions;
+using Naziki_Editor.Core.Timeline.EventBlocks.Services;
+using Naziki_Editor.Core.Timeline.Projection;
+using Naziki_Editor.Core.Timeline.Settings;
+using Naziki_Editor.Core.Timeline.Editing;
 using Naziki_Editor.Core.Compilation;
 using Naziki_Editor.Core.ErrorHandling;
 using Naziki_Editor.Core.Notifications;
+using Naziki_Editor.Core.Settings;
 using Naziki_Editor.Core.Shortcuts;
+using Naziki_Editor.Core.Theming;
+using Naziki_Editor.Core.Serialization;
+using Naziki_Editor.Core.Storyboard.Corrections;
 using Naziki_Editor.Views.Services;
 using Naziki_Editor.Views.PropertyEditor;
+using Naziki_Editor.ViewModels.Settings;
 
 namespace Naziki_Editor
 {
@@ -45,6 +57,16 @@ namespace Naziki_Editor
             services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<ITemplateManager, TemplateManager>();
             services.AddSingleton<IStoryboardParser, StoryboardParser>();
+            services.AddSingleton<IStoryboardPropertyCatalog, StoryboardPropertyCatalogService>();
+            services.AddSingleton<IStoryboardDocumentReader, StoryboardDocumentReader>();
+            services.AddSingleton<IStoryboardDocumentWriter, StoryboardDocumentWriter>();
+            services.AddSingleton<IStoryboardTemplatePropertyMapper, StoryboardTemplatePropertyMapper>();
+            services.AddSingleton<IStoryboardTimeResolver, StoryboardTimeResolver>();
+            services.AddSingleton<IStoryboardCorrectionAnalyzer, StoryboardCorrectionAnalyzer>();
+            services.AddSingleton<IStoryboardCorrectionService, StoryboardCorrectionService>();
+            services.AddSingleton<IStoryboardDocumentValidator, StoryboardDocumentValidator>();
+            services.AddSingleton<IEditorSnapshotSerializer, EditorSnapshotSerializer>();
+            services.AddSingleton<IJsonTextDiffService, JsonTextDiffService>();
             services.AddSingleton<ITrackBlueprintManager, TrackBlueprintManager>();
             services.AddSingleton<IAudioSyncEngine>(sp => new AudioSyncEngineAdapter(new AudioSyncEngine()));
             
@@ -61,9 +83,30 @@ namespace Naziki_Editor
             // 快捷键系统 - 单例（依赖 ICommandDispatcher）
             services.AddSingleton<IShortcutManager, ShortcutManager>();
 
+            // 时间轴模块 - 共享引擎
+            services.AddTransient<TimelineCoordEngine>();
+            services.AddTransient<IMainTimelineService, MainTimelineService>();
+            services.AddTransient<IMacroTimelineService, MacroTimelineService>();
+            services.AddTransient<IMicroTimelineService, MicroTimelineService>();
+            services.AddTransient<IEventBlockService, EventBlockService>();
+            services.AddSingleton<ITimelineProjectionService, TimelineProjectionService>();
+            services.AddSingleton<IPropertyMetadataCatalog, PropertyMetadataCatalog>();
+            services.AddSingleton<IMicroTimelineSessionFactory, MicroTimelineSessionFactory>();
+            services.AddSingleton<ITimelineSettings, TimelineSettingsProvider>();
+            services.AddSingleton<ITimelineEditService, TimelineEditService>();
+            services.AddSingleton<ITemplateInstanceService, TemplateInstanceService>();
+
+            // 设置系统 - 单例
+            services.AddSingleton<ISettingsStore, SettingsStore>();
+            services.AddTransient<SettingsWindowViewModel>();
+
+            // 主题系统 - 单例
+            services.AddSingleton<IThemeManager, ThemeManager>();
+
             // 窗口 - 瞬态
             services.AddTransient<Views.MainWindow>();
             services.AddTransient<ProjectManagement.ProjectHubWindow>();
+            services.AddTransient<Views.Settings.SettingsWindow>();
 
             ServiceProvider = services.BuildServiceProvider();
 
@@ -72,12 +115,22 @@ namespace Naziki_Editor
             AssetMetaManager.Initialize(dialogService);
 
             // 初始化静态服务定位器（Core/View 层静态类需要 IDialogService）
-            Core.Timeline.TimelineLayoutEngine.Initialize(dialogService);
+            Core.Timeline.Shared.TimelineLayoutEngine.Initialize(dialogService);
             Core.Compilation.StoryboardCompiler.Initialize(dialogService);
             BoundedSliderControl.Initialize(dialogService);
+
+            // 初始化设置系统：注册默认分类并加载已保存的设置
+            var settingsStore = ServiceProvider.GetRequiredService<ISettingsStore>() as SettingsStore;
+            settingsStore?.RegisterDefaultCategories();
+            settingsStore?.Load();
+
+            // 初始化主题系统（必须在设置加载之后）
+            var themeManager = ServiceProvider.GetRequiredService<IThemeManager>();
+            themeManager.Initialize();
         }
 
         public static T GetService<T>() where T : notnull
             => ServiceProvider.GetRequiredService<T>();
     }
 }
+

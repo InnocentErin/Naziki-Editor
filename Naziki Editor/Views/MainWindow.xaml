@@ -47,15 +47,75 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextColor}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ToolbarSeparatorStyle" TargetType="Separator">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Background="{TemplateBinding Background}" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WelcomeButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextColor}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3A3A5C"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="30"/>
             <RowDefinition Height="25"/>
+            <RowDefinition Height="32"/>
             <RowDefinition Height="65*" MinHeight="200"/>
             <RowDefinition Height="5"/>
             <RowDefinition Height="35*" MinHeight="200"/>
+            <RowDefinition Height="24"/>
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
@@ -96,12 +156,43 @@
                 <MenuItem Header="快进时光(_R)" Name="MenuRedo" Click="MenuRedo_Click" InputGestureText="Ctrl+Y"/>
             </MenuItem>
 
+            <MenuItem Header="工具(_T)">
+                <MenuItem Header="🧰 故事板检查与修正..." Name="MenuStoryboardCorrection"
+                          Click="MenuStoryboardCorrection_Click"/>
+                <Separator/>
+                <MenuItem Header="⚙️ 设置(_S)..." Name="MenuSettings" Click="MenuSettings_Click" InputGestureText="Ctrl+,"/>
+            </MenuItem>
+
             <MenuItem Header="关于(_A)">
                 <MenuItem Header="关于 Naziki Studio..." Name="MenuAbout" Click="MenuAbout_Click"/>
             </MenuItem>
         </Menu>
 
-        <Grid Grid.Row="2">
+        <!-- 工具栏 -->
+        <Border Grid.Row="2" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                <Button Content="📄" ToolTip="新建项目" Width="28" Height="24" Click="ToolbarNew_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="📂" ToolTip="打开项目" Width="28" Height="24" Click="ToolbarOpen_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="💾" ToolTip="保存" Width="28" Height="24" Click="ToolbarSave_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Separator Style="{StaticResource ToolbarSeparatorStyle}"/>
+                <Button Content="↩" ToolTip="撤销" Width="28" Height="24" Click="ToolbarUndo_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="↪" ToolTip="重做" Width="28" Height="24" Click="ToolbarRedo_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Separator Style="{StaticResource ToolbarSeparatorStyle}"/>
+                <Button Content="▶" ToolTip="播放" Width="28" Height="24" Click="ToolbarPlay_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="⏸" ToolTip="暂停" Width="28" Height="24" Click="ToolbarPause_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="⏹" ToolTip="停止" Width="28" Height="24" Click="ToolbarStop_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Separator Style="{StaticResource ToolbarSeparatorStyle}"/>
+                <Button Content="−" ToolTip="缩小" Width="22" Height="24" Click="ToolbarZoomOut_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Slider x:Name="ZoomSlider" Width="100" Height="24" Minimum="10" Maximum="200" Value="100"
+                        TickFrequency="10" IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center" Margin="2,0"
+                        ValueChanged="ZoomSlider_ValueChanged"/>
+                <Button Content="+" ToolTip="放大" Width="22" Height="24" Click="ToolbarZoomIn_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+                <Button Content="↺" ToolTip="重置缩放" Width="22" Height="24" Click="ToolbarZoomReset_Click" Style="{StaticResource ToolbarButtonStyle}"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="15*" MinWidth="150"/>
                 <ColumnDefinition Width="Auto"/>
@@ -121,9 +212,44 @@
             <local:PropertyPanelControl x:Name="PropertyPanel" Grid.Column="6" />
         </Grid>
 
-        <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
+        <!-- 欢迎页：无项目时覆盖在内容区域上方 -->
+        <Grid x:Name="WelcomePage" Grid.Row="3" Background="{DynamicResource MainBgColor}" Visibility="Visible" Panel.ZIndex="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="4">
+            <StackPanel Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="🛸 Naziki Editor" FontSize="28" FontWeight="Bold"
+                           Foreground="{DynamicResource MainTextColor}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                <TextBlock Text="欢迎使用故事板编辑器" FontSize="14"
+                           Foreground="{DynamicResource SecTextColor}" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+
+                <Button Content="📂 打开已有项目" Width="240" Height="40" Margin="0,0,0,12"
+                        Click="WelcomeOpenProject_Click" Style="{StaticResource WelcomeButtonStyle}"/>
+                <Button Content="✨ 创建新故事板" Width="240" Height="40" Margin="0,0,0,12"
+                        Click="WelcomeNewStoryboard_Click" Style="{StaticResource WelcomeButtonStyle}"/>
+                <Button Content="📋 从模板创建" Width="240" Height="40" Margin="0,0,0,12"
+                        Click="WelcomeFromTemplate_Click" Style="{StaticResource WelcomeButtonStyle}"/>
+
+                <TextBlock Text="最近项目" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource SecTextColor}" Margin="0,20,0,8"/>
+                <ListBox x:Name="RecentProjectsList" Width="240" Height="120"
+                         Background="{DynamicResource BorderColor}" BorderThickness="0"
+                         Foreground="{DynamicResource MainTextColor}"
+                         MouseDoubleClick="RecentProjectsList_MouseDoubleClick"/>
+            </StackPanel>
+        </Grid>
+
+        <GridSplitter Grid.Row="4" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{DynamicResource BorderColor}" Cursor="SizeNS"/>
+
+        <Grid Grid.Row="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="35*" MinWidth="200"/>
                 <ColumnDefinition Width="5"/>
@@ -134,5 +260,38 @@
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderColor}" Cursor="SizeWE"/>
             <local:TimelineControl x:Name="TimelineConsole" Grid.Column="2" />
         </Grid>
+
+        <!-- 状态栏 -->
+        <StatusBar Grid.Row="6" Background="{DynamicResource MainBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0"
+                   VerticalAlignment="Stretch" Padding="0">
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem Grid.Column="0" Margin="8,0">
+                <TextBlock x:Name="StatusPlaybackTime" Text="00:00 / 00:00" FontSize="11"
+                           Foreground="{DynamicResource SecTextColor}"/>
+            </StatusBarItem>
+            <StatusBarItem Grid.Column="1" HorizontalAlignment="Center">
+                <TextBlock x:Name="StatusSelectedObject" Text="" FontSize="11"
+                           Foreground="{DynamicResource SecTextColor}"/>
+            </StatusBarItem>
+            <StatusBarItem Grid.Column="2" Margin="0,0,8,0">
+                <TextBlock x:Name="StatusObjectCount" Text="对象: 0" FontSize="11"
+                           Foreground="{DynamicResource SecTextColor}"/>
+            </StatusBarItem>
+            <StatusBarItem Grid.Column="3" Margin="0,0,8,0">
+                <TextBlock x:Name="StatusModified" Text="" FontSize="11"
+                           Foreground="Orange"/>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>

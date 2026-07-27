@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using ICSharpCode.AvalonEdit.Highlighting;
 using Newtonsoft.Json;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core;
@@ -10,6 +9,7 @@ using Naziki_Editor.State;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Shortcuts;
 using System.Linq;
+using System.Collections;
 
 namespace Naziki_Editor.Views
 {
@@ -27,6 +27,9 @@ namespace Naziki_Editor.Views
         private object _lastSelectedObject;
         private bool _isGlobalPreviewMode = false;
         public ProjectDataContext Context { get; private set; }
+        private IStoryboardDocumentReader StoryboardReader => AppServices.GetService<IStoryboardDocumentReader>();
+        private IStoryboardDocumentWriter StoryboardWriter => AppServices.GetService<IStoryboardDocumentWriter>();
+        private IStoryboardDocumentValidator StoryboardValidatorService => AppServices.GetService<IStoryboardDocumentValidator>();
 
         public void LoadContext(ProjectDataContext context) => Context = context;
 
@@ -40,7 +43,6 @@ namespace Naziki_Editor.Views
         public CanvasControl()
         {
             InitializeComponent();
-            JsonEditor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("JavaScript");
         }
 
         public bool IsJsonTabActive
@@ -81,7 +83,7 @@ namespace Naziki_Editor.Views
                 {
                     NoSelectionHint.Visibility = Visibility.Collapsed;
                     JsonEditor.Visibility = Visibility.Visible;
-                    JsonEditor.Text = StoryboardSerializer.ToJson(currentModel);
+                    JsonEditor.Text = StoryboardWriter.Write(currentModel);
                 }
                 else if (_lastSelectedObject == null)
                 {
@@ -93,7 +95,7 @@ namespace Naziki_Editor.Views
                 {
                     NoSelectionHint.Visibility = Visibility.Collapsed;
                     JsonEditor.Visibility = Visibility.Visible;
-                    JsonEditor.Text = StoryboardSerializer.ToJson(_lastSelectedObject);
+                    JsonEditor.Text = StoryboardWriter.WriteNode(_lastSelectedObject);
                 }
                 HasUnappliedChanges = false;
                 TxtJsonStatus.Text = "✅ 代码已刷新为最新状态。";
@@ -123,13 +125,15 @@ namespace Naziki_Editor.Views
                 var root = Context?.Storyboard;
                 if (_isGlobalPreviewMode)
                 {
-                    var newRoot = JsonConvert.DeserializeObject<StoryboardRoot>(JsonEditor.Text, StoryboardSerializer.GetSettings());
-                    if (newRoot == null) throw new Exception("解析结果为空！");
+                    var newRoot = StoryboardReader.Read(JsonEditor.Text);
+                    ThrowIfInvalid(StoryboardValidatorService.Validate(newRoot));
                     OnApplyJsonSuccess?.Invoke(newRoot);
                 }
-                else if (_lastSelectedObject != null)
+                else if (_lastSelectedObject is IStoryboardEntity currentEntity)
                 {
-                    JsonConvert.PopulateObject(JsonEditor.Text, _lastSelectedObject);
+                    var replacement = StoryboardReader.ReadEntity(JsonEditor.Text, currentEntity.GetType());
+                    ThrowIfInvalid(StoryboardValidatorService.ValidateEntity(replacement));
+                    ReplaceEntityContents(currentEntity, replacement);
                     OnApplyJsonSuccess?.Invoke(root);
                 }
 
@@ -144,6 +148,31 @@ namespace Naziki_Editor.Views
                 TxtJsonStatus.Foreground = new SolidColorBrush(Colors.OrangeRed);
                 return false;
             }
+        }
+
+        private static void ReplaceEntityContents(IStoryboardEntity target, IStoryboardEntity source)
+        {
+            target.Id = source.Id;
+            target.IsIdSynthetic = source.IsIdSynthetic;
+            target.TargetId = source.TargetId;
+            target.ParentId = source.ParentId;
+            target.UnknownProperties.Clear();
+            foreach (var property in source.UnknownProperties)
+                target.UnknownProperties[property.Key] = property.Value.DeepClone();
+
+            var targetType = target.GetType();
+            targetType.GetProperty("BaseState")?.SetValue(target, source.GetBaseState());
+            var targetStates = target.GetKeyframes();
+            targetStates.Clear();
+            foreach (var state in source.GetKeyframes()) targetStates.Add(state);
+        }
+
+        private static void ThrowIfInvalid(IReadOnlyList<StoryboardDiagnostic> diagnostics)
+        {
+            var errors = diagnostics.Where(item => item.Severity == StoryboardDiagnosticSeverity.Error).ToArray();
+            if (errors.Length > 0)
+                throw new JsonException(string.Join(Environment.NewLine,
+                    errors.Select(item => $"{item.Path}: {item.Message}")));
         }
 
         private void JsonEditor_TextChanged(object sender, EventArgs e)

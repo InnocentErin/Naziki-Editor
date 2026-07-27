@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Naziki_Editor.Core;
 using Naziki_Editor.Models;
 
@@ -15,5 +16,6 @@ namespace Naziki_Editor.Core.Abstractions
         PropertyCategory GetCategory(string propertyName);
         PropertyConstraint GetConstraint(string propertyName);
         IReadOnlyCollection<string> GetAllowedPropertiesForType(TemplateType type);
+        bool IsEditableProperty(PropertyInfo property);
     }
 }

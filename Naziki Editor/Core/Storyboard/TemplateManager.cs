@@ -1,4 +1,5 @@
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Compilation;
 using Naziki_Editor.Models;
 using System.Collections.Generic;
 
@@ -94,6 +95,8 @@ namespace Naziki_Editor.Core
                 var props = state.GetType().GetProperties();
                 foreach (var prop in props)
                 {
+                    if (!StoryboardTemplatePropertyMapper.IsExportableProperty(prop))
+                        continue;
                     if (prop.GetValue(state) == null) continue;
 
                     string n = prop.Name.ToLower();

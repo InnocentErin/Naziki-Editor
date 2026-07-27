@@ -23,7 +23,7 @@ namespace Naziki_Editor.Core.Shortcuts
                 Id = "NewProject",
                 Description = "新建项目",
                 Key = Key.N,
-                Modifiers = ModifierKeys.Control,
+                Modifiers = ModifierKeys.Control | ModifierKeys.Shift,
                 CommandName = "NewProject",
                 Context = ShortcutContext.Global
             };
@@ -55,6 +55,16 @@ namespace Naziki_Editor.Core.Shortcuts
                 Key = Key.S,
                 Modifiers = ModifierKeys.Control | ModifierKeys.Shift,
                 CommandName = "SaveProjectAs",
+                Context = ShortcutContext.Global
+            };
+
+            yield return new ShortcutBinding
+            {
+                Id = "ExportStoryboard",
+                Description = "导出故事板",
+                Key = Key.E,
+                Modifiers = ModifierKeys.Control | ModifierKeys.Shift,
+                CommandName = "ExportStoryboard",
                 Context = ShortcutContext.Global
             };
 
@@ -296,6 +306,24 @@ namespace Naziki_Editor.Core.Shortcuts
                 CommandName = "TimelineZoomReset",
                 Context = ShortcutContext.Timeline
             };
+
+            yield return new ShortcutBinding { Id = "TimelineFitAll", Description = "缩放到全部内容", Key = Key.F, Modifiers = ModifierKeys.Shift, CommandName = "TimelineFitAll", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineFocusSelection", Description = "聚焦选中内容", Key = Key.F, Modifiers = ModifierKeys.None, CommandName = "TimelineFocusSelection", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineOpenMicro", Description = "打开微观时间轴", Key = Key.Enter, Modifiers = ModifierKeys.None, CommandName = "TimelineOpenMicro", Context = ShortcutContext.MainTimeline };
+            yield return new ShortcutBinding { Id = "TimelineReturnMain", Description = "返回主时间轴", Key = Key.Escape, Modifiers = ModifierKeys.None, CommandName = "TimelineReturnMain", Context = ShortcutContext.MicroTimeline, Priority = 20 };
+            yield return new ShortcutBinding { Id = "TimelineSelectAll", Description = "全选时间轴项目", Key = Key.A, Modifiers = ModifierKeys.Control, CommandName = "TimelineSelectAll", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineCopy", Description = "复制时间轴项目", Key = Key.C, Modifiers = ModifierKeys.Control, CommandName = "TimelineCopy", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelinePaste", Description = "粘贴时间轴项目", Key = Key.V, Modifiers = ModifierKeys.Control, CommandName = "TimelinePaste", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineAddKeyframe", Description = "添加关键帧", Key = Key.K, Modifiers = ModifierKeys.Control, CommandName = "TimelineAddKeyframe", Context = ShortcutContext.MicroTimeline };
+            yield return new ShortcutBinding { Id = "TimelinePreviousKeyframe", Description = "上一个关键帧", Key = Key.PageUp, Modifiers = ModifierKeys.None, CommandName = "TimelinePreviousKeyframe", Context = ShortcutContext.MicroTimeline };
+            yield return new ShortcutBinding { Id = "TimelineNextKeyframe", Description = "下一个关键帧", Key = Key.PageDown, Modifiers = ModifierKeys.None, CommandName = "TimelineNextKeyframe", Context = ShortcutContext.MicroTimeline };
+            yield return new ShortcutBinding { Id = "TimelineNudgeLeft", Description = "向左微移", Key = Key.Left, Modifiers = ModifierKeys.None, CommandName = "TimelineNudgeLeft", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineNudgeRight", Description = "向右微移", Key = Key.Right, Modifiers = ModifierKeys.None, CommandName = "TimelineNudgeRight", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineNudgeLeftLarge", Description = "向左大步移动", Key = Key.Left, Modifiers = ModifierKeys.Shift, CommandName = "TimelineNudgeLeftLarge", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineNudgeRightLarge", Description = "向右大步移动", Key = Key.Right, Modifiers = ModifierKeys.Shift, CommandName = "TimelineNudgeRightLarge", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineToggleSnap", Description = "切换时间轴吸附", Key = Key.S, Modifiers = ModifierKeys.Shift, CommandName = "TimelineToggleSnap", Context = ShortcutContext.Timeline };
+            yield return new ShortcutBinding { Id = "TimelineDetachTemplate", Description = "解绑模板实例", Key = Key.U, Modifiers = ModifierKeys.Control | ModifierKeys.Shift, CommandName = "TimelineDetachTemplate", Context = ShortcutContext.MicroTimeline };
+            yield return new ShortcutBinding { Id = "TimelineCancelEdit", Description = "取消当前时间轴编辑", Key = Key.Escape, Modifiers = ModifierKeys.None, CommandName = "TimelineCancelEdit", Context = ShortcutContext.MainTimeline, Priority = 20 };
 
             // ==========================================
             // 🖥️ 视图操作

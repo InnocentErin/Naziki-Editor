@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.ErrorHandling;
-using Newtonsoft.Json;
 
 namespace Naziki_Editor.Core.History
 {
@@ -15,10 +14,12 @@ namespace Naziki_Editor.Core.History
         private readonly List<string> _undoStack = new List<string>();
         private readonly List<string> _redoStack = new List<string>();
         private readonly IErrorHandler _errorHandler;
+        private readonly IEditorSnapshotSerializer _snapshotSerializer;
 
-        public HistoryService(IErrorHandler errorHandler)
+        public HistoryService(IErrorHandler errorHandler, IEditorSnapshotSerializer snapshotSerializer)
         {
             _errorHandler = errorHandler;
+            _snapshotSerializer = snapshotSerializer;
         }
 
         /// <inheritdoc />
@@ -37,7 +38,7 @@ namespace Naziki_Editor.Core.History
 
             _errorHandler.TryExecute(() =>
             {
-                string jsonSnapshot = JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings());
+                string jsonSnapshot = _snapshotSerializer.Serialize(currentState);
 
                 // 如果和上一步一模一样，就不记录（防止无意义的重复存档）
                 if (_undoStack.Count > 0 && _undoStack[_undoStack.Count - 1] == jsonSnapshot)
@@ -62,13 +63,13 @@ namespace Naziki_Editor.Core.History
 
             try
             {
-                _redoStack.Add(JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings()));
+                _redoStack.Add(_snapshotSerializer.Serialize(currentState));
 
                 string previousStateJson = _undoStack[_undoStack.Count - 1];
                 _undoStack.RemoveAt(_undoStack.Count - 1);
 
                 success = true;
-                return JsonConvert.DeserializeObject<T>(previousStateJson, StoryboardSerializer.GetSettings());
+                return _snapshotSerializer.Deserialize<T>(previousStateJson);
             }
             catch (Exception ex)
             {
@@ -86,13 +87,13 @@ namespace Naziki_Editor.Core.History
 
             try
             {
-                _undoStack.Add(JsonConvert.SerializeObject(currentState, StoryboardSerializer.GetSettings()));
+                _undoStack.Add(_snapshotSerializer.Serialize(currentState));
 
                 string nextStateJson = _redoStack[_redoStack.Count - 1];
                 _redoStack.RemoveAt(_redoStack.Count - 1);
 
                 success = true;
-                return JsonConvert.DeserializeObject<T>(nextStateJson, StoryboardSerializer.GetSettings());
+                return _snapshotSerializer.Deserialize<T>(nextStateJson);
             }
             catch (Exception ex)
             {

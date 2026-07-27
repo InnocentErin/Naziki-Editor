@@ -124,6 +124,23 @@ namespace Naziki_Editor.Core.Storyboard
             return newKey;
         }
 
+        /// <summary>
+        /// 创建空白故事板根对象，包含一个默认场景控制器。
+        /// 默认场景控制器启用透视投影（Perspective=true, Fov=53.2）。
+        /// </summary>
+        public StoryboardRoot CreateEmptyStoryboard()
+        {
+            var root = new StoryboardRoot();
+            
+            var defaultController = CreateSceneController();
+            defaultController.Id = "scene_default";
+            defaultController.BaseState.Perspective = true;
+            defaultController.BaseState.Fov = 53.2f;
+            
+            root.controllers.Add(defaultController);
+            return root;
+        }
+
         private static string GenerateTempId(string prefix)
         {
             return $"{prefix}_{DateTime.Now.Ticks}";

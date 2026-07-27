@@ -1,0 +1,90 @@
+读取历史项目发生错误：
+Object reference not set to an instance of an object.
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at Naziki_Editor.Views.MainWindow.ZoomSlider_ValueChanged(Object sender, RoutedPropertyChangedEventArgs`1 e) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml.cs:line 1574
+   at System.Windows.RoutedEventArgs.InvokeHandler(Delegate handler, Object target)
+   at System.Windows.EventRoute.InvokeHandlersImpl(Object source, RoutedEventArgs args, Boolean reRaised)
+   at System.Windows.UIElement.RaiseEventImpl(DependencyObject sender, RoutedEventArgs args)
+   at System.Windows.Controls.Slider.OnValueChanged(Double oldValue, Double newValue)
+   at System.Windows.FrameworkElement.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.DependencyObject.NotifyPropertyChange(DependencyPropertyChangedEventArgs args)
+   at System.Windows.DependencyObject.UpdateEffectiveValue(EntryIndex entryIndex, DependencyProperty dp, PropertyMetadata metadata, EffectiveValueEntry oldEntry, EffectiveValueEntry& newEntry, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType)
+   at System.Windows.DependencyObject.CoerceValue(DependencyProperty dp)
+   at System.Windows.Controls.Primitives.RangeBase.OnMinimumChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+   at System.Windows.FrameworkElement.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.DependencyObject.NotifyPropertyChange(DependencyPropertyChangedEventArgs args)
+   at System.Windows.DependencyObject.UpdateEffectiveValue(EntryIndex entryIndex, DependencyProperty dp, PropertyMetadata metadata, EffectiveValueEntry oldEntry, EffectiveValueEntry& newEntry, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType)
+   at System.Windows.DependencyObject.SetValueCommon(DependencyProperty dp, Object value, PropertyMetadata metadata, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType, Boolean isInternal)
+   at System.Windows.DependencyObject.SetValue(DependencyProperty dp, Object value)
+   at MS.Internal.Xaml.Runtime.ClrObjectRuntime.SetValue(Object inst, XamlMember property, Object value)
+   at MS.Internal.Xaml.Runtime.PartialTrustTolerantRuntime.SetValue(Object obj, XamlMember property, Object value)
+   at System.Xaml.XamlObjectWriter.Logic_ApplyPropertyValue(ObjectWriterContext ctx, XamlMember prop, Object value, Boolean onParent)
+   at System.Xaml.XamlObjectWriter.Logic_DoAssignmentToParentProperty(ObjectWriterContext ctx)
+   at System.Xaml.XamlObjectWriter.WriteEndMember()
+   at System.Windows.Markup.WpfXamlLoader.TransformNodes(XamlReader xamlReader, XamlObjectWriter xamlWriter, Boolean onlyLoadOneNode, Boolean skipJournaledProperties, Boolean shouldPassLineNumberInfo, IXamlLineInfo xamlLineInfo, IXamlLineInfoConsumer xamlLineInfoConsumer, XamlContextStack`1 stack, IStyleConnector styleConnector)
+   at System.Windows.Markup.WpfXamlLoader.Load(XamlReader xamlReader, IXamlObjectWriterFactory writerFactory, Boolean skipJournaledProperties, Object rootObject, XamlObjectWriterSettings settings, Uri baseUri)
+   at System.Windows.Markup.WpfXamlLoader.LoadBaml(XamlReader xamlReader, Boolean skipJournaledProperties, Object rootObject, XamlAccessLevel accessLevel, Uri baseUri)
+   at System.Windows.Markup.XamlReader.LoadBaml(Stream stream, ParserContext parserContext, Object parent, Boolean closeStream)
+   at System.Windows.Application.LoadComponent(Object component, Uri resourceLocator)
+   at Naziki_Editor.Views.MainWindow.InitializeComponent() in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml:line 1
+   at Naziki_Editor.Views.MainWindow..ctor(IHistoryService historyService, IEntityFactory entityFactory, IProjectService projectService, IStoryboardRepository storyboardRepository, IWorkspaceService workspaceService, ICommandDispatcher commandDispatcher, IEditorCoordinator editorCoordinator, IMessageBroker messageBroker, ICompilationService compilationService, IDialogService dialogService, IAudioSyncEngine audioEngine, AppCommands appCommands, NoteVisualEngine noteVisualEngine, IPropertyEditorService propertyEditorService, GlobalRenderEngine renderEngine, IErrorHandler errorHandler, INotificationService notificationService, IShortcutManager shortcutManager, ISettingsStore settingsStore) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml.cs:line 223
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithManyArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitDisposeCache(ServiceCallSite transientCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at Naziki_Editor.ProjectManagement.ProjectHubWindow.LaunchMainWindow(String projectFilePath, NazikiProjectModel projectData) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\ProjectManagement\ProjectHubWindow.xaml.cs:line 281
+   at Naziki_Editor.ProjectManagement.ProjectHubWindow.HistoryListBox_SelectionChanged(Object sender, SelectionChangedEventArgs e) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\ProjectManagement\ProjectHubWindow.xaml.cs:line 166
+
+创建项目文件发生报错：
+Object reference not set to an instance of an object.
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at Naziki_Editor.Views.MainWindow.ZoomSlider_ValueChanged(Object sender, RoutedPropertyChangedEventArgs`1 e) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml.cs:line 1574
+   at System.Windows.EventRoute.InvokeHandlersImpl(Object source, RoutedEventArgs args, Boolean reRaised)
+   at System.Windows.UIElement.RaiseEventImpl(DependencyObject sender, RoutedEventArgs args)
+   at System.Windows.Controls.Slider.OnValueChanged(Double oldValue, Double newValue)
+   at System.Windows.FrameworkElement.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.DependencyObject.NotifyPropertyChange(DependencyPropertyChangedEventArgs args)
+   at System.Windows.DependencyObject.UpdateEffectiveValue(EntryIndex entryIndex, DependencyProperty dp, PropertyMetadata metadata, EffectiveValueEntry oldEntry, EffectiveValueEntry& newEntry, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType)
+   at System.Windows.DependencyObject.CoerceValue(DependencyProperty dp)
+   at System.Windows.Controls.Primitives.RangeBase.OnMinimumChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+   at System.Windows.FrameworkElement.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.DependencyObject.NotifyPropertyChange(DependencyPropertyChangedEventArgs args)
+   at System.Windows.DependencyObject.UpdateEffectiveValue(EntryIndex entryIndex, DependencyProperty dp, PropertyMetadata metadata, EffectiveValueEntry oldEntry, EffectiveValueEntry& newEntry, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType)
+   at System.Windows.DependencyObject.SetValueCommon(DependencyProperty dp, Object value, PropertyMetadata metadata, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType, Boolean isInternal)
+   at System.Windows.Baml2006.WpfMemberInvoker.SetValue(Object instance, Object value)
+   at MS.Internal.Xaml.Runtime.ClrObjectRuntime.SetValue(Object inst, XamlMember property, Object value)
+   at MS.Internal.Xaml.Runtime.PartialTrustTolerantRuntime.SetValue(Object obj, XamlMember property, Object value)
+   at System.Xaml.XamlObjectWriter.Logic_ApplyPropertyValue(ObjectWriterContext ctx, XamlMember prop, Object value, Boolean onParent)
+   at System.Xaml.XamlObjectWriter.Logic_DoAssignmentToParentProperty(ObjectWriterContext ctx)
+   at System.Xaml.XamlObjectWriter.WriteEndMember()
+   at System.Windows.Markup.WpfXamlLoader.TransformNodes(XamlReader xamlReader, XamlObjectWriter xamlWriter, Boolean onlyLoadOneNode, Boolean skipJournaledProperties, Boolean shouldPassLineNumberInfo, IXamlLineInfo xamlLineInfo, IXamlLineInfoConsumer xamlLineInfoConsumer, XamlContextStack`1 stack, IStyleConnector styleConnector)
+   at System.Windows.Markup.WpfXamlLoader.Load(XamlReader xamlReader, IXamlObjectWriterFactory writerFactory, Boolean skipJournaledProperties, Object rootObject, XamlObjectWriterSettings settings, Uri baseUri)
+   at System.Windows.Markup.WpfXamlLoader.LoadBaml(XamlReader xamlReader, Boolean skipJournaledProperties, Object rootObject, XamlAccessLevel accessLevel, Uri baseUri)
+   at System.Windows.Markup.XamlReader.LoadBaml(Stream stream, ParserContext parserContext, Object parent, Boolean closeStream)
+   at System.Windows.Application.LoadComponent(Object component, Uri resourceLocator)
+   at Naziki_Editor.Views.MainWindow.InitializeComponent() in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml:line 1
+   at Naziki_Editor.Views.MainWindow..ctor(IHistoryService historyService, IEntityFactory entityFactory, IProjectService projectService, IStoryboardRepository storyboardRepository, IWorkspaceService workspaceService, ICommandDispatcher commandDispatcher, IEditorCoordinator editorCoordinator, IMessageBroker messageBroker, ICompilationService compilationService, IDialogService dialogService, IAudioSyncEngine audioEngine, AppCommands appCommands, NoteVisualEngine noteVisualEngine, IPropertyEditorService propertyEditorService, GlobalRenderEngine renderEngine, IErrorHandler errorHandler, INotificationService notificationService, IShortcutManager shortcutManager, ISettingsStore settingsStore) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\Views\MainWindow.xaml.cs:line 223
+   at InvokeStub_MainWindow..ctor(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithManyArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitDisposeCache(ServiceCallSite transientCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at Naziki_Editor.ProjectManagement.ProjectHubWindow.LaunchMainWindow(String projectFilePath, NazikiProjectModel projectData) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\ProjectManagement\ProjectHubWindow.xaml.cs:line 281
+   at Naziki_Editor.ProjectManagement.ProjectHubWindow.BtnCreateProject_Click(Object sender, RoutedEventArgs e) in D:\Naziki_Editor\Naziki Editor\Naziki Editor\ProjectManagement\ProjectHubWindow.xaml.cs:line 237

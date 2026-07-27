@@ -3,7 +3,6 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.ErrorHandling;
-using Naziki_Editor.Core.Serialization.Converters;
 using Naziki_Editor.Models;
 using System;
 using System.Collections.Generic;
@@ -30,9 +29,6 @@ namespace Naziki_Editor.Core
 
             _errorHandler.TryExecute(() =>
             {
-                // 🌟 P0修复：先处理 $note 占位符，确保后续逻辑能正确处理
-                ResolveNotePlaceholders(root);
-
                 // 依次全量洗盘 6 大场景对象数组
                 ProcessList(root.sprites, "sprite", root, project);
                 ProcessList(root.texts, "text", root, project);
@@ -41,53 +37,6 @@ namespace Naziki_Editor.Core
                 ProcessList(root.controllers, "controller", root, project);
                 ProcessList(root.note_controllers, "note", root, project);
             }, "DataValidation", "StoryboardParser.StandardizeStoryboardIds");
-        }
-
-        // 🌟 P0修复：$note 占位符处理
-        // 当 note_controller 的 note 字段为具体数字时，替换 $note 占位符
-        private static void ResolveNotePlaceholders(StoryboardRoot root)
-        {
-            if (root?.note_controllers == null) return;
-
-            foreach (var nc in root.note_controllers)
-            {
-                // 只处理 note 为具体数字的情况（非选择器）
-                if (nc.BaseState?.NoteTarget is long noteId || nc.BaseState?.NoteTarget is int noteIdInt)
-                {
-                    string noteIdStr = (nc.BaseState.NoteTarget is long l) ? l.ToString() : ((int)nc.BaseState.NoteTarget).ToString();
-                    ReplaceNotePlaceholder(nc, noteIdStr);
-                }
-                // 对于 note 选择器 {}，保留 $note 占位符不变（游戏运行时会展开）
-            }
-        }
-
-        private static void ReplaceNotePlaceholder(IStoryboardEntity entity, string noteId)
-        {
-            const string placeholder = "$note";
-
-            if (entity.Id?.Contains(placeholder) == true)
-                entity.Id = entity.Id.Replace(placeholder, noteId);
-
-            if (entity.ParentId?.Contains(placeholder) == true)
-                entity.ParentId = entity.ParentId.Replace(placeholder, noteId);
-
-            if (entity.TargetId?.Contains(placeholder) == true)
-                entity.TargetId = entity.TargetId.Replace(placeholder, noteId);
-
-            // 处理 BaseState 中的 time 字段
-            var baseState = entity.GetBaseState();
-            if (baseState != null)
-            {
-                var timeProp = baseState.GetType().GetProperty("Time");
-                if (timeProp != null)
-                {
-                    var timeVal = timeProp.GetValue(baseState);
-                    if (timeVal is string timeStr && timeStr.Contains(placeholder))
-                    {
-                        timeProp.SetValue(baseState, timeStr.Replace(placeholder, noteId));
-                    }
-                }
-            }
         }
 
         private static void ProcessList<T>(List<T> list, string typePrefix, StoryboardRoot root, NazikiProjectModel project) where T : IStoryboardEntity
@@ -116,12 +65,14 @@ namespace Naziki_Editor.Core
                     {
                         // 📖 账本里有记录！说明是重启或二次打开，直接精准重合复活原有的唯一唯一ID！
                         entity.Id = savedId;
+                        entity.IsIdSynthetic = true;
                     }
                     else
                     {
                         // 🆕 初次导入野生谱面，账本无记录，小艾动态为它捏一个合法的身份证，并立刻在账本上留痕！
                         string generatedId = $"{targetId}_target_{index + 1}_{Guid.NewGuid().ToString().Substring(0, 8)}";
                         entity.Id = generatedId;
+                        entity.IsIdSynthetic = true;
 
                         if (project != null && project.ControlBoardIdMaps != null)
                         {
@@ -133,6 +84,7 @@ namespace Naziki_Editor.Core
                 {
                     // 情况 C：既没有id也没有target_id的野生实体，走原本的智能命名
                     entity.Id = GenerateSmartIdForImport(entity, typePrefix, root);
+                    entity.IsIdSynthetic = true;
                 }
             }
         }
@@ -208,32 +160,4 @@ namespace Naziki_Editor.Core
         }
     }
 
-    // ==========================================
-    // 🌟 全局 JSON 输出大管家 (供预览和保存使用)
-    // ==========================================
-    public static class StoryboardSerializer
-    {
-        public static JsonSerializerSettings GetSettings()
-        {
-            return new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                ContractResolver = new DefaultContractResolver
-                {
-                    NamingStrategy = new SnakeCaseNamingStrategy() // 依然保持蛇形命名
-                },
-                Formatting = Formatting.Indented,
-                Converters = new List<JsonConverter>
-                {
-                    new StoryboardEntityConverter(), // ✨ 注入小艾定制的终极转换器！
-                    new UnitFloatConverter()
-                }
-            };
-        }
-
-        public static string ToJson(object obj)
-        {
-            return JsonConvert.SerializeObject(obj, GetSettings());
-        }
-    }
 }

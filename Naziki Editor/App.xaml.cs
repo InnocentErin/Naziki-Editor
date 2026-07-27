@@ -70,23 +70,7 @@ namespace Naziki_Editor
         {
             // 🗑️ 【已经把这里导致套娃的 --crash-watcher 召唤法阵删掉了！】
 
-            // 🌟 核心驱动 1：自适应动态换肤
-            try
-            {
-                bool isDarkMode = true;
-                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
-                {
-                    if (key?.GetValue("AppsUseLightTheme") != null)
-                    {
-                        isDarkMode = (int)key.GetValue("AppsUseLightTheme") == 0;
-                    }
-                }
-
-                string themePath = isDarkMode ? "Themes/DarkTheme.xaml" : "Themes/LightTheme.xaml";
-                var themeDict = new ResourceDictionary { Source = new Uri(themePath, UriKind.Relative) };
-                Application.Current.Resources.MergedDictionaries[0] = themeDict;
-            }
-            catch { }
+            // 🌟 主题初始化已迁移至 ThemeManager (AppServices.ConfigureServices 中自动调用)
 
             // 🚀 核心驱动 2：【.nep 项目双击直通车机制】
             if (e.Args.Length > 0 && File.Exists(e.Args[0]))

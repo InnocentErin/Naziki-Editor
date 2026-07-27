@@ -41,6 +41,9 @@ namespace Naziki_Editor.Core.Abstractions
         /// <summary>打开保存文件对话框，返回选中路径或 null</summary>
         string? ShowSaveFileDialog(string title, string filter, string defaultFileName = "");
 
+        /// <summary>显示输入对话框，返回用户输入的文本或 null</summary>
+        string? ShowInput(string message, string title, string defaultText = "");
+
         // 异步版本
         Task<string?> ShowOpenFileDialogAsync(string title, string filter);
         Task<string?> ShowSaveFileDialogAsync(string title, string filter, string defaultFileName);

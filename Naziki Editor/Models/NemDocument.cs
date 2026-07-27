@@ -1,5 +1,7 @@
 ﻿using System;
 
+using Newtonsoft.Json;
+
 namespace Naziki_Editor.Models
 {
     // ==========================================
@@ -7,16 +9,16 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class NemDocument
     {
+        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 2;
         // 素材的种类："Text", "Line", "Template" 等
-        public string MaterialType { get; set; }
+        [JsonProperty("material_type")] public string MaterialType { get; set; }
 
         // 素材的展示名称
-        public string MaterialName { get; set; }
+        [JsonProperty("material_name")] public string MaterialName { get; set; }
 
-        // 序列化后的真正对象数据（直接存 JSON 字符串，反序列化时极其安全）
-        public string PayloadJson { get; set; }
+        [JsonProperty("payload")] public StoryboardRoot Payload { get; set; } = new();
 
         // 制造日期
-        public DateTime CreationTime { get; set; } = DateTime.Now;
+        [JsonProperty("creation_time")] public DateTime CreationTime { get; set; } = DateTime.Now;
     }
 }

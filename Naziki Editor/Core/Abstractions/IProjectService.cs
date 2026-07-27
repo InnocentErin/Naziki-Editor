@@ -12,7 +12,10 @@ namespace Naziki_Editor.Core.Abstractions
         // 异步接口
         Task<ProjectDataContext?> LoadProjectAsync(string filePath);
         Task SaveProjectAsync(ProjectDataContext context, string filePath);
-        Task ExportCytoidStoryboardAsync(StoryboardRoot storyboard, string outputPath);
+        Task ExportCytoidStoryboardAsync(
+            StoryboardRoot storyboard,
+            string outputPath,
+            ProjectDataContext? context = null);
         Task SaveStoryboardMetaAsync(ProjectDataContext context, string storyboardPath);
         Task SaveProjectNepFileAsync(ProjectDataContext context, string? filePath = null);
 

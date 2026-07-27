@@ -1,4 +1,4 @@
-using Naziki_Editor.Core.Abstractions;
+﻿using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.State;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -12,10 +12,10 @@ namespace Naziki_Editor.UI.ViewModels
         private readonly IMessageBroker _messageBroker;
         private ProjectDataContext? _context;
 
-        public ObservableCollection<TimelineTrackGroupModel> TrackGroups { get; } = new();
+        public ObservableCollection<MainTimelineGroupViewModel> TrackGroups { get; } = new();
 
-        public ObservableCollection<TimelineTrackGroupModel> UpperTrackGroups { get; } = new();
-        public ObservableCollection<TimelineTrackGroupModel> LowerTrackGroups { get; } = new();
+        public ObservableCollection<MainTimelineGroupViewModel> UpperTrackGroups { get; } = new();
+        public ObservableCollection<MainTimelineGroupViewModel> LowerTrackGroups { get; } = new();
 
         private double _pixelsPerSecond = 100.0;
         public double PixelsPerSecond
@@ -53,7 +53,7 @@ namespace Naziki_Editor.UI.ViewModels
         public void RefreshFromContext()
         {
             if (_context == null) return;
-            var calculatedGroups = new UI.Services.TimelineDataEngine().BuildMacroTimeline(_context);
+            var calculatedGroups = new UI.Services.TimelineDataEngine().BuildMainTimeline(_context);
             TrackGroups.Clear();
             UpperTrackGroups.Clear();
             LowerTrackGroups.Clear();

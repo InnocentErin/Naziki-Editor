@@ -123,8 +123,17 @@ namespace Naziki_Editor.Core
                     return double.NaN;
                 }
 
-                double baseSeconds = this.TickToSeconds(targetNote.tick);
-                return baseSeconds + offset;
+                var anchor = parts.Length >= 2 ? parts[0].ToLowerInvariant() : "start";
+                return anchor switch
+                {
+                    "end" => TickToSeconds(targetNote.tick + Math.Max(0, targetNote.hold_tick)) + offset,
+                    "intro" => TickToSeconds(targetNote.tick) - 1.5 + offset,
+                    "at" when parts.Length >= 3 &&
+                              double.TryParse(parts[2], out var percentage) =>
+                        TickToSeconds(targetNote.tick +
+                            (int)Math.Round(Math.Max(0, targetNote.hold_tick) * percentage)),
+                    _ => TickToSeconds(targetNote.tick) + offset
+                };
             }
             catch
             {

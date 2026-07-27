@@ -15,5 +15,11 @@ namespace Naziki_Editor.Core.Abstractions
         C2NoteController CreateNoteController(C2Note note);
         C2Template CreateTemplate(string baseName);
         string GenerateUniqueTemplateKey(StoryboardRoot root, string baseName);
+
+        /// <summary>
+        /// 创建空白故事板根对象，包含默认场景控制器。
+        /// 用于从零开始创建新故事板。
+        /// </summary>
+        StoryboardRoot CreateEmptyStoryboard();
     }
 }

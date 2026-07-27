@@ -8,11 +8,16 @@ using Naziki_Editor.Core.Storyboard;
 using Naziki_Editor.Core.Shortcuts;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 
 namespace Naziki_Editor.Views
@@ -27,14 +32,20 @@ namespace Naziki_Editor.Views
         public event Action<AssetBundle> OnAssetScanned;
         public event Action<object> OnEventNodeSelected;
 
+        public event Action OnAddSpriteRequested;
         public event Action OnAddTextRequested;
         public event Action OnAddLineRequested;
+        public event Action OnAddVideoRequested;
         public event Action OnAddSceneRequested;
+        public event Action OnAddNoteCtrlRequested;
         public event Action OnAddTemplateRequested; 
 
+        private void BtnAddSprite_Click(object sender, RoutedEventArgs e) => OnAddSpriteRequested?.Invoke();
         private void BtnAddText_Click(object sender, RoutedEventArgs e) => OnAddTextRequested?.Invoke();
         private void BtnAddLine_Click(object sender, RoutedEventArgs e) => OnAddLineRequested?.Invoke();
+        private void BtnAddVideo_Click(object sender, RoutedEventArgs e) => OnAddVideoRequested?.Invoke();
         private void BtnAddScene_Click(object sender, RoutedEventArgs e) => OnAddSceneRequested?.Invoke();
+        private void BtnAddNoteCtrl_Click(object sender, RoutedEventArgs e) => OnAddNoteCtrlRequested?.Invoke();
         private void BtnAddTemplate_Click(object sender, RoutedEventArgs e) => OnAddTemplateRequested?.Invoke();
 
 
@@ -47,6 +58,7 @@ namespace Naziki_Editor.Views
         private IMessageBroker _messageBroker;
         private IDialogService _dialogService;
         private INotificationService _notificationService;
+        private IStoryboardEntity? _clipboardEntity;
 
         public void LoadContext(ProjectDataContext context) => Context = context;
 
@@ -77,12 +89,11 @@ namespace Naziki_Editor.Views
         // ==========================================
         public void ExecuteImportStoryboard()
         {
-            // 🛡️ 【加固拦截】：再次确保谱面必须在场
+            // 无谱面时允许导入，但给出提示
             if (Context == null || !Context.HasChart)
             {
-                _dialogService.ShowMessage("🚨 导入失败！必须先导入并加载谱面文件，才能导入故事板。\n因为故事板中的所有对象时间依赖谱面的 BPM 与时间轴计算。",
-                                           "强制顺序拦截", DialogMessageType.Error);
-                return;
+                // 不阻止，仅日志记录（提示条已在 XAML 中显示）
+                System.Diagnostics.Debug.WriteLine("[EventListControl] 无谱面状态下导入故事板，Note Controller 相关功能将受限。");
             }
 
             OpenFileDialog openFileDialog = new OpenFileDialog { Filter = "Cytoid 故事板 (*.json)|*.json|所有文件 (*.*)|*.*", Title = "请选择你的故事板文件" };
@@ -112,7 +123,8 @@ namespace Naziki_Editor.Views
 
         public void AddNoteGroupToTree(TreeViewItem groupItem)
         {
-            NoteCtrlListBox.Items.Add(groupItem);
+            // 兼容 ItemsSource 模式：刷新整个列表
+            LoadStoryboardUI();
             UpdateEmptyHintVisibility();
         }
 
@@ -120,50 +132,126 @@ namespace Naziki_Editor.Views
         {
             if (Context == null || !Context.HasStoryboard) return;
             var root = Context.Storyboard;
+            AppServices.GetService<IStoryboardDocumentValidator>().Validate(root, Context);
 
             ClearAllDrawers();
 
             // ✨ 降临过滤器：只要 TargetId 属性里存在非空字串，意味着它是提线木偶，前台列表冷酷蒸发！
+            var spriteItems = new List<EventListItemViewModel>();
             if (root.sprites?.Count > 0) foreach (var obj in root.sprites)
             {
-                if (!string.IsNullOrEmpty(obj.TargetId)) continue; 
-                SpriteListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+                if (!string.IsNullOrEmpty(obj.TargetId)) continue;
+                spriteItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            spriteItems = spriteItems.OrderBy(s => s.SortTime).ToList();
+            SpriteListBox.ItemsSource = spriteItems;
+            SpriteListBox.Visibility = spriteItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var textItems = new List<EventListItemViewModel>();
             if (root.texts?.Count > 0) foreach (var obj in root.texts)
             {
                 if (!string.IsNullOrEmpty(obj.TargetId)) continue;
-                TextListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+                textItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            textItems = textItems.OrderBy(s => s.SortTime).ToList();
+            TextListBox.ItemsSource = textItems;
+            TextListBox.Visibility = textItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var videoItems = new List<EventListItemViewModel>();
             if (root.videos?.Count > 0) foreach (var obj in root.videos)
             {
                 if (!string.IsNullOrEmpty(obj.TargetId)) continue;
-                VideoListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+                videoItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            videoItems = videoItems.OrderBy(s => s.SortTime).ToList();
+            VideoListBox.ItemsSource = videoItems;
+            VideoListBox.Visibility = videoItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var lineItems = new List<EventListItemViewModel>();
             if (root.lines?.Count > 0) foreach (var obj in root.lines)
             {
                 if (!string.IsNullOrEmpty(obj.TargetId)) continue;
-                LinesListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+                lineItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            lineItems = lineItems.OrderBy(s => s.SortTime).ToList();
+            LinesListBox.ItemsSource = lineItems;
+            LinesListBox.Visibility = lineItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var sceneItems = new List<EventListItemViewModel>();
             if (root.controllers?.Count > 0) foreach (var obj in root.controllers)
             {
                 if (!string.IsNullOrEmpty(obj.TargetId)) continue;
-                SceneListBox.Items.Add(new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj });
+                sceneItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            sceneItems = sceneItems.OrderBy(s => s.SortTime).ToList();
+            SceneListBox.ItemsSource = sceneItems;
+            SceneListBox.Visibility = sceneItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var noteItems = new List<EventListItemViewModel>();
             if (root.note_controllers?.Count > 0) foreach (var obj in root.note_controllers)
             {
                 if (!string.IsNullOrEmpty(obj.TargetId)) continue;
-                ListBoxItem item = new ListBoxItem { Content = EventNameResolver.GetDisplayName(obj), Tag = obj };
-                if (obj.BaseState?.NoteTarget is JObject) { item.Foreground = Brushes.DarkCyan; item.FontWeight = FontWeights.Bold; }
-                NoteCtrlListBox.Items.Add(item);
+                noteItems.Add(new EventListItemViewModel
+                {
+                    Id = obj.Id ?? "?",
+                    DisplayContent = EventNameResolver.GetDisplayName(obj),
+                    DisplayTime = FormatTime(GetStartTime(obj)),
+                    Tag = obj,
+                    SortTime = GetStartTime(obj)
+                });
             }
+            noteItems = noteItems.OrderBy(s => s.SortTime).ToList();
+            NoteCtrlListBox.ItemsSource = noteItems;
+            NoteCtrlListBox.Visibility = noteItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+            var templateItems = new List<EventListItemViewModel>();
             if (root.templates?.Count > 0) foreach (var kvp in root.templates)
-                EventTemplateListBox.Items.Add(new ListBoxItem { Content = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key, Tag = kvp.Value });
+                templateItems.Add(new EventListItemViewModel
+                {
+                    Id = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key,
+                    DisplayContent = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key,
+                    DisplayTime = "",
+                    Tag = kvp.Value,
+                    SortTime = 0
+                });
+            templateItems = templateItems.OrderBy(s => s.SortTime).ToList();
+            EventTemplateListBox.ItemsSource = templateItems;
+            EventTemplateListBox.Visibility = templateItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateEmptyHintVisibility();
         }
@@ -174,7 +262,7 @@ namespace Naziki_Editor.Views
             var currentListBox = GetCurrentActiveListBox();
             if (currentListBox != null)
             {
-                if (currentListBox.Items.Count > 0)
+                if (currentListBox.ItemsSource is IList sourceList && sourceList.Count > 0)
                 {
                     currentListBox.Visibility = Visibility.Visible;
                     DynamicEmptyHint.Visibility = Visibility.Collapsed;
@@ -207,20 +295,20 @@ namespace Naziki_Editor.Views
 
         private void ClearAllDrawers()
         {
-            SpriteListBox.Items.Clear();
-            TextListBox.Items.Clear();
-            VideoListBox.Items.Clear();
-            LinesListBox.Items.Clear();
-            SceneListBox.Items.Clear();
-            NoteCtrlListBox.Items.Clear();
-            EventTemplateListBox.Items.Clear();
+            SpriteListBox.ItemsSource = null;
+            TextListBox.ItemsSource = null;
+            VideoListBox.ItemsSource = null;
+            LinesListBox.ItemsSource = null;
+            SceneListBox.ItemsSource = null;
+            NoteCtrlListBox.ItemsSource = null;
+            EventTemplateListBox.ItemsSource = null;
         }
 
         private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (e.AddedItems.Count > 0 && e.AddedItems[0] is ListBoxItem selectedItem)
+            if (e.AddedItems.Count > 0 && e.AddedItems[0] is EventListItemViewModel vm)
             {
-                if (selectedItem.Tag != null) OnEventNodeSelected?.Invoke(selectedItem.Tag);
+                if (vm.Tag != null) OnEventNodeSelected?.Invoke(vm.Tag);
             }
             else if (e.AddedItems.Count == 0)
             {
@@ -234,9 +322,9 @@ namespace Naziki_Editor.Views
         {
             if (sender == EventTemplateListBox)
             {
-                if (EventTemplateListBox.SelectedItem is ListBoxItem templateItem && templateItem.Tag is C2Template template)
+                if (EventTemplateListBox.SelectedItem is EventListItemViewModel templateVm && templateVm.Tag is C2Template template)
                 {
-                    string templateKey = templateItem.Content?.ToString();
+                    string templateKey = templateVm.Id;
                     if (templateKey == "未命名模板") templateKey = "";
 
                     if (templateKey != null)
@@ -249,7 +337,7 @@ namespace Naziki_Editor.Views
             }
 
             // ✨ 核心重写：双击全面拥抱万能接口 IStoryboardEntity！
-            if (sender is ListBox listBox && listBox.SelectedItem is ListBoxItem item && item.Tag is IStoryboardEntity selectedObj)
+            if (sender is ListBox listBox && listBox.SelectedItem is EventListItemViewModel vm && vm.Tag is IStoryboardEntity selectedObj)
             {
                 _messageBroker.Publish("RequestOpenPropertyEditor", (object)selectedObj);
                     e.Handled = true;
@@ -280,11 +368,11 @@ namespace Naziki_Editor.Views
 
             var root = Context.Storyboard;
             bool hasDeleted = false;
-            var selectedItems = activeList.SelectedItems.Cast<ListBoxItem>().ToList();
+            var selectedItems = activeList.SelectedItems.Cast<EventListItemViewModel>().ToList();
 
-            foreach (var item in selectedItems)
+            foreach (var vm in selectedItems)
             {
-                var tag = item.Tag;
+                var tag = vm.Tag;
 
                 // ✨ 核心重写：删除算法全线拥抱 C2 新军团与仓储接口
                 if (tag is IStoryboardEntity objToDelete)
@@ -294,7 +382,7 @@ namespace Naziki_Editor.Views
                 }
                 else if (tag is C2Template)
                 {
-                    string templateKey = item.Content?.ToString();
+                    string templateKey = vm.Id;
                     if (templateKey == "未命名模板") templateKey = "";
 
                     if (templateKey != null && _storyboardRepository.ContainsTemplate(root, templateKey))
@@ -326,13 +414,168 @@ namespace Naziki_Editor.Views
             }
         }
 
-        // 🔘 结界上的“导入谱面”按钮被点击时，跨频道呼叫主窗口的大魔法！
+        // 🔘 结界上的"导入谱面"按钮被点击时，跨频道呼叫主窗口的大魔法！
         private void BtnOverlayImportChart_Click(object sender, RoutedEventArgs e)
         {
             // 📢 对着大喇叭喊话：有人按下了导入谱面按钮！主窗口你听到了吗，快去干活！
             _messageBroker.Publish("RequestImportChart");
         }
 
+        // ==========================================
+        // 🔍 搜索过滤
+        // ==========================================
+        private void TxtSearchFilter_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var filter = (sender as TextBox)?.Text?.Trim()?.ToLower() ?? "";
+            var listBox = GetCurrentActiveListBox();
+            if (listBox == null) return;
 
+            if (listBox.ItemsSource is IList sourceList)
+            {
+                var view = CollectionViewSource.GetDefaultView(sourceList);
+                if (view != null)
+                {
+                    view.Filter = item =>
+                    {
+                        if (string.IsNullOrEmpty(filter)) return true;
+                        if (item is EventListItemViewModel vm)
+                            return (vm.Id?.ToLower().Contains(filter) == true) ||
+                                   (vm.DisplayContent?.ToLower().Contains(filter) == true) ||
+                                   (vm.DisplayTime?.ToLower().Contains(filter) == true);
+                        return true;
+                    };
+                }
+            }
+        }
+
+        // ==========================================
+        // ⏱️ 时间格式化工具
+        // ==========================================
+        private static string FormatTime(double seconds)
+        {
+            if (seconds >= 60)
+                return $"{(int)(seconds / 60)}:{(seconds % 60):00.0}";
+            return $"{seconds:F1}s";
+        }
+
+        private static double GetStartTime(IStoryboardEntity entity)
+        {
+            var baseState = entity.GetBaseState();
+            if (baseState != null)
+            {
+                var timeProp = baseState.GetType().GetProperty("Time");
+                if (timeProp != null)
+                {
+                    var timeVal = timeProp.GetValue(baseState);
+                    if (timeVal != null)
+                    {
+                        if (timeVal is double d) return d;
+                        if (timeVal is float f) return f;
+                        if (timeVal is long l) return l;
+                        if (timeVal is int i) return i;
+                        if (double.TryParse(timeVal.ToString(), out double result)) return result;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        // ==========================================
+        // 📋 复制粘贴功能
+        // ==========================================
+        /// <summary>
+        /// 公开的复制入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecuteCopySelected()
+        {
+            var listBox = GetCurrentActiveListBox();
+            if (listBox?.SelectedItem is EventListItemViewModel vm && vm.Tag is IStoryboardEntity entity)
+            {
+                _clipboardEntity = entity;
+                _notificationService?.Show($"已复制事件: {vm.Id}", NotificationType.Info);
+            }
+        }
+
+        /// <summary>
+        /// 公开的粘贴入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecutePaste()
+        {
+            if (_clipboardEntity == null || Context?.Storyboard == null) return;
+
+            // 深拷贝并生成新ID
+            var cloned = CloneEntity(_clipboardEntity);
+            if (cloned == null) return;
+
+            _storyboardRepository.Add(Context.Storyboard, cloned);
+            LoadStoryboardUI();
+            _notificationService?.Show($"已粘贴事件: {cloned.Id}", NotificationType.Info);
+        }
+
+        private IStoryboardEntity? CloneEntity(IStoryboardEntity source)
+        {
+            var settings = new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.Auto,
+                Formatting = Formatting.Indented
+            };
+            var json = JsonConvert.SerializeObject(source, settings);
+            var cloned = JsonConvert.DeserializeObject(json, source.GetType(), settings) as IStoryboardEntity;
+            if (cloned != null)
+            {
+                var idProp = cloned.GetType().GetProperty("Id");
+                if (idProp != null)
+                {
+                    var oldId = idProp.GetValue(cloned)?.ToString() ?? "";
+                    var newId = oldId + "_copy_" + DateTime.Now.Ticks;
+                    idProp.SetValue(cloned, newId);
+                }
+            }
+            return cloned;
+        }
+
+        // ==========================================
+        // ✏️ 重命名功能
+        // ==========================================
+        /// <summary>
+        /// 公开的重命名入口（供快捷键系统调用）。
+        /// </summary>
+        public void ExecuteRenameSelected()
+        {
+            var listBox = GetCurrentActiveListBox();
+            if (listBox?.SelectedItem is EventListItemViewModel vm && vm.Tag is IStoryboardEntity entity)
+            {
+                var result = _dialogService?.ShowInput("请输入新的事件 ID:", "重命名事件", vm.Id ?? "");
+                if (!string.IsNullOrEmpty(result) && result != vm.Id)
+                {
+                    var idProp = entity.GetType().GetProperty("Id");
+                    idProp?.SetValue(entity, result);
+                    LoadStoryboardUI();
+                    Context?.MarkAsModified();
+                }
+            }
+        }
+
+
+    }
+
+    /// <summary>
+    /// 事件列表行视图模型，用于三列显示绑定。
+    /// </summary>
+    public class EventListItemViewModel
+    {
+        public string Id { get; set; }
+        public string DisplayContent { get; set; }
+        public string DisplayTime { get; set; }
+        public object Tag { get; set; }
+        public double SortTime { get; set; }
+        public Brush WarningBrush =>
+            Tag is IStoryboardEntity entity && entity.AllDiagnostics().Count > 0
+                ? new SolidColorBrush(Color.FromArgb(72, 255, 69, 58))
+                : Brushes.Transparent;
+        public string WarningToolTip =>
+            Tag is IStoryboardEntity entity
+                ? string.Join(Environment.NewLine, entity.AllDiagnostics().Select(item => $"{item.Path}: {item.Message}"))
+                : "";
     }
 }

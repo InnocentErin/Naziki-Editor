@@ -137,6 +137,17 @@
                     </Expander>
                 </StackPanel>
 
+                <Border x:Name="UnknownFieldsCard" Visibility="Collapsed"
+                        Background="#22FF453A" BorderBrush="#FFFF453A" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,5,0,10">
+                    <StackPanel>
+                        <TextBlock Text="⚠ 未识别的 JSON 字段" FontWeight="Bold" Foreground="#FFFF6B62"/>
+                        <TextBlock Text="字段已被原样保留。可在此删除，或前往源代码编辑器修改其 JSON 值。"
+                                   TextWrapping="Wrap" FontSize="10" Margin="0,3,0,8"/>
+                        <StackPanel x:Name="UnknownFieldsPanel"/>
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
         <TextBlock x:Name="TxtEmptyState" Text="👈 请先在左侧轨道选择一个状态层" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TipsColor}"/>

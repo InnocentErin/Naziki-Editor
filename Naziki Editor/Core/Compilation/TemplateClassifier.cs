@@ -42,13 +42,14 @@ namespace Naziki_Editor.Core.Compilation
 
             foreach (var prop in props)
             {
+                if (!StoryboardTemplatePropertyMapper.IsExportableProperty(prop))
+                    continue;
                 if (prop.Name == "Time" || prop.Name == "RelativeTime" || prop.Name == "AddTime" || prop.Name == "Easing" || prop.Name == "Destroy")
                     continue;
 
                 object val = prop.GetValue(state);
                 if (val != null)
                 {
-                    if (val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) continue;
                     activeProps.Add(prop.Name);
                 }
             }

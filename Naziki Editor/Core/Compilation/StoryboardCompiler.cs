@@ -17,41 +17,51 @@ namespace Naziki_Editor.Core.Compilation
         private C2Chart _chart;
         private ChartTimeEngine _engine;
         private Dictionary<string, C2Template> _templates;
+        private readonly IStoryboardTemplatePropertyMapper _templatePropertyMapper;
 
         public List<string> CompileWarnings { get; private set; } = new List<string>();
 
         // 构造函数接受整个 Chart、时间引擎和模板字典，准备好一切进行编译
-        public StoryboardCompiler(C2Chart chart, ChartTimeEngine engine, Dictionary<string, C2Template> templates)
+        public StoryboardCompiler(
+            C2Chart chart,
+            ChartTimeEngine engine,
+            Dictionary<string, C2Template> templates,
+            IStoryboardTemplatePropertyMapper? templatePropertyMapper = null)
         {
             _chart = chart;
             _engine = engine;
             _templates = templates;
+            _templatePropertyMapper =
+                templatePropertyMapper ?? new StoryboardTemplatePropertyMapper();
         }
 
         // 主入口：展平整个 Storyboard，处理所有对象类型
         public void FlattenStoryboard(StoryboardRoot root)
         {
             CompileWarnings.Clear();
-            ProcessEntityList<C2Sprite, SpriteState>(root.sprites);
-            ProcessEntityList<C2Text, TextState>(root.texts);
-            ProcessEntityList<C2Line, LineState>(root.lines);
-            ProcessEntityList<C2Video, VideoState>(root.videos);
-            ProcessEntityList<C2SceneController, ControllerState>(root.controllers);
-            ProcessEntityList<C2NoteController, NoteControllerState>(root.note_controllers);
+            ProcessEntityList<C2Sprite, SpriteState>(root.sprites, "sprites");
+            ProcessEntityList<C2Text, TextState>(root.texts, "texts");
+            ProcessEntityList<C2Line, LineState>(root.lines, "lines");
+            ProcessEntityList<C2Video, VideoState>(root.videos, "videos");
+            ProcessEntityList<C2SceneController, ControllerState>(root.controllers, "controllers");
+            ProcessEntityList<C2NoteController, NoteControllerState>(root.note_controllers, "note_controllers");
 
             // 🌟 终极进化：细胞分裂法术！
             // 在所有控制器的相对时间被展平为绝对时间后，执行高维到低维的物理拆解！
             MitosisSceneControllers(root.controllers);
+            root.templates.Clear();
         }
 
         // 通用处理函数：针对每种对象列表，调用展平函数处理它们的关键帧
-        private void ProcessEntityList<TEntity, TState>(List<TEntity> entities)
+        private void ProcessEntityList<TEntity, TState>(List<TEntity> entities, string collectionName)
             where TEntity : StoryboardEntity<TState>
             where TState : ObjectState, new()
         {
             if (entities == null) return;
-            foreach (var entity in entities)
+            for (var entityIndex = 0; entityIndex < entities.Count; entityIndex++)
             {
+                var entity = entities[entityIndex];
+                var entityPath = $"$.{collectionName}[{entityIndex}]";
                 // 🌟 提取基准状态的时间作为相对时间计算的起点
                 float baseTime = 0f;
                 if (entity.BaseState?.Time != null && entity.BaseState.Time.ToString() != float.MaxValue.ToString())
@@ -61,33 +71,54 @@ namespace Naziki_Editor.Core.Compilation
                 }
 
                 // 🌟 如果基准状态中引用了模板，且关键帧列表为空，则从基准状态展开模板
-                if (!string.IsNullOrEmpty(entity.BaseState?.Template)
-                    && (entity.Keyframes == null || entity.Keyframes.Count == 0))
+                if (!string.IsNullOrEmpty(entity.BaseState?.Template))
                 {
-                    var templateKeyframe = new TState();
-                    // 复制基准状态的Template属性
-                    typeof(TState).GetProperty("Template")?.SetValue(templateKeyframe, entity.BaseState.Template);
-                    templateKeyframe.Time = baseTime; // 使用实体的基准时间
-                    entity.Keyframes = new List<TState> { templateKeyframe };
+                    var templateName = entity.BaseState.Template;
+                    if (_templates != null &&
+                        _templates.TryGetValue(templateName, out var baseTemplate))
+                    {
+                        HandleMappingIssues(_templatePropertyMapper.Apply(
+                                entity.BaseState,
+                                baseTemplate.BaseState,
+                                StoryboardTemplateApplyMode.FillMissing,
+                                $"$.templates.{EscapePathSegment(templateName)}"),
+                            $"{entityPath}.template");
+
+                        if (entity.Keyframes == null || entity.Keyframes.Count == 0)
+                        {
+                            var templateKeyframe = new TState
+                            {
+                                Template = templateName,
+                                Time = baseTime
+                            };
+                            entity.Keyframes = new List<TState> { templateKeyframe };
+                        }
+                    }
                     entity.BaseState.Template = null; // 清除基准状态中的模板引用，避免重复展开
                 }
 
-                entity.Keyframes = FlattenStates<TState>(entity.Keyframes, baseTime);
+                entity.Keyframes = FlattenStates<TState>(
+                    entity.Keyframes, baseTime, entityPath);
             }
         }
 
         // ==========================================
         // 🧬 1. 顶层对象展平引擎 (遵循官方时间推算规范)
         // ==========================================
-        private List<TState> FlattenStates<TState>(List<TState> originalStates, float baseStateTime = 0f) where TState : ObjectState, new()
+        private List<TState> FlattenStates<TState>(
+            List<TState> originalStates,
+            float baseStateTime,
+            string entityPath) where TState : ObjectState, new()
         {
             if (originalStates == null || originalStates.Count == 0) return originalStates;
 
             var flattenedList = new List<TState>();
             float lastStateTime = baseStateTime;
 
-            foreach (var state in originalStates)
+            for (var stateIndex = 0; stateIndex < originalStates.Count; stateIndex++)
             {
+                var state = originalStates[stateIndex];
+                var referencePath = $"{entityPath}.states[{stateIndex}]";
                 List<float> triggerTimes = new List<float>();
 
                 if (state.AddTime.HasValue)
@@ -130,7 +161,11 @@ namespace Naziki_Editor.Core.Compilation
                     var template = _templates[state.Template];
                     foreach (float baseTime in triggerTimes)
                     {
-                        TState mergedBaseState = MergeProperties<TState>(state, template.BaseState);
+                        TState mergedBaseState = MergeProperties<TState>(
+                            state,
+                            template.BaseState,
+                            $"$.templates.{EscapePathSegment(state.Template)}",
+                            referencePath);
                         mergedBaseState.Template = null;
 
                         if (template.Keyframes == null || template.Keyframes.Count == 0)
@@ -142,7 +177,13 @@ namespace Naziki_Editor.Core.Compilation
                         }
                         else
                         {
-                            var expandedChildren = ExpandTemplateKeyframes<TState>(template.Keyframes, baseTime, mergedBaseState, new HashSet<string> { state.Template });
+                            var expandedChildren = ExpandTemplateKeyframes<TState>(
+                                template.Keyframes,
+                                baseTime,
+                                mergedBaseState,
+                                new HashSet<string> { state.Template },
+                                state.Template,
+                                referencePath);
                             flattenedList.AddRange(expandedChildren);
 
                             if (expandedChildren.Count > 0)
@@ -161,13 +202,22 @@ namespace Naziki_Editor.Core.Compilation
         // ==========================================
         // 🪆 2. 子帧递归拆解术
         // ==========================================
-        private List<TState> ExpandTemplateKeyframes<TState>(List<TemplateState> templateStates, float baseTime, TState inheritedBaseState, HashSet<string> visitedTemplates) where TState : ObjectState, new()
+        private List<TState> ExpandTemplateKeyframes<TState>(
+            List<TemplateState> templateStates,
+            float baseTime,
+            TState inheritedBaseState,
+            HashSet<string> visitedTemplates,
+            string currentTemplateName,
+            string referencePath) where TState : ObjectState, new()
         {
             var result = new List<TState>();
             float lastStateTime = baseTime;
 
-            foreach (var tState in templateStates)
+            for (var templateStateIndex = 0;
+                 templateStateIndex < templateStates.Count;
+                 templateStateIndex++)
             {
+                var tState = templateStates[templateStateIndex];
                 float currentTriggerTime = 0f;
 
                 if (tState.AddTime.HasValue)
@@ -198,7 +248,11 @@ namespace Naziki_Editor.Core.Compilation
                 if (currentTriggerTime != float.MaxValue) lastStateTime = currentTriggerTime;
 
                 // 🌟 子帧覆盖术：模板关键帧的值应覆盖继承的基准状态
-                TState mergedState = ApplyKeyframeOverrides<TState>(inheritedBaseState, tState);
+                TState mergedState = ApplyKeyframeOverrides<TState>(
+                    inheritedBaseState,
+                    tState,
+                    $"$.templates.{EscapePathSegment(currentTemplateName)}.states[{templateStateIndex}]",
+                    referencePath);
                 mergedState.Template = null;
 
                 if (string.IsNullOrEmpty(tState.Template) || _templates == null || !_templates.ContainsKey(tState.Template))
@@ -224,7 +278,13 @@ namespace Naziki_Editor.Core.Compilation
                     else
                     {
                         var newVisited = new HashSet<string>(visitedTemplates) { tState.Template };
-                        var subExpanded = ExpandTemplateKeyframes<TState>(childTemplate.Keyframes, currentTriggerTime, mergedState, newVisited);
+                        var subExpanded = ExpandTemplateKeyframes<TState>(
+                            childTemplate.Keyframes,
+                            currentTriggerTime,
+                            mergedState,
+                            newVisited,
+                            tState.Template,
+                            referencePath);
                         result.AddRange(subExpanded);
                     }
                 }
@@ -274,65 +334,61 @@ namespace Naziki_Editor.Core.Compilation
 
         private T DeepClone<T>(T source) => JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(source, Formatting.None));
 
-        private TState MergeProperties<TState>(TState explicitState, TemplateState templateState) where TState : ObjectState, new()
+        private TState MergeProperties<TState>(
+            TState explicitState,
+            TemplateState templateState,
+            string templatePath,
+            string referencePath) where TState : ObjectState, new()
         {
             TState merged = DeepClone(explicitState);
             if (templateState == null) return merged;
-            PropertyInfo[] props = typeof(TState).GetProperties();
-            Type templateType = typeof(TemplateState);
-
-            foreach (var prop in props)
-            {
-                if (prop.Name == "Time" || prop.Name == "RelativeTime" || prop.Name == "AddTime" || prop.Name == "Template") continue;
-                object explicitVal = prop.GetValue(merged);
-                bool isExplicitNull = (explicitVal == null);
-                if (explicitVal is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) isExplicitNull = true;
-
-                if (isExplicitNull)
-                {
-                    PropertyInfo tProp = templateType.GetProperty(prop.Name);
-                    if (tProp != null)
-                    {
-                        object tVal = tProp.GetValue(templateState);
-                        if (tVal != null)
-                        {
-                            string tJson = JsonConvert.SerializeObject(tVal);
-                            object clonedTVal = JsonConvert.DeserializeObject(tJson, prop.PropertyType);
-                            prop.SetValue(merged, clonedTVal);
-                        }
-                    }
-                }
-            }
+            HandleMappingIssues(_templatePropertyMapper.Apply(
+                merged,
+                templateState,
+                StoryboardTemplateApplyMode.FillMissing,
+                templatePath),
+                referencePath);
             return merged;
         }
 
         // 🌟 子帧覆盖术：将模板关键帧的值覆盖到继承的基准状态上
-        private TState ApplyKeyframeOverrides<TState>(TState baseState, TemplateState keyframeState) where TState : ObjectState, new()
+        private TState ApplyKeyframeOverrides<TState>(
+            TState baseState,
+            TemplateState keyframeState,
+            string templateStatePath,
+            string referencePath) where TState : ObjectState, new()
         {
             TState result = DeepClone(baseState);
             if (keyframeState == null) return result;
-            PropertyInfo[] props = typeof(TState).GetProperties();
-            Type templateType = typeof(TemplateState);
-
-            foreach (var prop in props)
-            {
-                if (prop.Name == "Time" || prop.Name == "RelativeTime" || prop.Name == "AddTime" || prop.Name == "Template") continue;
-
-                PropertyInfo tProp = templateType.GetProperty(prop.Name);
-                if (tProp != null)
-                {
-                    object tVal = tProp.GetValue(keyframeState);
-                    if (tVal != null)
-                    {
-                        // 模板关键帧的值直接覆盖继承的基准状态
-                        string tJson = JsonConvert.SerializeObject(tVal);
-                        object clonedTVal = JsonConvert.DeserializeObject(tJson, prop.PropertyType);
-                        prop.SetValue(result, clonedTVal);
-                    }
-                }
-            }
+            HandleMappingIssues(_templatePropertyMapper.Apply(
+                result,
+                keyframeState,
+                StoryboardTemplateApplyMode.Override,
+                templateStatePath),
+                referencePath);
             return result;
         }
+
+        private void HandleMappingIssues(
+            IReadOnlyList<StoryboardTemplatePropertyIssue> issues,
+            string referencePath)
+        {
+            foreach (var warning in issues.Where(issue =>
+                         issue.Severity == StoryboardDiagnosticSeverity.Warning))
+                CompileWarnings.Add(
+                    $"⚠️ {warning.SourcePath}（引用：{referencePath}）: {warning.Message}");
+            var errors = issues.Where(issue =>
+                issue.Severity == StoryboardDiagnosticSeverity.Error).ToArray();
+            if (errors.Length > 0)
+                throw new InvalidOperationException(string.Join(Environment.NewLine,
+                    errors.Select(error =>
+                        $"{error.SourcePath}（引用：{referencePath}）: {error.Message}")));
+        }
+
+        private static string EscapePathSegment(string value) =>
+            value.All(character => char.IsLetterOrDigit(character) || character == '_')
+                ? value
+                : $"['{value.Replace("'", "\\'")}']";
 
         // ==========================================
         // 🦠 4. 细胞分裂引擎 (Controller Mitosis)
@@ -429,11 +485,11 @@ namespace Naziki_Editor.Core.Compilation
             var props = typeof(ControllerState).GetProperties();
             foreach (var prop in props)
             {
+                if (!StoryboardTemplatePropertyMapper.IsExportableProperty(prop)) continue;
                 if (IsBaseProperty(prop.Name)) continue;
 
                 object val = prop.GetValue(state);
                 bool isExplicitNull = (val == null);
-                if (val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) isExplicitNull = true;
 
                 if (!isExplicitNull)
                 {
@@ -449,6 +505,9 @@ namespace Naziki_Editor.Core.Compilation
             var props = typeof(ControllerState).GetProperties();
             foreach (var prop in props)
             {
+                if (!StoryboardTemplatePropertyMapper.IsExportableProperty(
+                        prop, requireWrite: true))
+                    continue;
                 if (IsBaseProperty(prop.Name)) continue;
 
                 var cat = PropertyClassifier.GetCategory(prop.Name);
@@ -465,6 +524,7 @@ namespace Naziki_Editor.Core.Compilation
             var props = typeof(ControllerState).GetProperties();
             foreach (var prop in props)
             {
+                if (!StoryboardTemplatePropertyMapper.IsExportableProperty(prop)) continue;
                 if (IsBaseProperty(prop.Name)) continue;
 
                 var cat = PropertyClassifier.GetCategory(prop.Name);
@@ -472,7 +532,6 @@ namespace Naziki_Editor.Core.Compilation
                 {
                     object val = prop.GetValue(state);
                     bool isExplicitNull = (val == null);
-                    if (val is UnitFloat uf && uf.Value == 0 && uf.Unit == ReferenceUnit.World) isExplicitNull = true;
                     if (!isExplicitNull) return true;
                 }
             }

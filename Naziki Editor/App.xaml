@@ -5,10 +5,15 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Themes/LightTheme.xaml"/>
-                <ResourceDictionary Source="Themes/Styles.xaml"/>
-                <ResourceDictionary Source="Themes/TimelineStyles.xaml"/>
-                <ResourceDictionary Source="Themes/NotificationStyles.xaml"/>
+                <!-- 主题颜色资源 (索引 0-2)，由 ThemeManager 动态替换 -->
+                <ResourceDictionary Source="Themes/Dark/Colors.xaml"/>
+                <ResourceDictionary Source="Themes/Dark/NotificationColors.xaml"/>
+                <ResourceDictionary Source="Themes/Dark/TimelineColors.xaml"/>
+                <!-- 基础样式 (索引 3+)，不随主题变化 -->
+                <ResourceDictionary Source="Themes/Base/Styles.xaml"/>
+                <ResourceDictionary Source="Themes/Base/TimelineStyles.xaml"/>
+                <ResourceDictionary Source="Themes/Base/TimelineTabs.xaml"/>
+                <ResourceDictionary Source="Themes/Base/NotificationStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

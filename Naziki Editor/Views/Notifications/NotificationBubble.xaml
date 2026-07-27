@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="60" d:DesignWidth="380"
              x:Name="NotificationRoot">
 
     <UserControl.Resources>
@@ -16,16 +15,16 @@
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Success">
-                    <Setter Property="Background" Value="{StaticResource NotificationSuccessBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationSuccessBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Warning">
-                    <Setter Property="Background" Value="{StaticResource NotificationWarningBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationWarningBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Error">
-                    <Setter Property="Background" Value="{StaticResource NotificationErrorBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationErrorBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Info">
-                    <Setter Property="Background" Value="{StaticResource NotificationInfoBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationInfoBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -34,23 +33,23 @@
         <Style x:Key="IconStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,8,0"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Success">
-                    <Setter Property="Foreground" Value="{StaticResource NotificationSuccessBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource NotificationSuccessBrush}"/>
                     <Setter Property="Text" Value="✓"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Warning">
-                    <Setter Property="Foreground" Value="{StaticResource NotificationWarningBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource NotificationWarningBrush}"/>
                     <Setter Property="Text" Value="⚠"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Error">
-                    <Setter Property="Foreground" Value="{StaticResource NotificationErrorBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource NotificationErrorBrush}"/>
                     <Setter Property="Text" Value="✕"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Info">
-                    <Setter Property="Foreground" Value="{StaticResource NotificationInfoBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource NotificationInfoBrush}"/>
                     <Setter Property="Text" Value="ℹ"/>
                 </DataTrigger>
             </Style.Triggers>
@@ -60,27 +59,27 @@
         <Style x:Key="BgStyle" TargetType="Border">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Success">
-                    <Setter Property="Background" Value="{StaticResource NotificationSuccessBgBrush}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource NotificationSuccessBorderBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationSuccessBgBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource NotificationSuccessBorderBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Warning">
-                    <Setter Property="Background" Value="{StaticResource NotificationWarningBgBrush}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource NotificationWarningBorderBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationWarningBgBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource NotificationWarningBorderBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Error">
-                    <Setter Property="Background" Value="{StaticResource NotificationErrorBgBrush}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource NotificationErrorBorderBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationErrorBgBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource NotificationErrorBorderBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Type, ElementName=NotificationRoot}" Value="Info">
-                    <Setter Property="Background" Value="{StaticResource NotificationInfoBgBrush}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource NotificationInfoBorderBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource NotificationInfoBgBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource NotificationInfoBorderBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <!-- 气泡主体 -->
-    <Border Style="{StaticResource BgStyle}"
+    <!-- 气泡主体：动态宽高，随内容自适应 -->
+    <Border Style="{DynamicResource BgStyle}"
             BorderThickness="1"
             CornerRadius="8"
             Padding="12,10"
@@ -95,30 +94,33 @@
             <DropShadowEffect Color="#40000000" BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
         </Border.Effect>
 
+        <!-- 使用 Grid 替代 StackPanel，让文本列受限于 MaxWidth 实现自动换行 -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>   <!-- 左侧颜色指示条 -->
+                <ColumnDefinition Width="Auto"/>   <!-- 图标 -->
+                <ColumnDefinition Width="*"/>      <!-- 消息文本（自适应填充剩余宽度） -->
+                <ColumnDefinition Width="Auto"/>   <!-- 右侧关闭按钮 -->
             </Grid.ColumnDefinitions>
 
             <!-- 左侧类型颜色指示条 -->
-            <Border Grid.Column="0" Style="{StaticResource TypeIndicatorStyle}"/>
+            <Border Grid.Column="0" Style="{DynamicResource TypeIndicatorStyle}"/>
 
-            <!-- 中间：图标 + 消息文本 -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource IconStyle}"/>
-                <TextBlock x:Name="MessageText"
-                           Text="{Binding Message, ElementName=NotificationRoot}"
-                           Foreground="{StaticResource NotificationTextBrush}"
-                           FontSize="13"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"
-                           LineHeight="18"/>
-            </StackPanel>
+            <!-- 图标 -->
+            <TextBlock Grid.Column="1" Style="{DynamicResource IconStyle}"/>
+
+            <!-- 消息文本：自动换行，高度随内容自适应 -->
+            <TextBlock Grid.Column="2" x:Name="MessageText"
+                       Text="{Binding Message, ElementName=NotificationRoot}"
+                       Foreground="{DynamicResource NotificationTextBrush}"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       LineHeight="18"
+                       MaxWidth="340"/>
 
             <!-- 右侧关闭按钮 -->
-            <Button Grid.Column="2"
+            <Button Grid.Column="3"
                     x:Name="CloseButton"
                     Width="24" Height="24"
                     Background="Transparent"
@@ -134,7 +136,7 @@
                             <TextBlock x:Name="CloseIcon"
                                        Text="✕"
                                        FontSize="12"
-                                       Foreground="{StaticResource NotificationCloseBrush}"
+                                       Foreground="{DynamicResource NotificationCloseBrush}"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"/>
                         </Border>

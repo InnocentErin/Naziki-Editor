@@ -1,5 +1,7 @@
 ﻿using System;
 
+using Newtonsoft.Json;
+
 namespace Naziki_Editor.Models
 {
     // ==========================================
@@ -7,6 +9,7 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class NazikiProjectModel
     {
+        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 2;
         // 1. 创世元数据
         public string ProjectName { get; set; } = "未命名项目";
         public string EditorVersion { get; set; } = "1.0.0";

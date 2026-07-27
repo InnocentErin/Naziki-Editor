@@ -1,41 +1,54 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 using Naziki_Editor.Core;
+using Naziki_Editor.Core.Timeline.Shared;
 using Naziki_Editor.Models;
 using Naziki_Editor.UI.ViewModels;
 using Naziki_Editor.State;
+using Naziki_Editor.Core.Timeline.Projection;
 
 namespace Naziki_Editor.UI.Services
 {
     public class TimelineDataEngine
     {
+        private readonly ITimelineProjectionService _projectionService;
+
+        public TimelineDataEngine()
+            : this(new TimelineProjectionService())
+        {
+        }
+
+        public TimelineDataEngine(ITimelineProjectionService projectionService)
+        {
+            _projectionService = projectionService ?? throw new ArgumentNullException(nameof(projectionService));
+        }
         // =========================================================================
         // 🌍 形态 A：全景主时间轴（中心辐射宏观排版模型生成器）
         // =========================================================================
-        public ObservableCollection<TimelineTrackGroupModel> BuildMacroTimeline(ProjectDataContext context)
+        public ObservableCollection<MainTimelineGroupViewModel> BuildMainTimeline(ProjectDataContext context)
         {
-            var groups = new ObservableCollection<TimelineTrackGroupModel>();
+            var groups = new ObservableCollection<MainTimelineGroupViewModel>();
             var root = context?.Storyboard;
 
             // 1. 🏗️ 初始化中心辐射的各大常驻星环 (GroupIndex 决定上下物理位置)
             // ✨ 初始全部设为 false，稍后在收纳逻辑里会强行展开 Layer0 和有数据的组
-            var layer2 = new TimelineTrackGroupModel { GroupName = "📦 物理图层 - Layer 2 (前景/UI)", GroupIndex = 30, IsExpanded = false };
-            var layer1 = new TimelineTrackGroupModel { GroupName = "📦 物理图层 - Layer 1 (中景/游玩)", GroupIndex = 20, IsExpanded = false };
-            var layer0 = new TimelineTrackGroupModel { GroupName = "📦 物理图层 - Layer 0 (背景)", GroupIndex = 10, IsExpanded = true };
+            var layer2 = new MainTimelineGroupViewModel { GroupName = "📦 物理图层 - Layer 2 (前景/UI)", GroupIndex = 30, IsExpanded = false };
+            var layer1 = new MainTimelineGroupViewModel { GroupName = "📦 物理图层 - Layer 1 (中景/游玩)", GroupIndex = 20, IsExpanded = false };
+            var layer0 = new MainTimelineGroupViewModel { GroupName = "📦 物理图层 - Layer 0 (背景)", GroupIndex = 10, IsExpanded = true };
 
             // 🎛️ 控制器在音频轨之下，所以给负数！(越往下负得越多)
-            var controllerGroup = new TimelineTrackGroupModel { GroupName = "🎛️ 画面滤镜与场景控制器", GroupIndex = -10, IsExpanded = false };
-            var noteGroup = new TimelineTrackGroupModel { GroupName = "🎵 音符轨迹控制器", GroupIndex = -20, IsExpanded = false };
+            var controllerGroup = new MainTimelineGroupViewModel { GroupName = "🎛️ 画面滤镜与场景控制器", GroupIndex = -10, IsExpanded = false };
+            var noteGroup = new MainTimelineGroupViewModel { GroupName = "🎵 音符轨迹控制器", GroupIndex = -20, IsExpanded = false };
 
             // 🌟 核心满足大大需求：为每个轨道组【强行塞入一条保底空轨道】！
-            layer2.Tracks.Add(new TimelineTrackModel { TrackIndex = 0, TrackName = "Order 0" });
-            layer1.Tracks.Add(new TimelineTrackModel { TrackIndex = 0, TrackName = "Order 0" });
-            layer0.Tracks.Add(new TimelineTrackModel { TrackIndex = 0, TrackName = "Order 0" });
-            controllerGroup.Tracks.Add(new TimelineTrackModel { TrackIndex = 0, TrackName = "默认控制轨" });
-            noteGroup.Tracks.Add(new TimelineTrackModel { TrackIndex = 0, TrackName = "默认音符轨" });
+            layer2.Tracks.Add(new MainTimelineTrackViewModel { TrackIndex = 0, TrackName = "Order 0" });
+            layer1.Tracks.Add(new MainTimelineTrackViewModel { TrackIndex = 0, TrackName = "Order 0" });
+            layer0.Tracks.Add(new MainTimelineTrackViewModel { TrackIndex = 0, TrackName = "Order 0" });
+            controllerGroup.Tracks.Add(new MainTimelineTrackViewModel { TrackIndex = 0, TrackName = "默认控制轨" });
+            noteGroup.Tracks.Add(new MainTimelineTrackViewModel { TrackIndex = 0, TrackName = "默认音符轨" });
 
             groups.Add(layer2);
             groups.Add(layer1);
@@ -62,14 +75,14 @@ namespace Naziki_Editor.UI.Services
                 if (FastReflectionHelper.TryGetValue(baseState, "Layer", out object lObj)) layerVal = Convert.ToInt32(lObj);
                 if (FastReflectionHelper.TryGetValue(baseState, "Order", out object oObj)) orderVal = Convert.ToInt32(oObj);
 
-                TimelineTrackGroupModel targetGroup = layer0;
+                MainTimelineGroupViewModel targetGroup = layer0;
                 if (layerVal == 1) targetGroup = layer1;
                 else if (layerVal >= 2) targetGroup = layer2;
 
                 var track = targetGroup.Tracks.FirstOrDefault(t => t.TrackIndex == orderVal);
                 if (track == null)
                 {
-                    track = new TimelineTrackModel { TrackIndex = orderVal, TrackName = $"Order {orderVal}" };
+                    track = new MainTimelineTrackViewModel { TrackIndex = orderVal, TrackName = $"Order {orderVal}" };
                     targetGroup.Tracks.Add(track);
                 }
                 track.Clips.Add(CreateClipFromEntity(entity, orderVal, context)); // 👈 这里叫 orderVal
@@ -85,7 +98,7 @@ namespace Naziki_Editor.UI.Services
                     if (track != null) { track.TrackName = ctrl.Id ?? "Unknown"; }
                     else
                     {
-                        track = new TimelineTrackModel { TrackIndex = controllerGroup.Tracks.Count, TrackName = ctrl.Id ?? "Unknown" };
+                        track = new MainTimelineTrackViewModel { TrackIndex = controllerGroup.Tracks.Count, TrackName = ctrl.Id ?? "Unknown" };
                         controllerGroup.Tracks.Add(track);
                     }
                     track.Clips.Add(CreateClipFromEntity(ctrl, track.TrackIndex, context)); // 👈 这里叫 track.TrackIndex
@@ -100,7 +113,7 @@ namespace Naziki_Editor.UI.Services
                     if (track != null) { track.TrackName = noteCtrl.Id ?? "Unknown"; }
                     else
                     {
-                        track = new TimelineTrackModel { TrackIndex = noteGroup.Tracks.Count, TrackName = noteCtrl.Id ?? "Unknown" };
+                        track = new MainTimelineTrackViewModel { TrackIndex = noteGroup.Tracks.Count, TrackName = noteCtrl.Id ?? "Unknown" };
                         noteGroup.Tracks.Add(track);
                     }
                     track.Clips.Add(CreateClipFromEntity(noteCtrl, track.TrackIndex, context)); // 👈 这里叫 track.TrackIndex
@@ -126,114 +139,25 @@ namespace Naziki_Editor.UI.Services
             return groups;
         }
 
-        // =========================================================================
-        // 🔬 形态 B：AE 式详细调整模式（单事件百叶窗多属性轨道生成器）
-        // =========================================================================
-        public ObservableCollection<TimelineTrackGroupModel> BuildDetailedTimeline(TimelineClipModel mainClip, ProjectDataContext context)
-        {
-            var groups = new ObservableCollection<TimelineTrackGroupModel>();
-            if (mainClip?.AssociatedObject == null) return groups;
-
-            var entity = mainClip.AssociatedObject;
-            var propGroup = new TimelineTrackGroupModel { GroupName = $"🎬 细分属性展开: {mainClip.DisplayName}", GroupIndex = 100, IsExpanded = true };
-            groups.Add(propGroup);
-
-            var baseState = entity.GetBaseState();
-            var keyframes = entity.GetKeyframes();
-            if (baseState == null) return groups;
-
-            // 🛡️ DNA 防呆剔除名单
-            HashSet<string> ignoreProps = new HashSet<string> {
-                "Time", "Easing", "AddTime", "RelativeTime", "Id", "ParentId", "TargetId", "States", "Keyframes", "Layer", "Order", "Template"
-            };
-
-            PropertyInfo[] props = baseState.GetType().GetProperties();
-            int trackIdx = 0;
-
-            foreach (var prop in props)
-            {
-                if (ignoreProps.Contains(prop.Name)) continue;
-
-                bool hasAnimation = false;
-
-                // 初态有值吗？
-                if (FastReflectionHelper.TryGetValue(baseState, prop.Name, out object baseVal) && baseVal != null)
-                    hasAnimation = true;
-
-                // 后续帧有变动吗？
-                if (!hasAnimation && keyframes != null)
-                {
-                    foreach (var frame in keyframes)
-                    {
-                        if (FastReflectionHelper.TryGetValue(frame, prop.Name, out object frameVal) && frameVal != null)
-                        {
-                            hasAnimation = true; break;
-                        }
-                    }
-                }
-
-                // ✨ 只有发生过位移/变动的属性，才配拥有一条专属微观小轨道！
-                if (hasAnimation)
-                {
-                    var track = new TimelineTrackModel { TrackIndex = trackIdx++, TrackName = prop.Name };
-
-                    // 🚨 注意：这里暂时把整个对象包装进去，后续在 UI 层的 ClipPropertyTrackRow 里
-                    // 会自动解析出这个属性的具体点阵来画线！
-                    track.Clips.Add(CreateClipFromEntity(entity, track.TrackIndex, context));
-                    propGroup.Tracks.Add(track);
-                }
-            }
-
-            return groups;
-        }
+        [Obsolete("Use BuildMainTimeline.")]
+        public ObservableCollection<MainTimelineGroupViewModel> BuildMacroTimeline(ProjectDataContext context)
+            => BuildMainTimeline(context);
 
         // =========================================================================
         // 🛠️ 纯净方块胶囊生成器
         // =========================================================================
-        private TimelineClipModel CreateClipFromEntity(IStoryboardEntity entity, int trackIndex, ProjectDataContext context)
+        private EventBlockViewModel CreateClipFromEntity(IStoryboardEntity entity, int trackIndex, ProjectDataContext context)
         {
-            double start = 0;
-
-            var baseState = entity.GetBaseState();
-            var allNotes = context?.Chart?.note_list;
-
-            // ✨ 解析起始时间
-            if (baseState != null && FastReflectionHelper.TryGetValue(baseState, "Time", out object startTimeObj) && startTimeObj != null)
-            {
-                // 🟢 雷达 1：打印原始读取到的 Time 字符串
-                System.Diagnostics.Debug.WriteLine($"[时间轴雷达 1] 正在处理实体 ID: {entity.Id}");
-                System.Diagnostics.Debug.WriteLine($"[时间轴雷达 1] 原始 Time 表达式: '{startTimeObj}'");
-
-                if (context != null && context.TimeEngine != null)
-                {
-                    start = context.TimeEngine.ParseCytoidTimeExpression(startTimeObj, allNotes);
-
-                    // 🟢 雷达 2：打印解析之后得到的绝对秒数
-                    System.Diagnostics.Debug.WriteLine($"[时间轴雷达 1] 解析后的绝对秒数: {start}");
-
-                    if (double.IsNaN(start))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"❗ [严重警告] 时间解析失败！实体 {entity.Id} 因找不到对应音符，时间强制归零。");
-                        start = 0;
-                    }
-                }
-                else
-                {
-                    if (!double.TryParse(startTimeObj.ToString(), out start))
-                    {
-                        start = 0;
-                    }
-                }
-            }
-
-            double end = StoryboardTimeConverter.CalculateEntityEndTime(entity, start, context?.TimeEngine, allNotes);
-            return new TimelineClipModel
+            var projection = _projectionService.BuildEntityProjection(entity, context);
+            return new EventBlockViewModel
             {
                 AssociatedObject = entity,
                 DisplayName = EventNameResolver.GetDisplayName(entity),
                 TrackIndex = trackIndex,
-                StartTime = start,
-                EndTime = end
+                StartTime = projection.BaseStateTime,
+                EndTime = projection.LastStateTime,
+                HasTimeError = !projection.HasValidBaseTime || projection.HasErrors,
+                TimeDiagnostics = projection.Diagnostics.Select(d => d.Message).ToArray()
             };
         }
 
@@ -241,3 +165,4 @@ namespace Naziki_Editor.UI.Services
 
     }
 }
+

@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Naziki_Editor.Views.EventListControl"
+<UserControl x:Class="Naziki_Editor.Views.EventListControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -42,17 +42,27 @@
                                 <Grid Grid.Column="1" Background="Transparent">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
 
-                                    <UniformGrid Grid.Row="0" Columns="4" Margin="5,5,5,2">
+                                    <UniformGrid Grid.Row="0" Columns="3" Margin="5,5,5,2">
+                                        <Button Content="➕ 图片" x:Name="BtnAddSprite" Click="BtnAddSprite_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                         <Button Content="➕ 文字" x:Name="BtnAddText" Click="BtnAddText_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                         <Button Content="➕ 线条" x:Name="BtnAddLine" Click="BtnAddLine_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                        <Button Content="➕ 视频" x:Name="BtnAddVideo" Click="BtnAddVideo_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                         <Button Content="➕ 场景" x:Name="BtnAddScene" Click="BtnAddScene_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
-                                        <Button Content="➕ 模板" x:Name="BtnAddTemplate" Click="BtnAddTemplate_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
+                                        <Button Content="➕ 音符" x:Name="BtnAddNoteCtrl" Click="BtnAddNoteCtrl_Click" Margin="2" Padding="0,5" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand"/>
                                     </UniformGrid>
 
-                                    <Border Grid.Row="1" Background="Transparent">
+                                    <TextBox x:Name="TxtSearchFilter" Grid.Row="1" Margin="5,2,5,5" Padding="5,3"
+                                             FontSize="12" Background="{DynamicResource MenuBgColor}" 
+                                             Foreground="{DynamicResource MainTextColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"
+                                             TextChanged="TxtSearchFilter_TextChanged"
+                                             Tag="🔍 搜索事件..."/>
+
+                                    <Border Grid.Row="2" Background="Transparent">
                                         <ContentPresenter ContentSource="SelectedContent"/>
                                     </Border>
                                 </Grid>
@@ -61,25 +71,151 @@
                     </TabControl.Template>
 
                     <TabItem Header="图片">
-                        <ListBox x:Name="SpriteListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="SpriteListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="文字">
-                        <ListBox x:Name="TextListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="TextListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="线条">
-                        <ListBox x:Name="LinesListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="LinesListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="视频">
-                        <ListBox x:Name="VideoListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="VideoListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="场景">
-                        <ListBox x:Name="SceneListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="SceneListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="音符">
-                        <ListBox x:Name="NoteCtrlListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="NoteCtrlListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="模板">
-                        <ListBox x:Name="EventTemplateListBox" MouseDoubleClick="EventTree_MouseDoubleClick" Visibility="Collapsed" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged"/>
+                        <ListBox x:Name="EventTemplateListBox" MouseDoubleClick="EventTree_MouseDoubleClick" SelectionMode="Extended" SelectionChanged="ListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding WarningBrush}" ToolTip="{Binding WarningToolTip}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource AccentColor}" 
+                                                   FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayContent}" Foreground="{DynamicResource MainTextColor}" 
+                                                   FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="3,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DisplayTime}" Foreground="{DynamicResource SecTextColor}" 
+                                                   FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="3,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                 </TabControl>
 
@@ -94,14 +230,17 @@
             </Grid>
 
             <Button Grid.Row="1" x:Name="BtnDeleteEvent" Content="🗑️ 删除选中的事件" Click="BtnDeleteEvent_Click" 
-                    Margin="10,5,10,10" Padding="5,8" Background="#FF5555" Foreground="White" 
+                    Margin="10,5,10,10" Padding="5,8" Background="{DynamicResource VirtualLineBrush}" Foreground="White" 
                     FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
 
-            <Border x:Name="ChartMissingOverlay" Grid.RowSpan="2" Background="{DynamicResource MainBgColor}" Panel.ZIndex="999" Visibility="Visible">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="⚠️ 请先导入谱面文件" Foreground="#FF5555" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="必须存在谱面，才能导入或编辑故事板" Foreground="{DynamicResource SecTextColor}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                    <Button x:Name="BtnOverlayImportChart" Content="🎵 导入谱面文件" Padding="15,8" Background="{DynamicResource MenuBgColor}" Foreground="{DynamicResource MainTextColor}" BorderBrush="{DynamicResource BorderColor}" Cursor="Hand" Click="BtnOverlayImportChart_Click"/>
+            <Border x:Name="ChartMissingOverlay" Grid.RowSpan="2" Background="#F9E2AF" Panel.ZIndex="998" Visibility="Visible" 
+                    Height="32" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="⚠️ 当前未导入谱面，Note Controller 相关功能将受限" 
+                               Foreground="#1E1E2E" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button x:Name="BtnOverlayImportChart" Content="🎵 导入谱面" Padding="8,2" 
+                            Background="#1E1E2E" Foreground="#F9E2AF" BorderThickness="0" Cursor="Hand" 
+                            Click="BtnOverlayImportChart_Click" FontSize="11"/>
                 </StackPanel>
             </Border>
 

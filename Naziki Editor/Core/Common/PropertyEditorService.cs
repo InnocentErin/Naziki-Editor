@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Reflection;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Models;
+using Newtonsoft.Json;
 
 namespace Naziki_Editor.Core.Common
 {
@@ -50,6 +52,16 @@ namespace Naziki_Editor.Core.Common
         public IReadOnlyCollection<string> GetAllowedPropertiesForType(TemplateType type)
         {
             return new TemplateManager().GetAllowedPropertiesForType(type);
+        }
+
+        public bool IsEditableProperty(PropertyInfo property)
+        {
+            if (property == null || !property.CanRead || !property.CanWrite) return false;
+            if (property.GetIndexParameters().Length != 0) return false;
+            if (property.GetCustomAttribute<JsonIgnoreAttribute>() != null) return false;
+            return property.Name is not nameof(IExtensibleStoryboardNode.Diagnostics)
+                and not nameof(IExtensibleStoryboardNode.UnknownProperties)
+                and not nameof(IStoryboardEntity.IsIdSynthetic);
         }
     }
 }

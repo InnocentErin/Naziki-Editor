@@ -71,11 +71,11 @@ namespace Naziki_Editor.Core.Services
             try
             {
                 string json = File.ReadAllText(nemFilePath);
-                var nemDoc = JsonConvert.DeserializeObject<Models.NemDocument>(json);
-                if (nemDoc != null)
+                var nemDoc = Newtonsoft.Json.Linq.JObject.Parse(json);
+                if (nemDoc.Value<int?>("format_version") == 2)
                 {
-                    nemDoc.MaterialName = newDisplayName; // 替换内置名字
-                    File.WriteAllText(nemFilePath, JsonConvert.SerializeObject(nemDoc, Formatting.Indented));
+                    nemDoc["material_name"] = newDisplayName;
+                    File.WriteAllText(nemFilePath, nemDoc.ToString(Formatting.Indented));
                 }
             }
             catch (Exception ex)

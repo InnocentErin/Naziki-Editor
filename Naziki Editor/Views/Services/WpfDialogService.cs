@@ -145,6 +145,24 @@ namespace Naziki_Editor.Views.Services
 
         #endregion
 
+        #region 输入对话框
+
+        public string? ShowInput(string message, string title, string defaultText = "")
+        {
+            string? result = null;
+
+            ExecuteOnUIThread(() =>
+            {
+                result = InputDialog.ShowInput(message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
+                    defaultText);
+            }, nameof(ShowInput));
+
+            return result;
+        }
+
+        #endregion
+
         #region 内部辅助
 
         /// <summary>

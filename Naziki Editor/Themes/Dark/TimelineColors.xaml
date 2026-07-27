@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 暗色主题时间轴颜色资源 -->
+    <SolidColorBrush x:Key="TimelineKeyframeFill" Color="#4DB8FF"/>
+    <SolidColorBrush x:Key="TimelineKeyframeStroke" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TimelineKeyframeHover" Color="#FFFF00"/>
+    <SolidColorBrush x:Key="TimelineKeyframeDragging" Color="#FF3366"/>
+    <SolidColorBrush x:Key="TimelineOpacityFill" Color="#FFB84D"/>
+    <SolidColorBrush x:Key="TimelineOpacityStroke" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TimelineOpacityHover" Color="#FFFF00"/>
+    <SolidColorBrush x:Key="TimelineOpacityDragging" Color="#FF3366"/>
+    <SolidColorBrush x:Key="TimelineActiveKeyframeFill" Color="#FF3366"/>
+    <SolidColorBrush x:Key="TimelineActiveKeyframeStroke" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TimelineTickColor" Color="#A0A0A0"/>
+
+</ResourceDictionary>

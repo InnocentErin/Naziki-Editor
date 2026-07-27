@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 
@@ -19,11 +20,18 @@ namespace Naziki_Editor.Models
     // ==========================================
     // 🌟 一、 超级实体包装盒 (分离时空悖论的核心)
     // ==========================================
-    public interface IStoryboardEntity
+    public interface IExtensibleStoryboardNode
+    {
+        IDictionary<string, JToken> UnknownProperties { get; }
+        IList<StoryboardDiagnostic> Diagnostics { get; }
+    }
+
+    public interface IStoryboardEntity : IExtensibleStoryboardNode
     {
         string Id { get; set; }
         string TargetId { get; set; }
         string ParentId { get; set; }
+        bool IsIdSynthetic { get; set; }
         object GetBaseState();
         System.Collections.IList GetKeyframes();
     }
@@ -34,9 +42,15 @@ namespace Naziki_Editor.Models
         [JsonProperty("target_id", NullValueHandling = NullValueHandling.Ignore)]
         public string TargetId { get; set; }
         [JsonProperty("parent_id")] public string ParentId { get; set; }
+        [JsonIgnore] public bool IsIdSynthetic { get; set; }
 
         [JsonIgnore] public TState BaseState { get; set; } = new TState();
         [JsonIgnore] public List<TState> Keyframes { get; set; } = new List<TState>();
+
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
 
         public object GetBaseState() => BaseState;
         public System.Collections.IList GetKeyframes() => Keyframes;
@@ -74,21 +88,35 @@ namespace Naziki_Editor.Models
     // ==========================================
     // 🌟 二、 故事板大本营 (Storyboard Root)
     // ==========================================
-    public class StoryboardRoot
+    public class StoryboardRoot : IExtensibleStoryboardNode
     {
+        [JsonProperty("sprites")]
         public List<C2Sprite> sprites { get; set; } = new List<C2Sprite>();
+        [JsonProperty("texts")]
         public List<C2Text> texts { get; set; } = new List<C2Text>();
+        [JsonProperty("lines")]
         public List<C2Line> lines { get; set; } = new List<C2Line>();
+        [JsonProperty("videos")]
         public List<C2Video> videos { get; set; } = new List<C2Video>();
+        [JsonProperty("controllers")]
         public List<C2SceneController> controllers { get; set; } = new List<C2SceneController>();
+        [JsonProperty("note_controllers")]
         public List<C2NoteController> note_controllers { get; set; } = new List<C2NoteController>();
+        [JsonProperty("templates")]
         public Dictionary<string, C2Template> templates { get; set; } = new Dictionary<string, C2Template>();
+        [JsonProperty("triggers")]
+        public List<C2Trigger> triggers { get; set; } = new List<C2Trigger>();
+
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
     }
 
     // ==========================================
     // 🌟 三、 官方属性全集 (States) - 一个不差！
     // ==========================================
-    public abstract class ObjectState
+    public abstract class ObjectState : IExtensibleStoryboardNode
     {
         [JsonProperty("time")] public object Time { get; set; } // 可以是数字也可以是 "intro:123"
         [JsonProperty("relative_time")] public float? RelativeTime { get; set; }
@@ -96,6 +124,11 @@ namespace Naziki_Editor.Models
         [JsonProperty("easing")] public string Easing { get; set; } // EasingFunction.Ease
         [JsonProperty("destroy")] public bool? Destroy { get; set; }
         [JsonProperty("template")] public string Template { get; set; }
+
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
     }
 
     public abstract class StageObjectState : ObjectState
@@ -144,11 +177,15 @@ namespace Naziki_Editor.Models
     }
 
     // 🌟 1. 确保在 LineState 的上方，加上官方的端点位置类型！
-    public class LinePosition
+    public class LinePosition : IExtensibleStoryboardNode
     {
         [JsonProperty("x")] public UnitFloat X { get; set; }
         [JsonProperty("y")] public UnitFloat Y { get; set; }
         [JsonProperty("z")] public UnitFloat Z { get; set; }
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
     }
 
     // 🌟 2. 改造线条状态模型
@@ -429,7 +466,7 @@ namespace Naziki_Editor.Models
     // ==========================================
     // 🎯 核心：音符雷达选择器模型 (Note Selector)
     // ==========================================
-    public class NoteSelectorModel
+    public class NoteSelectorModel : IExtensibleStoryboardNode
     {
         [JsonProperty("type", NullValueHandling = NullValueHandling.Ignore)]
         public List<int> Type { get; set; } // 如果没值，序列化时不输出，等效于全选
@@ -448,6 +485,27 @@ namespace Naziki_Editor.Models
 
         [JsonProperty("max_x", NullValueHandling = NullValueHandling.Ignore)]
         public float? MaxX { get; set; }
+
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
+    }
+
+    public sealed class C2Trigger : IExtensibleStoryboardNode
+    {
+        [JsonProperty("type")] public string Type { get; set; }
+        [JsonProperty("combo")] public int? Combo { get; set; }
+        [JsonProperty("score")] public int? Score { get; set; }
+        [JsonProperty("notes")] public List<int> Notes { get; set; } = new();
+        [JsonProperty("spawn")] public List<string> Spawn { get; set; } = new();
+        [JsonProperty("destroy")] public List<string> Destroy { get; set; } = new();
+        [JsonProperty("uses")] public int? Uses { get; set; }
+
+        [JsonExtensionData]
+        public IDictionary<string, JToken> UnknownProperties { get; set; } =
+            new Dictionary<string, JToken>(StringComparer.Ordinal);
+        [JsonIgnore] public IList<StoryboardDiagnostic> Diagnostics { get; } = new List<StoryboardDiagnostic>();
     }
 
 

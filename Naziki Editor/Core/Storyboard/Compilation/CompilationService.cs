@@ -14,10 +14,15 @@ namespace Naziki_Editor.Core.Storyboard.Compilation
     public class CompilationService : ICompilationService
     {
         private readonly ICompilationNotifier? _notifier;
+        private readonly IStoryboardTemplatePropertyMapper _templatePropertyMapper;
 
-        public CompilationService(ICompilationNotifier? notifier = null)
+        public CompilationService(
+            ICompilationNotifier? notifier = null,
+            IStoryboardTemplatePropertyMapper? templatePropertyMapper = null)
         {
             _notifier = notifier;
+            _templatePropertyMapper =
+                templatePropertyMapper ?? new StoryboardTemplatePropertyMapper();
         }
 
         /// <inheritdoc />
@@ -30,7 +35,8 @@ namespace Naziki_Editor.Core.Storyboard.Compilation
             var compiler = new StoryboardCompiler(
                 context.Chart,
                 context.TimeEngine,
-                shadowStoryboard.templates ?? new Dictionary<string, C2Template>());
+                shadowStoryboard.templates ?? new Dictionary<string, C2Template>(),
+                _templatePropertyMapper);
 
             compiler.FlattenStoryboard(shadowStoryboard);
 
@@ -70,7 +76,8 @@ namespace Naziki_Editor.Core.Storyboard.Compilation
             var compiler = new StoryboardCompiler(
                 context.Chart,
                 context.TimeEngine,
-                shadowStoryboard.templates ?? new Dictionary<string, C2Template>());
+                shadowStoryboard.templates ?? new Dictionary<string, C2Template>(),
+                _templatePropertyMapper);
 
             compiler.FlattenStoryboard(shadowStoryboard);
 
@@ -122,10 +129,8 @@ namespace Naziki_Editor.Core.Storyboard.Compilation
 
         private static StoryboardRoot DeepCloneStoryboard(StoryboardRoot source)
         {
-            string json = StoryboardSerializer.ToJson(source);
-            var settings = StoryboardSerializer.GetSettings();
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<StoryboardRoot>(json, settings)
-                ?? new StoryboardRoot();
+            var snapshots = AppServices.GetService<IEditorSnapshotSerializer>();
+            return snapshots.Deserialize<StoryboardRoot>(snapshots.Serialize(source)) ?? new StoryboardRoot();
         }
     }
 }

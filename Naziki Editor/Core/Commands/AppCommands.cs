@@ -4,7 +4,9 @@ using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace Naziki_Editor.Core.Commands
 {
@@ -16,6 +18,7 @@ namespace Naziki_Editor.Core.Commands
         private readonly IHistoryService _historyService;
         private readonly ICompilationService _compilationService;
         private readonly INotificationService _notificationService;
+        private readonly IStoryboardDocumentValidator _storyboardValidator;
 
         public AppCommands(
             IProjectService projectService,
@@ -23,7 +26,8 @@ namespace Naziki_Editor.Core.Commands
             IMessageBroker messageBroker,
             IHistoryService historyService,
             ICompilationService compilationService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IStoryboardDocumentValidator storyboardValidator)
         {
             _projectService = projectService;
             _dialogService = dialogService;
@@ -31,6 +35,7 @@ namespace Naziki_Editor.Core.Commands
             _historyService = historyService;
             _compilationService = compilationService;
             _notificationService = notificationService;
+            _storyboardValidator = storyboardValidator;
         }
 
         // ==========================================
@@ -163,18 +168,30 @@ namespace Naziki_Editor.Core.Commands
 
             try
             {
+                var sourceErrors = _storyboardValidator
+                    .Validate(context.Storyboard, context)
+                    .Where(item => item.Severity == StoryboardDiagnosticSeverity.Error)
+                    .ToArray();
+                _messageBroker.Publish("RefreshStoryboardDiagnostics");
+                if (sourceErrors.Length > 0)
+                    throw new JsonSerializationException(
+                        "故事板源文档验证失败，未执行编译或写盘：" + Environment.NewLine +
+                        string.Join(Environment.NewLine, sourceErrors.Take(12)
+                            .Select(error => $"{error.Path}: {error.Message}")));
+
                 // 🧙‍♂️ 1/2. 影子分离、展平编译与模板元数据同步已下沉到 ICompilationService
                 var shadowStoryboard = _compilationService.CompileForExport(context);
-                _compilationService.SyncTemplateMetadata(context);
 
                 // 💾 3. 谱面主文件物理落盘 (纯净无套娃官方格式)
-                await _projectService.ExportCytoidStoryboardAsync(shadowStoryboard, context.StoryboardPath);
+                await _projectService.ExportCytoidStoryboardAsync(
+                    shadowStoryboard, context.StoryboardPath, context);
 
                 // 📒 4. 写入元数据小账本
+                _compilationService.SyncTemplateMetadata(context);
                 await _projectService.SaveStoryboardMetaAsync(context, context.StoryboardPath);
 
                 // 保存原本的工程配置文件 `.nep`
-                SaveProjectNepFile(context);
+                _projectService.SaveProjectNepFile(context, context.ProjectFilePath);
 
                 _notificationService.ShowSuccess("故事板已完美展平，元数据小账本也已同步写入硬盘！(๑>ᴗ<๑)✧");
             }

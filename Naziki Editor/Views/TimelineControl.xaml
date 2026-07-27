@@ -11,8 +11,18 @@
              PreviewMouseWheel="OnTimelineMouseWheel">
 
     <Grid>
-        <TabControl x:Name="TimelineTabs" Background="Transparent" BorderThickness="0">
-            <Grid Grid.IsSharedSizeScope="True">
+        <TabControl x:Name="TimelineTabs"
+                    Style="{DynamicResource TimelineTabControlStyle}"
+                    ItemContainerStyle="{DynamicResource TimelineTabItemStyle}"
+                    SelectionChanged="TimelineTabs_SelectionChanged">
+            <TabItem x:Name="MainTimelineTab" Tag="MAIN_TIMELINE">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🎞" Margin="0,0,6,0"/>
+                        <TextBlock Text="主时间轴" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Grid.IsSharedSizeScope="True">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="35"/>
                     <RowDefinition Height="*"/>
@@ -27,7 +37,7 @@
                 <Border Grid.Row="0" Background="{DynamicResource MenuBgColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,1">
                     <Grid>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" HorizontalAlignment="Left">
-                            <TextBlock x:Name="TxtCurrentTime" Width="55" Text="0.000s" Foreground="#4DB8FF" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="5,0,15,0"/>
+                            <TextBlock x:Name="TxtCurrentTime" Width="55" Text="0.000s" Foreground="{DynamicResource HighlightColor}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="5,0,15,0"/>
                             <Button x:Name="BtnPlay" Content="▶ 播放" Click="BtnPlay_Click" Margin="0,0,5,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
                             <Button x:Name="BtnPause" Content="⏸ 暂停" Click="BtnPause_Click" Margin="0,0,15,0" Padding="10,3" Background="Transparent" Foreground="{DynamicResource MainTextColor}" BorderThickness="0" Cursor="Hand"/>
                             <Button x:Name="BtnImportAudio" Content="🎵 导入参考音频" Click="BtnImportAudio_Click" Margin="0,0,15,0" Padding="10,3" Background="{DynamicResource HighlightBorderColor}" Foreground="White" BorderThickness="0" Cursor="Hand"/>
@@ -90,7 +100,7 @@
                                     </Thumb>
                                 </Canvas>
 
-                                <Path x:Name="PlayheadMarker" Fill="#FF5555" Data="M 0,0 L 6,10 L -6,10 Z" Cursor="SizeWE" MouseDown="Playhead_MouseDown" MouseMove="Playhead_MouseMove" MouseUp="Playhead_MouseUp" Panel.ZIndex="999">
+                                <Path x:Name="PlayheadMarker" Fill="{DynamicResource VirtualLineBrush}" Data="M 0,0 L 6,10 L -6,10 Z" Cursor="SizeWE" MouseDown="Playhead_MouseDown" MouseMove="Playhead_MouseMove" MouseUp="Playhead_MouseUp" Panel.ZIndex="999">
                                     <Path.RenderTransform>
                                         <TranslateTransform x:Name="TransRulerHead" X="0" Y="20"/>
                                     </Path.RenderTransform>
@@ -139,7 +149,8 @@
                     </Grid>
                 </Border>
 
-            </Grid>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

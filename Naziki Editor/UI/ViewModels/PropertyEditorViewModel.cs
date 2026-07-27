@@ -73,7 +73,7 @@ namespace Naziki_Editor.UI.ViewModels
             var props = CurrentState.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in props)
             {
-                if (IsExcludedProperty(prop.Name)) continue;
+                if (!_propertyEditorService.IsEditableProperty(prop) || IsExcludedProperty(prop.Name)) continue;
                 var value = prop.GetValue(CurrentState);
                 DynamicProperties.Add(new PropertyRowViewModel
                 {
@@ -91,7 +91,8 @@ namespace Naziki_Editor.UI.ViewModels
 
         private static bool IsExcludedProperty(string name)
         {
-            return name is "Id" or "TargetId" or "ParentId" or "Template" or "NoteTarget" or "Time" or "Easing" or "Layer" or "Order";
+            return name is "Id" or "TargetId" or "ParentId" or "Template" or "NoteTarget" or "Time"
+                or "Easing" or "Layer" or "Order" or "UnknownProperties" or "Diagnostics" or "IsIdSynthetic";
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

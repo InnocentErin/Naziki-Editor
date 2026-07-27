@@ -220,13 +220,6 @@ namespace Naziki_Editor.Views.Dialogs
             Close();
         }
 
-        private void ToggleDetailsBtn_Click(object sender, RoutedEventArgs e)
-        {
-            bool isExpanded = DetailsContent.Visibility == Visibility.Visible;
-            DetailsContent.Visibility = isExpanded ? Visibility.Collapsed : Visibility.Visible;
-            ToggleDetailsBtn.Content = isExpanded ? "▶ 查看详细错误信息" : "▼ 隐藏详细错误信息";
-        }
-
         /// <summary>
         /// 复制错误详情到剪贴板。
         /// </summary>

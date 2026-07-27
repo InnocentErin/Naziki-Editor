@@ -124,8 +124,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             if (referenceState != null)
             {
                 // 利用咱们配置好的大管家进行完美深拷贝！
-                string jsonClone = Core.StoryboardSerializer.ToJson(referenceState);
-                newFrame = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonClone, _stateType, Core.StoryboardSerializer.GetSettings());
+                var snapshotSerializer = AppServices.GetService<Core.Abstractions.IEditorSnapshotSerializer>();
+                string jsonClone = snapshotSerializer.Serialize(referenceState);
+                newFrame = snapshotSerializer.Deserialize(jsonClone, _stateType);
 
                 // 🚨 【小艾的终极防呆】：继承属性可以，但绝对不能继承“时间”！
                 // 如果时间和上一帧完全一样，就会触发咱们之前写的 StoryboardValidator 时空悖论报错！

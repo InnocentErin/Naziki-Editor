@@ -182,7 +182,7 @@
 | `StoryboardMeta.cs` | 故事板元数据 | `StoryboardMeta` 包含模板和轨道的额外 UI 属性。 |
 | `StoryboardModels.cs` | 故事板模型 | 定义 `IStoryboardEntity`, `StoryboardRoot`, `SpriteState`, `ControllerState` 等全量 C2 实体。 |
 | `TemplateType.cs` | 模板门派枚举 | 8 大门派 `Generic/StageObject/Text` 等。 |
-| `TimelineClipModels.cs` | 时间轴模型 | `TimelineClipModel` 用于 UI 层展示，包含 `StartTime`, `EndTime`, `AssociatedObject`。 |
+| `MacroClipModels.cs` | 时间轴模型 | `MacroClipModel` 用于 UI 层展示，包含 `StartTime`, `EndTime`, `AssociatedObject`。 |
 
 ### 18. `ProjectManagement` (项目入口)
 
@@ -216,7 +216,7 @@
 | `AssetItemViewModel.cs` | 素材项 VM | 包含 `DisplayName`, `IsEditing` 状态，支持双向绑定和重命名。 |
 | `PropertyEditorViewModel.cs` | 属性编辑器 VM | 构建 `DynamicProperties` 集合，驱动 `PropertyRowViewModel`。 |
 | `TimelineViewModel.cs` | 主时间轴 VM | 管理 `TrackGroups`, `PixelsPerSecond`, `CurrentPlayheadSeconds`，通过 `TimelineDataEngine` 生成数据。 |
-| `TimelineViewModels.cs` | 时间轴轨道模型 | `TimelineTrackGroupModel`, `TimelineTrackModel`, `TimelineClipModel` 纯数据结构。 |
+| `TimelineViewModels.cs` | 时间轴轨道模型 | `TimelineTrackGroupModel`, `TimelineTrackModel`, `MacroClipModel` 纯数据结构。 |
 
 ### 23. `Views` (WPF 主视图层)
 

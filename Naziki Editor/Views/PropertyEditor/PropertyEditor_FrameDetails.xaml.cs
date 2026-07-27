@@ -10,89 +10,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
-using static Naziki_Editor.Views.PropertyEditor.TimeBindingConverter;
 
 namespace Naziki_Editor.Views.PropertyEditor
 {
-
-
-
-
-
-    // ==========================================
-    // ✨ 专属翻译官：防止 Time 数组或空值转义成乱码
-    // ==========================================
-    public class TimeBindingConverter : IValueConverter
-    {
-        // ==========================================
-        // ✨ 专属翻译官 2 号：完美解析 System.Object 和 复杂数组！
-        // ==========================================
-        public class UniversalObjectConverter : IValueConverter
-        {
-            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            {
-                if (value == null) return "";
-                // 如果是普通的数字或纯字符串，直接打印
-                if (value is string || value is int || value is float || value is double) return value.ToString();
-
-                // 🎯【破解 System.Object】：如果是复杂的 JSON 选择器或 Pos 数组，把它序列化成漂亮的 JSON 字符串展示！
-                try { return Newtonsoft.Json.JsonConvert.SerializeObject(value, Newtonsoft.Json.Formatting.None); }
-                catch { return value.ToString(); }
-            }
-
-            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            {
-                string s = value?.ToString()?.Trim() ?? "";
-                if (string.IsNullOrEmpty(s)) return null;
-
-                // 如果用户手打了 JSON 括号，智能反序列化为对象！
-                if (s.StartsWith("{") || s.StartsWith("["))
-                {
-                    try { return Newtonsoft.Json.JsonConvert.DeserializeObject(s); } catch { return s; }
-                }
-                // 如果手打的是纯数字，智能转化回 int
-                if (int.TryParse(s, out int iVal)) return iVal;
-
-                // 兜底：纯字符串（例如 "$note"）
-                return s;
-            }
-        }
-
-
-
-
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            if (value is System.Collections.IList list)
-            {
-                var strList = new System.Collections.Generic.List<string>();
-                foreach (var item in list) strList.Add(item.ToString());
-                return string.Join(", ", strList);
-            }
-            string strVal = value?.ToString() ?? "";
-            if (strVal.Contains("3.402823")) return "";
-            return strVal;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            string s = value?.ToString() ?? "";
-            if (s.Contains(","))
-            {
-                var parts = s.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                var list = new System.Collections.Generic.List<object>();
-                foreach (var p in parts)
-                {
-                    string t = p.Trim();
-                    if (float.TryParse(t, out float f)) list.Add(f); else list.Add(t);
-                }
-                return list;
-            }
-            if (float.TryParse(s, out float fSingle)) return fSingle;
-            return s;
-        }
-    }
-
     public partial class PropertyEditor_FrameDetails : UserControl
     {
         private object _currentState;
@@ -170,6 +90,7 @@ namespace Naziki_Editor.Views.PropertyEditor
             PanelDetails.Visibility = Visibility.Visible;
             TxtEmptyState.Visibility = Visibility.Collapsed;
             TxtFrameTitle.Text = $"当前选中 ➡️ {frameTitle}";
+            RefreshUnknownFields();
             // PopulateTemplateDropdown(); 顶部已隐身，不再重复刷新它
 
             // 🚀 核心强打通：彻底废除一刀切的物理屏蔽屏障！
@@ -362,6 +283,7 @@ namespace Naziki_Editor.Views.PropertyEditor
                     PropertyInfo[] props = _currentState.GetType().GetProperties();
                     foreach (var prop in props)
                     {
+                        if (!_propertyEditorService.IsEditableProperty(prop)) continue;
                         // 筛选需要置顶的初始固定属性
                         if (prop.Name == "Path" || prop.Name == "Text" || prop.Name == "TextContent" || prop.Name == "NoteTarget" || prop.Name == "Pos")
                         {
@@ -588,6 +510,7 @@ namespace Naziki_Editor.Views.PropertyEditor
 
             foreach (var prop in props)
             {
+                if (!_propertyEditorService.IsEditableProperty(prop)) continue;
                 if (prop.Name == "Layer" || prop.Name == "Order") continue;
                 // ✨ 新增：VIP 常驻特权属性绝对不允许在下方的动态列表里二次生成！
                 if (prop.Name == "Time" || prop.Name == "Easing" || prop.Name == "AddTime" || prop.Name == "RelativeTime") continue;
@@ -940,6 +863,53 @@ namespace Naziki_Editor.Views.PropertyEditor
                     ClearError(txtValue, propName);
                 }
             };
+        }
+
+        private void RefreshUnknownFields()
+        {
+            UnknownFieldsPanel.Children.Clear();
+            if (_currentState is not IExtensibleStoryboardNode node || node.UnknownProperties.Count == 0)
+            {
+                UnknownFieldsCard.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            UnknownFieldsCard.Visibility = Visibility.Visible;
+            foreach (var property in node.UnknownProperties.ToArray())
+            {
+                var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.Children.Add(new TextBlock
+                {
+                    Text = property.Key,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var value = new TextBox
+                {
+                    Text = property.Value.ToString(Newtonsoft.Json.Formatting.None),
+                    IsReadOnly = true,
+                    Margin = new Thickness(5, 0, 5, 0),
+                    ToolTip = "请在 Canvas 源代码编辑器中修改此值"
+                };
+                Grid.SetColumn(value, 1);
+                row.Children.Add(value);
+                var delete = new Button { Content = "删除", Padding = new Thickness(8, 2, 8, 2) };
+                var propertyName = property.Key;
+                delete.Click += (_, _) =>
+                {
+                    node.UnknownProperties.Remove(propertyName);
+                    if (_context?.Storyboard is not null)
+                        AppServices.GetService<IStoryboardDocumentValidator>().Validate(_context.Storyboard);
+                    _context?.MarkAsModified();
+                    RefreshUnknownFields();
+                };
+                Grid.SetColumn(delete, 2);
+                row.Children.Add(delete);
+                UnknownFieldsPanel.Children.Add(row);
+            }
         }
 
         // 📦 专门为置顶的“固定属性”制造带有专属翻译官的 UI 排版行

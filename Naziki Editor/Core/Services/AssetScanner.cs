@@ -69,8 +69,13 @@ namespace Naziki_Editor.Core.Services
                     {
                         string json = File.ReadAllText(nemFile);
 
-                        // ✨ 抛弃 NemDocument 外壳，直接按设计师设定的"微型宇宙"进行解析！
-                        var miniRoot = JsonConvert.DeserializeObject<StoryboardRoot>(json);
+                        var capsule = JsonConvert.DeserializeObject<NemDocument>(json);
+                        if (capsule?.FormatVersion != 2) continue;
+                        var payloadToken = Newtonsoft.Json.Linq.JObject.Parse(json)["payload"];
+                        var miniRoot = payloadToken == null
+                            ? null
+                            : AppServices.GetService<Core.Abstractions.IStoryboardDocumentReader>()
+                                .Read(payloadToken.ToString());
 
                         if (miniRoot != null)
                         {

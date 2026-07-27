@@ -57,8 +57,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             _isTemplateMode = false;
 
             // 1. 克隆魔法
-            string jsonClone = Core.StoryboardSerializer.ToJson(targetObject);
-            _mainObject = (IStoryboardEntity)JsonConvert.DeserializeObject(jsonClone, targetObject.GetType(), Core.StoryboardSerializer.GetSettings());
+            var snapshotSerializer = AppServices.GetService<IEditorSnapshotSerializer>();
+            string jsonClone = snapshotSerializer.Serialize(targetObject);
+            _mainObject = (IStoryboardEntity)snapshotSerializer.Deserialize(jsonClone, targetObject.GetType());
 
             // 2. 接通神经纽带：当子控件切换标签时，我们在外面重装数据源！
             ModControlBoards.OnActiveObjectSwitched += (activeObj) =>
@@ -88,8 +89,8 @@ namespace Naziki_Editor.Views.PropertyEditor
                 {
                     if (obj.TargetId == _originalId && obj.Id != _originalId)
                     {
-                        string cbJson = Core.StoryboardSerializer.ToJson(obj);
-                        shadows.Add((IStoryboardEntity)JsonConvert.DeserializeObject(cbJson, obj.GetType(), Core.StoryboardSerializer.GetSettings()));
+                        string cbJson = snapshotSerializer.Serialize(obj);
+                        shadows.Add((IStoryboardEntity)snapshotSerializer.Deserialize(cbJson, obj.GetType()));
                     }
                 }
             }
@@ -112,8 +113,9 @@ namespace Naziki_Editor.Views.PropertyEditor
             _isTemplateMode = true;
             _templateName = templateName;
 
-            string jsonClone = JsonConvert.SerializeObject(targetTemplate, Core.StoryboardSerializer.GetSettings());
-            _editingTemplate = JsonConvert.DeserializeObject<C2Template>(jsonClone, Core.StoryboardSerializer.GetSettings());
+            var snapshotSerializer = AppServices.GetService<IEditorSnapshotSerializer>();
+            string jsonClone = snapshotSerializer.Serialize(targetTemplate);
+            _editingTemplate = snapshotSerializer.Deserialize<C2Template>(jsonClone);
 
             // ✨ 修复 1：兜底防线。如果新建的模板没有肉体，强行给它注入灵魂！
             if (_editingTemplate.BaseState == null) _editingTemplate.BaseState = new TemplateState();
@@ -181,13 +183,6 @@ namespace Naziki_Editor.Views.PropertyEditor
                 _context.MarkAsModified();
                 this.DialogResult = true;
                 this.Close();
-                return;
-            }
-
-            var validationResult = Core.StoryboardValidator.ValidateStateConflicts(_mainObject);
-            if (!validationResult.IsValid)
-            {
-                _dialogService.ShowMessage(validationResult.ErrorMessage, "主体对象防呆纠察", DialogMessageType.Warning);
                 return;
             }
 

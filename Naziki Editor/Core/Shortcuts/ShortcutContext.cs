@@ -29,8 +29,8 @@ namespace Naziki_Editor.Core.Shortcuts
         /// <summary>素材库面板获得焦点</summary>
         AssetList = 1 << 1,
 
-        /// <summary>时间轴面板获得焦点</summary>
-        Timeline = 1 << 2,
+        /// <summary>主时间轴面板获得焦点（保留原 Timeline 位值以兼容旧配置）</summary>
+        MainTimeline = 1 << 2,
 
         /// <summary>画布 / JSON 编辑器获得焦点</summary>
         Canvas = 1 << 3,
@@ -52,6 +52,12 @@ namespace Naziki_Editor.Core.Shortcuts
         /// 预留值，当前版本未使用。
         /// </summary>
         ModalDialog = 1 << 7,
+
+        /// <summary>微观属性时间轴获得焦点</summary>
+        MicroTimeline = 1 << 8,
+
+        /// <summary>任一时间轴上下文</summary>
+        Timeline = MainTimeline | MicroTimeline,
 
         /// <summary>匹配所有上下文（用于冲突检测）</summary>
         Any = ~0
