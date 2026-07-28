@@ -7,6 +7,7 @@ using Naziki_Editor.Views;
 using Naziki_Editor.Views.Dialogs;
 using Naziki_Editor.ProjectManagement;
 using Naziki_Editor.Core.Commands;
+using Naziki_Editor.Features.Preview;
 
 namespace Naziki_Editor
 {
@@ -99,6 +100,22 @@ namespace Naziki_Editor
             // 🕒 核心驱动 3：【普通启动流程】（设计师你之前删掉的窗口，小艾帮你加回来啦！）
             ProjectHubWindow hubWindow = AppServices.GetService<ProjectManagement.ProjectHubWindow>();
             hubWindow.Show();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try
+            {
+                AppServices.GetService<IUnityPreviewSessionService>()
+                    .ShutdownAsync()
+                    .Wait(TimeSpan.FromSeconds(3));
+            }
+            catch
+            {
+                // UnityPreviewProcessService.Dispose is the final exact-child fallback.
+            }
+            AppServices.ServiceProvider?.Dispose();
+            base.OnExit(e);
         }
 
         // =========================================================================

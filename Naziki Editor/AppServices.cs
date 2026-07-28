@@ -31,6 +31,13 @@ using Naziki_Editor.Core.Storyboard.Corrections;
 using Naziki_Editor.Views.Services;
 using Naziki_Editor.Views.PropertyEditor;
 using Naziki_Editor.ViewModels.Settings;
+using Naziki_Editor.Features.EditorShell;
+using Naziki_Editor.Features.EditorShell.Workspace;
+using Naziki_Editor.Features.Editing;
+using Naziki_Editor.Features.Preview;
+using Naziki_Editor.Features.Project.Resources;
+using Naziki_Editor.Features.Audio.Playback;
+using Naziki_Editor.Shared.Input;
 
 namespace Naziki_Editor
 {
@@ -47,11 +54,15 @@ namespace Naziki_Editor
             services.AddSingleton<IHistoryService, HistoryService>();
             services.AddSingleton<IEntityFactory, EntityFactory>();
             services.AddSingleton<IProjectService, ProjectService>();
+            services.AddSingleton<IProjectResourceService, ProjectResourceService>();
+            services.AddSingleton<IProjectReadinessService, ProjectReadinessService>();
             services.AddSingleton<IStoryboardRepository, StoryboardRepository>();
             services.AddSingleton<IWorkspaceService, WorkspaceService>();
             services.AddSingleton<ICommandDispatcher, CommandDispatcher>();
             services.AddSingleton<IEditorCoordinator, EditorCoordinator>();
             services.AddSingleton<IMessageBroker>(MessageBroker.Default);
+            services.AddSingleton<IInputSessionManager, InputSessionManager>();
+            services.AddSingleton<ISelectionService, SelectionService>();
             services.AddSingleton<ICompilationService, CompilationService>();
             services.AddSingleton<ICompilationNotifier, DialogCompilationNotifier>();
             services.AddSingleton<INotificationService, NotificationService>();
@@ -60,6 +71,23 @@ namespace Naziki_Editor
             services.AddSingleton<IStoryboardPropertyCatalog, StoryboardPropertyCatalogService>();
             services.AddSingleton<IStoryboardDocumentReader, StoryboardDocumentReader>();
             services.AddSingleton<IStoryboardDocumentWriter, StoryboardDocumentWriter>();
+            services.AddSingleton<StoryboardPreviewService>();
+            services.AddSingleton<IStoryboardPreviewDataSource>(sp => sp.GetRequiredService<StoryboardPreviewService>());
+            services.AddSingleton<IStoryboardChangeFeed>(sp => sp.GetRequiredService<StoryboardPreviewService>());
+            services.AddSingleton<IStoryboardPreviewPublisher>(sp => sp.GetRequiredService<StoryboardPreviewService>());
+            services.AddSingleton<IPreviewSettingsProvider, PreviewSettingsProvider>();
+            services.AddSingleton<IUnityPreviewTransport, NamedPipeUnityPreviewTransport>();
+            services.AddSingleton<IUnityPreviewProcessService, UnityPreviewProcessService>();
+            services.AddSingleton<IPreviewVfsMaterializer, PreviewVfsMaterializer>();
+            services.AddSingleton<IPreviewValidationService, PreviewValidationService>();
+            services.AddSingleton<UnityStoryboardPreviewHost>();
+            services.AddSingleton<IStoryboardPreviewHost>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IPreviewPlaybackController>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IPreviewClock>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IPreviewDiagnosticsService>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IPreviewReloadCoordinator>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IUnityPreviewSessionService>(sp => sp.GetRequiredService<UnityStoryboardPreviewHost>());
+            services.AddSingleton<IEditorMutationService, EditorMutationService>();
             services.AddSingleton<IStoryboardTemplatePropertyMapper, StoryboardTemplatePropertyMapper>();
             services.AddSingleton<IStoryboardTimeResolver, StoryboardTimeResolver>();
             services.AddSingleton<IStoryboardCorrectionAnalyzer, StoryboardCorrectionAnalyzer>();
@@ -69,6 +97,7 @@ namespace Naziki_Editor
             services.AddSingleton<IJsonTextDiffService, JsonTextDiffService>();
             services.AddSingleton<ITrackBlueprintManager, TrackBlueprintManager>();
             services.AddSingleton<IAudioSyncEngine>(sp => new AudioSyncEngineAdapter(new AudioSyncEngine()));
+            services.AddSingleton<IPlaybackCoordinator, PlaybackCoordinator>();
             
             // UI层服务 - 单例
             services.AddSingleton<IDialogService, WpfDialogService>();
@@ -98,6 +127,10 @@ namespace Naziki_Editor
 
             // 设置系统 - 单例
             services.AddSingleton<ISettingsStore, SettingsStore>();
+            services.AddSingleton<IRecentProjectService, RecentProjectService>();
+            services.AddSingleton<IWorkspaceLayoutService, WorkspaceLayoutService>();
+            services.AddTransient<MainWindowViewModel>();
+            services.AddTransient<IEditorShellCoordinator, EditorShellCoordinator>();
             services.AddTransient<SettingsWindowViewModel>();
 
             // 主题系统 - 单例

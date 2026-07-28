@@ -1,0 +1,105 @@
+using System;
+#if (UNITY_ANDROID || UNITY_IOS) && !CYTOID_EDITOR_HOST
+using E7.Native;
+#endif
+using UnityEngine;
+
+public class AudioManager : SingletonMonoBehavior<AudioManager>
+{
+    public AudioSource[] audioSources;
+    public AudioClip[] preloadedAudioClips;
+
+    public bool IsInitialized { get; private set; }
+
+    private IAudioServer _server;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        Context.AudioManager = this;
+    }
+
+    public void Initialize()
+    {
+        if (IsInitialized) return;
+
+        if (audioSources.Length != 7)
+            throw new InvalidOperationException(
+                $"Expected 7 AudioSources (1 music + 6 SFX), got {audioSources.Length}");
+
+        var serverType = Context.Player.Settings.AudioServer;
+#if !UNITY_ANDROID && !UNITY_IOS || CYTOID_EDITOR_HOST
+        serverType = AudioServerType.Unity;
+#else
+        if (serverType == AudioServerType.Exceed7 && !NativeAudio.OnSupportedPlatform)
+        {
+            Debug.LogWarning("[Audio] Exceed7 not supported on this platform; falling back to Unity");
+            serverType = AudioServerType.Unity;
+        }
+#endif
+
+        IAudioServer server = serverType switch
+        {
+#if (UNITY_ANDROID || UNITY_IOS) && !CYTOID_EDITOR_HOST
+            AudioServerType.Exceed7 => new Exceed7AudioServer(audioSources[0], audioSources[1..]),
+#endif
+            _ => new UnityAudioServer(audioSources[0], audioSources[1..]),
+        };
+
+        try
+        {
+            server.Initialize();
+            foreach (var clip in preloadedAudioClips)
+                server.LoadSfx(clip.name, clip, isResource: false, isPreloaded: true);
+        }
+        catch
+        {
+            try { server.Dispose(); }
+            catch { }
+            throw;
+        }
+
+        _server = server;
+        IsInitialized = true;
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        Dispose();
+    }
+
+    public void Dispose()
+    {
+        if (!IsInitialized) return;
+        IsInitialized = false;
+        try { _server?.Dispose(); }
+        catch (Exception e) { Debug.LogError($"Error disposing audio server: {e}"); }
+        _server = null;
+    }
+
+    private IAudioServer Server =>
+        _server ?? throw new InvalidOperationException("AudioManager not initialized");
+
+    public IMusicTrack LoadMusic(string id, AudioClip clip, bool isResource)
+        => Server.LoadMusic(id, clip, isResource);
+
+    public ISoundEffect LoadSfx(string id, AudioClip clip, bool isResource, bool isPreloaded = false)
+        => Server.LoadSfx(id, clip, isResource, isPreloaded);
+
+    public ISoundEffect GetSfx(string id) => Server.GetSfx(id);
+
+    public bool IsSfxLoaded(string id) => Server.IsSfxLoaded(id);
+
+    public void UnloadMusic() => Server.UnloadMusic();
+
+    public void UnloadSfx(string id) => Server.UnloadSfx(id);
+
+    public double AudioClockSeconds => Server.AudioClockSeconds;
+
+    public void UpdateVolumes()
+    {
+        if (!IsInitialized || _server == null) return;
+        _server.UpdateVolumes(Context.Player.Settings.MusicVolume, Context.Player.Settings.SoundEffectsVolume);
+    }
+}

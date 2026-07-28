@@ -1,0 +1,97 @@
+// Flutter-side fixes for Unity's exported :unityLibrary module (Gradle 9 compatible).
+// Applied automatically from android/build.gradle.kts after :unityLibrary evaluates.
+
+logger.lifecycle("[unity_flutter_embed] Applying Flutter Unity embed fixes")
+
+// AGP 9 rejects global flags such as -ignorewarnings in consumerProguardFiles.
+def consumerRules = rootProject.file("unity_consumer_proguard.txt")
+if (consumerRules.exists()) {
+    android.defaultConfig.consumerProguardFiles.clear()
+    android.defaultConfig.consumerProguardFiles.add(consumerRules)
+    logger.lifecycle("[unity_flutter_embed] Using sanitized consumer proguard rules")
+} else {
+    logger.warn("[unity_flutter_embed] Missing unity_consumer_proguard.txt")
+}
+
+def flutterBuildIl2CppImpl(
+        String workingDir,
+        String configuration,
+        String architecture,
+        String abi,
+        String[] staticLibraries) {
+    def commandLineArgs = []
+    commandLineArgs.add("--compile-cpp")
+    commandLineArgs.add("--platform=Android")
+    commandLineArgs.add("--architecture=${architecture}")
+    commandLineArgs.add("--outputpath=${workingDir}/src/main/jniLibs/${abi}/libil2cpp.so")
+    commandLineArgs.add("--baselib-directory=${workingDir}/src/main/jniStaticLibs/${abi}")
+    commandLineArgs.add("--configuration=${configuration}")
+    commandLineArgs.add("--dotnetprofile=unityaot-linux")
+    commandLineArgs.add("--usymtool-path=${workingDir}/src/main/Il2CppOutputProject/usymtool")
+    commandLineArgs.add("--profiler-report")
+    commandLineArgs.add("--profiler-output-file=${workingDir}/build/il2cpp_${abi}_${configuration}/il2cpp_conv.traceevents")
+    commandLineArgs.add("--print-command-line")
+    commandLineArgs.add("--static-lib-il2-cpp")
+    commandLineArgs.add("--data-folder=${workingDir}/src/main/Il2CppOutputProject/Source/il2cppOutput/data")
+    commandLineArgs.add("--generatedcppdir=${workingDir}/src/main/Il2CppOutputProject/Source/il2cppOutput")
+    commandLineArgs.add("--cachedirectory=${workingDir}/build/il2cpp_${abi}_${configuration}/il2cpp_cache")
+    commandLineArgs.add("--tool-chain-path=${android.ndkDirectory}")
+
+    staticLibraries.eachWithIndex { fileName, i ->
+        commandLineArgs.add("--additional-libraries=${workingDir}/src/main/jniStaticLibs/${abi}/${fileName}")
+    }
+
+    def executableExtension = ""
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+        executableExtension = ".exe"
+        commandLineArgs = commandLineArgs*.replace('\"', '\\\"')
+    }
+
+    def il2cppExecutable =
+            "${workingDir}/src/main/Il2CppOutputProject/IL2CPP/build/deploy/il2cpp${executableExtension}"
+    def command = [il2cppExecutable.toString()]
+    commandLineArgs.each { arg -> command.add(arg.toString()) }
+
+    def processBuilder = new ProcessBuilder(command)
+    processBuilder.environment().put("ANDROID_SDK_ROOT", getSdkDir())
+    processBuilder.redirectErrorStream(true)
+    def process = processBuilder.start()
+    process.inputStream.eachLine { line -> logger.lifecycle(line) }
+    def exitCode = process.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("il2cpp failed with exit code ${exitCode}")
+    }
+
+    def dbgLevel = project.android.defaultConfig.ndk.debugSymbolLevel
+    def usePublicSymbols = dbgLevel == null || !dbgLevel.toString().toLowerCase().equals("full")
+    def extensionToRemove = usePublicSymbols ? ".dbg.so" : ".sym.so"
+    def extensionToKeep = usePublicSymbols ? ".sym.so" : ".dbg.so"
+
+    project.delete "${workingDir}/src/main/jniLibs/${abi}/libil2cpp${extensionToRemove}"
+    project.ant.move(
+            file: "${workingDir}/src/main/jniLibs/${abi}/libil2cpp${extensionToKeep}",
+            tofile: "${workingDir}/symbols/${abi}/libil2cpp.so")
+}
+
+def buildIl2CppTask = tasks.findByName("buildIl2Cpp")
+if (buildIl2CppTask == null) {
+    logger.warn("[unity_flutter_embed] buildIl2Cpp task not found; skipping il2cpp fix")
+    return
+}
+
+def workingDir = projectDir.toString().replaceAll('\\\\', '/')
+def il2cppOutput = file("${workingDir}/src/main/jniLibs/arm64-v8a/libil2cpp.so")
+if (il2cppOutput.exists() && il2cppOutput.length() > 0L) {
+    buildIl2CppTask.enabled = false
+    logger.lifecycle("[unity_flutter_embed] libil2cpp.so already present; skipping buildIl2Cpp")
+    return
+}
+
+buildIl2CppTask.actions.clear()
+buildIl2CppTask.doLast {
+    def archs = [arm64: "arm64-v8a"]
+    def staticLibs = [arm64: [] as String[]]
+    archs.each { arch, abi ->
+        flutterBuildIl2CppImpl(workingDir, "Release", arch, abi, staticLibs[arch] as String[])
+    }
+}

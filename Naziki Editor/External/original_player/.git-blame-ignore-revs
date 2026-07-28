@@ -1,0 +1,12 @@
+# Git revisions to skip in `git blame` and the GitHub/GitLab blame view.
+# One full 40-char SHA-1 per line. Comments start with `#`.
+#
+# To enable locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Listed commits are mass-renormalization / formatting changes that carry no
+# logical diff; skipping them restores blame attribution to the real authors.
+
+# chore: normalize line endings to LF + strip trailing whitespace (354 files, pure ws)
+# Note: SHA is the post-rebase-merge SHA on main (rebase merge rewrites SHAs).
+7ff69df6d1028fc567abdbc3b859917726f7c530

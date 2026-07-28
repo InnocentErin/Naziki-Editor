@@ -14,9 +14,13 @@
     <Compile Remove="before\**" />
     <Compile Remove="NazikiEditor.Tests\**" />
     <Compile Remove="Tests\**" />
+    <Compile Remove="External\original_player\**" />
     <Page Remove="before\**" />
+    <Page Remove="External\original_player\**" />
     <None Remove="before\**" />
+    <None Remove="External\original_player\**" />
     <Resource Remove="before\**" />
+    <Resource Remove="External\original_player\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +36,7 @@
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Dirkster.AvalonDock" Version="4.72.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="NAudio" Version="2.3.0" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
@@ -45,6 +50,10 @@
 
   <ItemGroup>
     <Content Include="Core\Serialization\storyboard-properties.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Runtime\OriginalPlayer\**\*">
+      <Link>Runtime\OriginalPlayer\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

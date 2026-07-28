@@ -1,0 +1,130 @@
+<Window x:Class="Naziki_Editor.Views.Dialogs.NewProjectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="新建故事板工程"
+        Width="720" Height="710"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#1E1E2E">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#CDD6F4"/>
+            <Setter Property="Background" Value="#313244"/>
+            <Setter Property="BorderBrush" Value="#585B70"/>
+            <Setter Property="Padding" Value="9,7"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#BAC2DE"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="26">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock x:Name="TxtTitle" Text="创建完整的故事板工程"
+                       Foreground="#CDD6F4" FontSize="22" FontWeight="Bold"/>
+            <TextBlock x:Name="TxtSubtitle"
+                       Text="level、谱面、关卡音乐和背景图片是预览运行的必要资源。所选文件会复制进工程目录。"
+                       Foreground="#A6ADC8" Margin="0,7,0,14" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,8,0">
+                <TextBlock Text="工程名称" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="TxtProjectName" Text="未命名故事板"/>
+
+                <TextBlock Text="工程文件 (.nep)" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtProjectPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择位置…" Click="BrowseProject_Click"/>
+                </Grid>
+
+                <TextBlock Text="关卡 level 文件（必填）" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtLevelPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择 level…" Click="BrowseLevel_Click"/>
+                </Grid>
+
+                <TextBlock Text="谱面文件（必填）" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtChartPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择谱面…" Click="BrowseChart_Click"/>
+                </Grid>
+
+                <TextBlock Text="音频文件（必填）" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtMusicPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择音频…" Click="BrowseMusic_Click"/>
+                </Grid>
+
+                <TextBlock Text="背景图片（必填）" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtBackgroundPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择图片…" Click="BrowseBackground_Click"/>
+                </Grid>
+
+                <TextBlock Text="已有故事板（可选，留空时创建空白故事板）"
+                           Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtStoryboardPath" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="选择故事板…" Click="BrowseStoryboard_Click"/>
+                </Grid>
+
+                <Border x:Name="ErrorPanel" Background="#3B2028" BorderBrush="#F38BA8"
+                        BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,14,0,0"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="TxtError" Foreground="#F38BA8" TextWrapping="Wrap"/>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <TextBlock x:Name="TxtFolderHint"
+                       Text="将创建 level、music、assets/background 目录，并在 .nep 中保存相对路径。"
+                       Foreground="#7F849C" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="取消" Width="86" Click="Cancel_Click"
+                        Background="#313244" Foreground="#CDD6F4"/>
+                <Button x:Name="BtnConfirm" Content="创建工程" Width="110" Click="Confirm_Click"
+                        Background="#CBA6F7" Foreground="#1E1E2E" FontWeight="Bold"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

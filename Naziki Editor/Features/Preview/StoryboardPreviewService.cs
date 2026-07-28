@@ -1,0 +1,153 @@
+using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.State;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.IO;
+using Naziki_Editor.Features.Project.Resources;
+
+namespace Naziki_Editor.Features.Preview;
+
+public sealed class StoryboardPreviewService :
+    IStoryboardPreviewDataSource,
+    IStoryboardChangeFeed,
+    IStoryboardPreviewPublisher
+{
+    private readonly IStoryboardDocumentWriter _writer;
+    private readonly IProjectResourceService _resources;
+    private readonly object _syncRoot = new();
+    private readonly List<Action<StoryboardPreviewChangeSet>> _subscribers = [];
+    private long _version;
+    private string _sessionId = Guid.NewGuid().ToString("N");
+
+    public StoryboardPreviewService(
+        IStoryboardDocumentWriter writer,
+        IProjectResourceService resources)
+    {
+        _writer = writer;
+        _resources = resources;
+    }
+    public long CurrentVersion => Interlocked.Read(ref _version);
+
+    public StoryboardPreviewSnapshot GetSnapshot(ProjectDataContext context, double playbackTime = 0)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var projectDirectory = string.IsNullOrWhiteSpace(context.ProjectFilePath)
+            ? null
+            : Path.GetDirectoryName(context.ProjectFilePath);
+        var assetRoot = _resources.ResolvePath(context, ProjectResourceKind.Asset) ?? projectDirectory;
+
+        var levelPath = _resources.ResolvePath(context, ProjectResourceKind.Level);
+        return new StoryboardPreviewSnapshot(
+            _sessionId,
+            CurrentVersion,
+            context.ProjectFilePath,
+            _writer.Write(context.Storyboard),
+            SerializeChartForPreview(context.Chart),
+            assetRoot,
+            playbackTime)
+        {
+            LevelJson = !string.IsNullOrWhiteSpace(levelPath) && File.Exists(levelPath)
+                ? File.ReadAllText(levelPath)
+                : null,
+            MusicPath = _resources.ResolvePath(context, ProjectResourceKind.Music),
+            BackgroundPath = _resources.ResolvePath(context, ProjectResourceKind.Background),
+            ProjectId = context.ProjectData is null
+                ? _sessionId
+                : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(context.ProjectFilePath ?? context.ProjectData.ProjectName)))
+                    .ToLowerInvariant()[..24],
+            ProjectName = context.ProjectData?.ProjectName ?? "Naziki Preview"
+        };
+    }
+
+    private static string? SerializeChartForPreview(Models.C2Chart? chart)
+    {
+        if (chart is null) return null;
+
+        var root = JObject.FromObject(chart);
+        if (root["note_list"] is JArray notes)
+        {
+            foreach (var note in notes.OfType<JObject>())
+            {
+                // The editor keeps these fields nullable so incomplete charts can be
+                // repaired. The production game model uses non-nullable booleans.
+                if (note["has_sibling"] is null || note["has_sibling"]!.Type == JTokenType.Null)
+                    note["has_sibling"] = false;
+                if (note["is_forward"] is null || note["is_forward"]!.Type == JTokenType.Null)
+                    note["is_forward"] = false;
+
+                // This property is editor metadata and is not part of ChartModel.Note.
+                note.Remove(nameof(Models.C2Note.NoteDirection));
+            }
+        }
+
+        return root.ToString(Formatting.None);
+    }
+
+    public IDisposable Subscribe(Action<StoryboardPreviewChangeSet> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        lock (_syncRoot) _subscribers.Add(handler);
+        return new Subscription(() =>
+        {
+            lock (_syncRoot) _subscribers.Remove(handler);
+        });
+    }
+
+    public long PublishIncremental(
+        string source,
+        IReadOnlyList<StoryboardEntityChange> changes,
+        double? affectedStartTime = null,
+        double? affectedEndTime = null)
+    {
+        var baseVersion = CurrentVersion;
+        var targetVersion = Interlocked.Increment(ref _version);
+        Publish(new StoryboardPreviewChangeSet(
+            _sessionId,
+            baseVersion,
+            targetVersion,
+            StoryboardPreviewChangeKind.Incremental,
+            source,
+            changes,
+            affectedStartTime,
+            affectedEndTime));
+        return targetVersion;
+    }
+
+    public long PublishReset(string source)
+    {
+        var baseVersion = CurrentVersion;
+        var targetVersion = Interlocked.Increment(ref _version);
+        Publish(new StoryboardPreviewChangeSet(
+            _sessionId, baseVersion, targetVersion,
+            StoryboardPreviewChangeKind.Reset, source, []));
+        return targetVersion;
+    }
+
+    public void EndSession()
+    {
+        Publish(new StoryboardPreviewChangeSet(
+            _sessionId, CurrentVersion, CurrentVersion,
+            StoryboardPreviewChangeKind.SessionEnded, "Project.SessionEnded", []));
+    }
+
+    public void StartSession()
+    {
+        _sessionId = Guid.NewGuid().ToString("N");
+        Interlocked.Exchange(ref _version, 0);
+    }
+
+    private void Publish(StoryboardPreviewChangeSet changes)
+    {
+        Action<StoryboardPreviewChangeSet>[] handlers;
+        lock (_syncRoot) handlers = _subscribers.ToArray();
+        foreach (var handler in handlers) handler(changes);
+    }
+
+    private sealed class Subscription : IDisposable
+    {
+        private Action? _dispose;
+        public Subscription(Action dispose) => _dispose = dispose;
+        public void Dispose() => Interlocked.Exchange(ref _dispose, null)?.Invoke();
+    }
+}

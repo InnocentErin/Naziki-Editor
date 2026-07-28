@@ -1,0 +1,283 @@
+name: Flutter Plugin Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_ios:
+        description: Build iOS UnityFramework.xcframework after Unity export
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  UNITY_VERSION: 6000.0.75f1
+  FLUTTER_VERSION: 3.44.0
+  UNITY_PROJECT_PATH: engines/unity
+  FLUTTER_PLUGIN_PATH: engines/unity/flutter_plugin
+
+jobs:
+  android:
+    name: Android AAR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: false
+
+      - name: Restore Unity Library cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UNITY_PROJECT_PATH }}/Library
+          key: Library-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('engines/unity/Assets/**', 'engines/unity/Packages/**', 'engines/unity/ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-${{ env.UNITY_VERSION }}-
+            Library-Android-
+
+      - name: Install private vendor assets
+        env:
+          CYTOID_VENDOR_ARCHIVE: ${{ secrets.CYTOID_VENDOR_ARCHIVE_URL }}
+          CYTOID_VENDOR_ARCHIVE_SHA256: ${{ secrets.CYTOID_VENDOR_ARCHIVE_SHA256 }}
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/install_vendor_from_archive.sh
+
+      - name: Export and package Android Unity library
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.UNITY_PROJECT_PATH }}
+          targetPlatform: Android
+          buildMethod: CytoidCoreBuild.ExportAndroidLibraryForFlutter
+          allowDirtyBuild: true
+          # CytoidCoreBuild uses EditorApplication.update + EditorApplication.Exit(0)
+          # to pump script compilation async. -quit would exit before that fires.
+          manualExit: true
+
+      - name: Write artifact manifest
+        env:
+          MANIFEST_PLATFORM: android
+          MANIFEST_VERSION: '0.1.0'
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/write_manifest.sh
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cytoid-game-core-android
+          path: |
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/android/
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/manifest.android.json
+          if-no-files-found: error
+
+  ios-export:
+    name: iOS Unity export
+    runs-on: ubuntu-latest
+    if: inputs.build_ios
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+
+      - name: Restore Unity Library cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UNITY_PROJECT_PATH }}/Library
+          key: Library-iOS-${{ env.UNITY_VERSION }}-${{ hashFiles('engines/unity/Assets/**', 'engines/unity/Packages/**', 'engines/unity/ProjectSettings/**') }}
+          restore-keys: |
+            Library-iOS-${{ env.UNITY_VERSION }}-
+            Library-iOS-
+
+      - name: Install private vendor assets
+        env:
+          CYTOID_VENDOR_ARCHIVE: ${{ secrets.CYTOID_VENDOR_ARCHIVE_URL }}
+          CYTOID_VENDOR_ARCHIVE_SHA256: ${{ secrets.CYTOID_VENDOR_ARCHIVE_SHA256 }}
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/install_vendor_from_archive.sh
+
+      - name: Export iOS UnityLibrary Xcode project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.UNITY_PROJECT_PATH }}
+          targetPlatform: iOS
+          buildMethod: CytoidCoreBuild.ExportIOSLibraryForFlutterWithoutPackaging
+          allowDirtyBuild: true
+          # CytoidCoreBuild uses EditorApplication.update + EditorApplication.Exit(0)
+          # to pump script compilation async. -quit would exit before that fires.
+          manualExit: true
+
+      - name: Upload iOS Unity export
+        uses: actions/upload-artifact@v4
+        with:
+          name: cytoid-game-core-ios-export
+          path: ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/exports/ios/UnityLibrary/
+          if-no-files-found: error
+
+  ios-package:
+    name: iOS XCFramework
+    runs-on: macos-15
+    needs: ios-export
+    if: inputs.build_ios
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download iOS Unity export
+        uses: actions/download-artifact@v4
+        with:
+          name: cytoid-game-core-ios-export
+          path: ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/exports/ios/UnityLibrary
+
+      - name: Build UnityFramework.xcframework
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/build_unity_ios_framework.sh
+
+      - name: Zip XCFramework
+        run: ditto -c -k --sequesterRsrc --keepParent ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/ios/UnityFramework.xcframework ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/ios/UnityFramework.xcframework.zip
+
+      - name: Write artifact manifest
+        env:
+          MANIFEST_PLATFORM: ios
+          MANIFEST_VERSION: '0.1.0'
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/write_manifest.sh
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cytoid-game-core-ios
+          path: |
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/ios/UnityFramework.framework/
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/ios/UnityFramework.xcframework/
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/ios/UnityFramework.xcframework.zip
+            ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/manifest.ios.json
+          if-no-files-found: error
+
+  flutter-package:
+    name: Flutter plugin package
+    runs-on: ubuntu-latest
+    needs:
+      - android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cytoid-game-core-android
+          path: ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts/unity/android
+
+      - name: Flutter pub get
+        working-directory: ${{ env.FLUTTER_PLUGIN_PATH }}
+        run: flutter pub get
+
+      - name: Analyze Flutter plugin
+        working-directory: ${{ env.FLUTTER_PLUGIN_PATH }}
+        run: flutter analyze lib test
+
+      - name: Run Flutter plugin tests
+        working-directory: ${{ env.FLUTTER_PLUGIN_PATH }}
+        run: flutter test
+
+      - name: Package Flutter plugin zip
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/tool/package_flutter_plugin.sh
+
+      - name: Upload Flutter plugin package
+        uses: actions/upload-artifact@v4
+        with:
+          name: cytoid-game-core-flutter-plugin
+          path: ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/dist/cytoid_game_core-*.zip
+          if-no-files-found: error
+
+  # Build-level smoke test: links the AAR produced by `android` into the
+  # example app and asserts `flutter build apk --release` succeeds. This
+  # catches ABI/linkage regressions that `flutter-package`'s `flutter analyze`
+  # + `flutter test` cannot see (those steps do not build a host APK).
+  #
+  # SCOPE GUARD: this job is BUILD-LEVEL ONLY. It does NOT start an Android
+  # emulator and does NOT exercise the runtime path. Real-device smoke
+  # (kill-Unity-mid-session, send-failure, framework-load-failure, 10-session
+  # memory regression, backgrounded-session resume, refresh-rate restoration)
+  # is human-gated via F3 — see
+  # engines/unity/flutter_plugin/example/docs/real-device-smoke.md for the
+  # checklist that F3 follows. Per Fork 3=B and Fork 5=A, real-device CI
+  # runners and emulator boot are explicitly out of scope.
+  #
+  # Trigger remains workflow_dispatch only (no PR gating).
+  flutter-smoke:
+    name: Flutter host smoke (build-level)
+    runs-on: ubuntu-latest
+    needs:
+      - android
+      - flutter-package
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Build-only smoke: no git push/commit step needs credentials.
+          persist-credentials: false
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cytoid-game-core-android
+          # Canonical artifact ROOT, not the android leaf. The upload step
+          # preserves the relative layout (artifacts/unity/android/... +
+          # manifest.android.json); downloading to the leaf doubles the
+          # `unity/android` prefix and silently pushes the build into mock.
+          path: ${{ env.FLUTTER_PLUGIN_PATH }}/.cytoid_game_core/artifacts
+
+      # Assert the AAR + manifest landed at the canonical paths (non-empty
+      # AAR, v2 schema, platform=android). Fails on the nested-path failure
+      # mode that download-to-leaf would produce.
+      - name: Verify Android Unity artifacts
+        run: ${{ env.FLUTTER_PLUGIN_PATH }}/android/scripts/verify_artifacts.sh
+
+      # Strict: this job exists to prove Flutter hosts the REAL Unity core.
+      # A mock pass here is a silent regression. EXPECTED_ENGINE_MODE=unity
+      # makes check_engine_mode.sh exit non-zero on mock.
+      - name: Assert Unity engine mode
+        run: |
+          mode="$(EXPECTED_ENGINE_MODE=unity bash ${{ env.FLUTTER_PLUGIN_PATH }}/android/scripts/check_engine_mode.sh)"
+          echo "ENGINE_MODE=$mode"
+          echo "::notice::flutter-smoke ENGINE_MODE=$mode"
+
+      - name: Flutter pub get
+        working-directory: ${{ env.FLUTTER_PLUGIN_PATH }}/example
+        run: flutter pub get
+
+      - name: Build example APK
+        working-directory: ${{ env.FLUTTER_PLUGIN_PATH }}/example
+        run: flutter build apk --release
