@@ -4,6 +4,7 @@ using NAudio.Vorbis;
 using NAudio.Wave;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Models;
+using Naziki_Editor.Core.Storyboard.Canonical;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -159,15 +160,31 @@ public sealed class ProjectResourceService : IProjectResourceService
     private readonly IStoryboardDocumentReader _storyboardReader;
     private readonly IStoryboardDocumentWriter _storyboardWriter;
     private readonly IMessageBroker _messages;
+    private readonly IStoryboardImportService _storyboardImporter;
+    private readonly IStoryboardSourceStore _storyboardSourceStore;
 
     public ProjectResourceService(
         IStoryboardDocumentReader storyboardReader,
         IStoryboardDocumentWriter storyboardWriter,
         IMessageBroker messages)
+        : this(storyboardReader, storyboardWriter, messages,
+            new StoryboardImportService(),
+            new StoryboardSourceStore(new EditorStoryboardSerializer()))
+    {
+    }
+
+    public ProjectResourceService(
+        IStoryboardDocumentReader storyboardReader,
+        IStoryboardDocumentWriter storyboardWriter,
+        IMessageBroker messages,
+        IStoryboardImportService storyboardImporter,
+        IStoryboardSourceStore storyboardSourceStore)
     {
         _storyboardReader = storyboardReader;
         _storyboardWriter = storyboardWriter;
         _messages = messages;
+        _storyboardImporter = storyboardImporter;
+        _storyboardSourceStore = storyboardSourceStore;
     }
 
     public string ResolvePath(string projectFilePath, string configuredPath)
@@ -325,8 +342,20 @@ public sealed class ProjectResourceService : IProjectResourceService
                 AudioFilePath = ToProjectRelativePath(projectFile, music),
                 BackgroundPath = ToProjectRelativePath(projectFile, background),
                 StoryboardExportPath = ToProjectRelativePath(projectFile, storyboard),
+                StoryboardSourcePath = ".naziki/storyboard.editor.json",
                 MaterialFolderPath = "assets"
             };
+            var imported = _storyboardImporter.Import(
+                await File.ReadAllTextAsync(storyboard, cancellationToken)
+                    .ConfigureAwait(false));
+            if (!imported.CanReplace)
+                throw new InvalidDataException(string.Join(
+                    Environment.NewLine,
+                    imported.Issues.Select(issue =>
+                        $"{issue.Path}: {issue.Message}")));
+            var editorSource = _storyboardSourceStore.GetDefaultSourcePath(projectFile);
+            _storyboardSourceStore.Save(editorSource, imported.Document);
+            createdFiles.Add(editorSource);
             await WriteAtomicAsync(
                 projectFile,
                 JsonConvert.SerializeObject(project, Formatting.Indented),

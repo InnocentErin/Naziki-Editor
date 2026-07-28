@@ -9,6 +9,7 @@ using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Xunit;
+using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Tests;
 
@@ -44,6 +45,15 @@ public sealed class ProjectResourceServiceTests
             Assert.Equal("music/music.wav", result.Project.AudioFilePath);
             Assert.Equal("assets/background/cover.png", result.Project.BackgroundPath);
             Assert.Equal("level/storyboard.json", result.Project.StoryboardExportPath);
+            Assert.Equal(3, result.Project.FormatVersion);
+            Assert.Equal(".naziki/storyboard.editor.json",
+                result.Project.StoryboardSourcePath);
+            var editorSourcePath = Path.Combine(projectDirectory,
+                ".naziki", "storyboard.editor.json");
+            Assert.True(File.Exists(editorSourcePath));
+            Assert.Equal(1, JObject.Parse(
+                await File.ReadAllTextAsync(editorSourcePath))
+                .Value<int>("schema_version"));
             Assert.All(new[]
             {
                 result.Project.ChartFilePath,

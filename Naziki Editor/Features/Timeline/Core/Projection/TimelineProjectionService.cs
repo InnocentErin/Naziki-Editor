@@ -4,6 +4,7 @@ using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Storyboard.Corrections;
+using Naziki_Editor.Core.Storyboard.Canonical;
 
 namespace Naziki_Editor.Core.Timeline.Projection;
 
@@ -14,16 +15,89 @@ namespace Naziki_Editor.Core.Timeline.Projection;
 public sealed class TimelineProjectionService : ITimelineProjectionService
 {
     private readonly IStoryboardTimeResolver _timeResolver;
+    private readonly IStoryboardMaterializer _materializer;
 
     public TimelineProjectionService()
-        : this(new StoryboardTimeResolver())
+        : this(new StoryboardTimeResolver(),
+            new StoryboardMaterializer(
+                new StoryboardTimePositionResolver(),
+                new NoteQueryService()))
     {
     }
 
     public TimelineProjectionService(IStoryboardTimeResolver timeResolver)
+        : this(timeResolver,
+            new StoryboardMaterializer(
+                new StoryboardTimePositionResolver(),
+                new NoteQueryService()))
+    {
+    }
+
+    public TimelineProjectionService(IStoryboardTimeResolver timeResolver,
+        IStoryboardMaterializer materializer)
     {
         _timeResolver = timeResolver;
+        _materializer = materializer;
     }
+
+    public IReadOnlyList<CanonicalEntityTimelineProjection>
+        BuildCanonicalProjections(EditorStoryboardDocument document,
+            C2Chart? chart, ITimeEngine? timeEngine)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var materialized = _materializer.Materialize(document, chart, timeEngine);
+        var sharedDiagnostics = materialized.Issues
+            .Where(issue => issue.Path == "$" ||
+                            !issue.Path.StartsWith("editor:",
+                                StringComparison.Ordinal))
+            .Select(ToTimelineDiagnostic)
+            .ToArray();
+
+        return materialized.Entities.Select(entity =>
+        {
+            var prefix = $"editor:{entity.EditorId}";
+            var diagnostics = materialized.Issues
+                .Where(issue => issue.Path.StartsWith(prefix,
+                    StringComparison.Ordinal))
+                .Select(ToTimelineDiagnostic)
+                .Concat(sharedDiagnostics)
+                .ToArray();
+            var frames = entity.Frames
+                .OrderBy(frame => frame.EffectiveTime ??
+                                  double.PositiveInfinity)
+                .ThenBy(frame => frame.Sequence)
+                .Select(frame => new CanonicalProjectedTimelineFrame(
+                    frame.OccurrenceId,
+                    frame.FrameId,
+                    frame.EffectiveTime,
+                    frame.Sequence,
+                    (Newtonsoft.Json.Linq.JObject)
+                        frame.EffectiveState.DeepClone(),
+                    frame.Time,
+                    frame.SourceTemplate,
+                    frame.BoundNoteId))
+                .ToArray();
+            return new CanonicalEntityTimelineProjection(
+                entity.OccurrenceId,
+                entity.EditorId,
+                entity.Kind,
+                entity.RuntimeId,
+                entity.BoundNoteId,
+                entity.EffectiveActivationTime,
+                entity.ActivationMode,
+                (Newtonsoft.Json.Linq.JObject)entity.BaseState.DeepClone(),
+                frames,
+                diagnostics);
+        }).ToArray();
+    }
+
+    private static TimelineDiagnostic ToTimelineDiagnostic(
+        StoryboardImportIssue issue) => new(
+        issue.Code,
+        $"{issue.Path}: {issue.Message}",
+        issue.Severity == StoryboardDiagnosticSeverity.Error
+            ? TimelineDiagnosticSeverity.Error
+            : TimelineDiagnosticSeverity.Warning);
 
     public EntityTimelineProjection BuildEntityProjection(
         IStoryboardEntity entity,

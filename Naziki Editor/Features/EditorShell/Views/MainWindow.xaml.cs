@@ -524,6 +524,25 @@ namespace Naziki_Editor.Views
             {
                 try
                 {
+                    // Normalize and validate before copying a resource or
+                    // replacing either in-memory document.
+                    var importService =
+                        AppServices.GetService<IStoryboardImportService>();
+                    var wireWriter =
+                        AppServices.GetService<IStoryboardDocumentWriter>();
+                    var imported = importService.Import(
+                        wireWriter.Write(root), Context.Chart,
+                        Context.StoryboardMeta,
+                        Context.ProjectData?.ControlBoardIdMaps);
+                    var importErrors = imported.Issues.Where(issue =>
+                        issue.Severity ==
+                        StoryboardDiagnosticSeverity.Error).ToArray();
+                    if (!imported.CanReplace)
+                        throw new JsonSerializationException(string.Join(
+                            Environment.NewLine,
+                            importErrors.Select(issue =>
+                                $"{issue.Path}: {issue.Message}")));
+
                     if (Context.ProjectData != null && !string.IsNullOrWhiteSpace(Context.ProjectFilePath))
                     {
                         await _projectResources.ImportAsync(
@@ -539,6 +558,10 @@ namespace Naziki_Editor.Views
                     }
 
                     Context.Storyboard = root;
+                    Context.EditorStoryboard = imported.Document!;
+                    Context.LegacyStoryboardProjectionHash =
+                        AppServices.GetService<IStoryboardCanonicalBridge>()
+                            .ComputeLegacyProjectionHash(root);
 
                     CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();

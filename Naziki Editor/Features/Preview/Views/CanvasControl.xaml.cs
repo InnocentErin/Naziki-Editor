@@ -358,6 +358,10 @@ namespace Naziki_Editor.Views
                 {
                     RefreshJsonView();
                 }
+                else if (tabControl.SelectedIndex == 2)
+                {
+                    RefreshRuntimeJsonPreview();
+                }
                 if (_unityHost.HostHandle != IntPtr.Zero)
                 {
                     var (width, height) = GetPreviewPixelSize();
@@ -601,6 +605,29 @@ namespace Naziki_Editor.Views
             // Keep the public shortcut contract and ask Unity to render at the new size.
             if (_unityHost.HostHandle != IntPtr.Zero)
                 _ = ResizeNativePreviewForZoomAsync();
+        }
+
+        private void RefreshRuntimeJsonPreview()
+        {
+            if (RuntimeJsonEditor is null || Context is null) return;
+            try
+            {
+                var result = AppServices
+                    .GetService<IStoryboardCanonicalBridge>()
+                    .Export(Context);
+                var errors = result.Issues.Where(issue =>
+                    issue.Severity == StoryboardDiagnosticSeverity.Error)
+                    .ToArray();
+                RuntimeJsonEditor.Text = errors.Length == 0
+                    ? result.Json.ToString(Formatting.Indented)
+                    : "// 运行导出被阻止\n// " +
+                      string.Join("\n// ", errors.Select(issue =>
+                          $"{issue.Path}: {issue.Message}"));
+            }
+            catch (Exception ex)
+            {
+                RuntimeJsonEditor.Text = "// 运行导出预览失败: " + ex.Message;
+            }
         }
 
         private async Task ResizeNativePreviewForZoomAsync()

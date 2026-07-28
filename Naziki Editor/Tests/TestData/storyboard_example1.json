@@ -1,0 +1,1125 @@
+{
+	"texts":
+	[
+		{
+			"text":"Charter:",
+			"color":"#2E64FE",
+			"size": 40,
+			"x": -250,
+			"y": 250,
+			"easing": "easeOutQuad",
+			"states":
+			[
+				{
+					"opacity": 0,
+					"time": 1.5,
+				},
+				{
+					"opacity": 1,
+					"time": 1.6,
+				},
+				{
+					"opacity": 1,
+					"add_time": 0.8,
+				},
+				{
+					"opacity": 0,
+					"add_time": 0.4,
+				}
+			]
+		},
+		{
+			"text":"He2O3",
+			"color":"#F78181",
+			"size": 40,
+			"x": 250,
+			"y": 250,
+			"easing": "easeOutQuad",
+			"states":
+			[
+				{
+					"opacity": 0,
+					"time": 3.1,
+				},
+				{
+					"opacity": 1,
+					"time": 3.2,
+				},
+				{
+					"opacity": 1,
+					"add_time": 0.8,
+				},
+				{
+					"opacity": 0,
+					"add_time": 0.4,
+				}
+			]
+		},
+		{
+			"text":"Artist:",
+			"color":"#2E64FE",
+			"size": 40,
+			"x": -250,
+			"y": 250,
+			"easing": "easeOutQuad",
+			"states":
+			[
+				{
+					"opacity": 0,
+					"time": 4.7,
+				},
+				{
+					"opacity": 1,
+					"time": 4.8,
+				},
+				{
+					"opacity": 1,
+					"add_time": 0.8,
+				},
+				{
+					"opacity": 0,
+					"add_time": 0.4,
+				}
+			]
+		},
+		{
+			"text":"seiya-murai",
+			"color":"#F78181",
+			"size": 40,
+			"x": 250,
+			"y": 250,
+			"easing": "easeOutQuad",
+			"states":
+			[
+				{
+					"opacity": 0,
+					"time": 6.3,
+				},
+				{
+					"opacity": 1,
+					"time": 6.4,
+				},
+				{
+					"opacity": 1,
+					"add_time": 0.8,
+				},
+				{
+					"opacity": 0,
+					"add_time": 0.4,
+				}
+			]
+		}
+	],
+	"sprites":
+	[
+		{
+            			"path": "prince.png",
+			"layer":1,	
+			"preserve_aspect": true,
+			"scale":1.2,
+			"states":
+			[
+			{
+				"time":78,
+				"opacity":0.4,
+				"x":600,
+				"y":0,
+			},
+			{
+				"add_time":0.35,
+				"x":150,
+				"y":-25,
+			},
+			{
+				"template":"princessshake",
+				"x":150,
+				"time":[78.4,81.6,84.8,88,91.2,94.4,97.6,100.8],
+			},
+			{
+				"time":116.8,
+				"opacity":0.45,
+				"x":150,
+				"y":0,
+			},
+			{
+				"time":120,	
+				"opacity":0.45,
+				"x":50,
+				"y":0,
+			},
+			{
+				"time":120,	
+				"opacity":0,
+				"x":50,
+				"y":0,
+			},
+			]
+		},
+		{
+            			"path": "ice.png",
+			"layer":1,	
+			"preserve_aspect": true,
+			"scale":1,
+			"states":
+			[
+			{
+				"template":"enemyshake",
+				"x":-150,
+				"time":[40,43.2,46.4,49.6,52.8,56,59.2,62.4]
+			},
+			{
+				"time":65.6,
+				"opacity":0.1,
+				"x":-150,
+			},
+			{
+				"time":78,
+				"x":-150,
+			},
+			{
+				"add_time":0.4,
+				"x":-600,
+			}
+			]
+		},
+		{
+            			"path": "witch.png",	
+			"layer":1,	
+			"preserve_aspect": true,
+			"scale":1,
+			"states":
+			[
+			{
+				"template":"enemyshake",
+				"x":150,
+				"time":[40,43.2,46.4,49.6,52.8,56,59.2,62.4]
+			},
+			{
+				"time":65.6,
+				"opacity":0.1,
+				"x":150,
+			},
+			{
+				"time":78,
+				"x":150,
+			},
+			{
+				"add_time":0.4,
+				"x":600,
+			}
+			]
+		},
+		{
+            			"path": "black.png",	
+			"layer":0,	
+			"states":
+			[
+			{
+				"time":40,
+				"scale":5,
+				"opacity":0.6,
+			},
+			{
+				"time":65.6,
+				"scale":5,
+				"opacity":0.6,
+			},
+			{
+				"time":65.6,
+				"scale":5,
+				"opacity":0,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"states":
+			[
+			{
+				"time":32,
+				"scale":0.8,
+				"opacity":0.8,
+				"x":-300,
+				"y":-150,
+			},
+			{
+				"add_time":1.2,
+				"opacity":0.8,
+				"x":600,
+				"y":-150,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"states":
+			[
+			{
+				"time":32.1,
+				"scale":0.8,
+				"opacity":0.8,
+				"x":-300,
+				"y":-75,
+			},
+			{
+				"add_time":1.2,
+				"opacity":0.8,
+				"x":600,
+				"y":-75,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"states":
+			[
+			{
+				"time":32.2,
+				"scale":0.8,
+				"opacity":0.8,
+				"x":-300,
+				"y":0,
+			},
+			{
+				"add_time":1.2,
+				"opacity":0.8,
+				"x":600,
+				"y":0,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"states":
+			[
+			{
+				"time":32.3,
+				"scale":0.8,
+				"opacity":0.8,
+				"x":-300,
+				"y":75,
+			},
+			{
+				"add_time":1.2,
+				"opacity":0.8,
+				"x":600,
+				"y":75,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"states":
+			[
+			{
+				"time":32.4,
+				"scale":0.8,
+				"opacity":0.8,
+				"x":-300,
+				"y":150,
+			},
+			{
+				"add_time":1.2,
+				"opacity":0.8,
+				"x":600,
+				"y":150,
+			}
+			]
+		},
+		{
+            			"path": "cat.png",	
+			"preserve_aspect": true,
+			"scale":2,
+			"states":
+			[
+			{
+				"time":120,
+				"scale":0.8,
+				"opacity":0.8,
+			}
+			]
+		},
+		{
+            			"path": "princess.png",
+			"layer":1,		
+			"preserve_aspect": true,
+			"scale":1.5,
+			"states":
+			[
+			{
+				"template":"princessshake",
+				"time":[20.8,24,27.2,30.4,33.6,52.8,56,59.2]
+			},
+			{
+				"time":38.4,
+				"opacity":0,
+			},
+			{
+				"time":52.7,
+				"opacity":0,
+			},
+			{
+				"time":62.4,
+				"x":0,
+				"opacity":0.35,
+			},
+			{
+				"time":65.6,
+				"x":0,
+				"opacity":0.15,
+			},
+			{
+				"time":78,
+				"x":0,
+				"opacity":0.35,
+			},
+			{
+				"time":78.4,
+				"x":-150,
+				"y":-25,
+			},
+			{
+				"template":"princessshake",
+				"x":-150,
+				"time":[78.4,81.6,84.8,88,91.2,94.4,97.6,100.8],
+			},
+			{
+				"time":116.8,
+				"opacity":0.45,
+				"x":-150,
+				"y":0,
+			},
+			{
+				"time":120,	
+				"opacity":0.45,
+				"x":-70,
+				"y":0,
+			},
+			{
+				"time":120,	
+				"opacity":0,
+				"x":-70,
+				"y":0,
+			},
+			]
+		},
+		{
+            			"path": "heart.png",	
+			"preserve_aspect": true,
+			"easing":"easeinquad",
+			"states":
+			[
+			{
+				"time":1.6,
+				"scale":1,
+				"opacity":0,
+				"x":-250,
+				"y":0,
+			},
+			{
+				"add_time":0.1,
+				"opacity":0.9,
+				"x":-250,
+				"y":0,
+			},
+			{
+				"time":3.2,
+				"opacity":0.2,
+				"x":250,
+				"y":0,
+			},
+			{
+				"add_time":0.1,
+				"opacity":0.9,
+				"x":250,
+				"y":0,
+			},
+			{
+				"time":4.8,
+				"opacity":0.2,
+				"x":-250,
+				"y":0,
+			},
+			{
+				"add_time":0.1,
+				"opacity":0.9,
+				"x":-250,
+				"y":0,
+			},
+			{
+				"time":6.4,
+				"opacity":0.2,
+				"x":250,
+				"y":0,
+			},
+			{
+				"add_time":0.1,
+				"opacity":0.9,
+				"scale":1,
+				"x":250,
+				"y":0,
+			},
+			{
+				"time":7.6,
+				"opacity":0.5,
+				"scale":1.5,
+				"x":0,
+				"y":0,
+			},
+			{
+				"template":"heartshake",
+				"time":[8,8.8,9.6,10.4,11.2,12,12.8,13.6,14.4,15.2,16,16.8,17.6,18.4,19.2],
+			},
+			{
+				"time":19.21,
+				"opacity":0.5,
+				"scale":1.5,
+				"x":0,
+				"y":0,
+			},
+			{
+				"time":20.8,
+				"opacity":0,
+				"scale":7,
+				"x":0,
+				"y":0,
+			},
+			{
+				"template":"heartfallleft1",
+				"time":[104,104.8,105.6,106.4,107.2,108,108.8],
+			}
+			]
+		},
+		{
+            			"path": "heart.png",	
+			"preserve_aspect": true,
+			"easing":"easeinquad",
+			"states":
+			[
+			{
+				"template":"heartfallleft2",
+				"time":[104.4,105.2,106,106.8,107.6,108.4,109.2],
+			}
+			]
+		},
+		{
+            			"path": "heart.png",	
+			"preserve_aspect": true,
+			"easing":"easeinquad",
+			"states":
+			[
+			{
+				"template":"heartfallright1",
+				"time":[110.4,111.2,112,112.8,113.6,114.4,115.2],
+			}
+			]
+		},
+		{
+            			"path": "heart.png",	
+			"preserve_aspect": true,
+			"easing":"easeinquad",
+			"states":
+			[
+			{
+				"template":"heartfallright2",
+				"time":[110.8,111.6,112.4,113.2,114,114.8,115.6],
+			}
+			]
+		},
+		{
+            			"path": "heart.png",	
+			"preserve_aspect": true,
+			"easing":"easeinquad",
+			"states":
+			[
+			{
+				"time":116.8,
+				"opacity":0,
+				"scale":1,
+			},
+			{
+				"time":120,
+				"opacity":0.4,
+				"scale":4,
+			},
+			{
+				"time":120,
+				"opacity":0,
+				"scale":4,
+			}
+			]
+		}
+	],
+	"controllers":
+	[	
+		{
+			"perspective":true,
+			"states": 	
+			[
+			{
+				"time":"start:153",
+				"fov":53.2,
+			},
+			{
+				"time":"start:155:-0.2",
+				"fov":58.2,
+			},
+			{
+				"time":"start:233",
+				"fov":58.2,
+			},
+			{
+				"time":"start:237",
+				"fov":53.2,
+			},
+			{
+				"time":"start:263",
+				"fov":53.2,
+			},
+			{
+				"time":"start:270",
+				"fov":58.2,
+			},
+			{
+				"time":"start:472",
+				"fov":58.2,
+				"rot_z":0,
+			},
+			{
+				"time":"start:481",
+				"fov":58.2,
+				"rot_z":15,
+			},
+			{
+				"time":"start:490",
+				"fov":58.2,
+				"rot_z":-15,
+			},
+			{
+				"time":"start:499",
+				"fov":58.2,
+				"rot_z":15,
+			},
+			{
+				"time":"start:510",
+				"fov":58.2,
+				"rot_z":-15,
+			},
+			{
+				"time":"start:522",
+				"fov":58.2,
+				"rot_z":15,
+			},
+			{
+				"time":"start:534",
+				"fov":58.2,
+				"rot_z":0,
+			},
+			{
+				"time":"start:550",
+				"fov":58.2,
+			},
+			{
+				"time":"start:569",
+				"fov":53.2,
+			},
+			{
+				"time":"start:854",
+				"fov":53.2,
+			},
+			{
+				"time":"start:860",
+				"fov":50.2,
+			},
+			]
+		},
+		{
+			"states": 	
+			[
+			{
+				"time":0,
+				"arcade":true,
+				"arcade_intensity":0.7,
+				"arcade_inteference_size":2,
+				"arcade_contrast":2,
+			}
+			]
+		},
+		{
+			"states": 	
+			[
+			{
+				"time":0,
+				"ui_opacity":0,
+			},
+			{
+				"time":"start:72",
+				"ui_opacity":0,
+			},
+			{
+				"time":"start:72",
+				"ui_opacity":0.25,
+			},
+			{
+				"time":"start:263",
+				"gray_scale":true,
+				"gray_scale_intensity":0,
+			},
+			{
+				"time":"start:270",
+				"gray_scale":true,
+				"gray_scale_intensity":0.6,
+			},
+			{
+				"time":"start:472",
+				"ui_opacity":0.25,
+			},		
+			{
+				"time":"start:472",
+				"ui_opacity":0,
+			},
+			{
+				"time":"start:550",
+				"gray_scale":true,
+				"gray_scale_intensity":0.6,
+				"ui_opacity":0,
+			},
+			{
+				"time":"start:569",
+				"gray_scale":false,
+				"gray_scale_intensity":0,
+				"ui_opacity":0.25,
+			},
+			{
+				"time":"start:732",
+				"ui_opacity":0.25,
+			},
+			{
+				"time":"start:732",
+				"ui_opacity":0,
+			}
+			]
+		},
+		{
+			"states": 	
+			[
+			{
+				"template":"shake",
+				"time":["start:569","start:574","start:580","start:584","start:589","start:595","start:600","start:604","start:608","start:614","start:620","start:624","start:635",
+					"start:640","start:644","start:653","start:659","start:665","start:671","start:677","start:683","start:688","start:694","start:700","start:704","start:709:-0.2",
+					"start:712","start:717","start:721","start:726:-0.2","start:729"]
+			},
+			{	
+				"template":"littleshake",
+				"time":["start:318","start:322","start:326","start:330"]
+			}
+			]
+		},
+		{
+			"states": 	
+			[
+			{
+				"background_dim": 1,
+				"time": 0,
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:1",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:67",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:67:0.03",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:69",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:69:0.03",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:71",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:71:0.03",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:72",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:155:-1",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.9,
+				"time": "start:155:-0.2",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.9,
+				"time": "start:237:-0.2",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:237",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:263",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:263",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:550",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:569",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 0.8,
+				"time": "start:880",
+				"easing": "easeinquad",
+			},
+			{
+				"background_dim": 1,
+				"time": "start:880",
+				"easing": "easeinquad",
+			}
+			]
+		}
+	],
+	"templates":
+	{
+		"shake":
+		{
+			"easing": "linear",
+			"perspective":true,
+			"states": 
+			[
+			{
+				"relative_time": 0,
+				"fov": 53.2,
+			},
+			{
+				"relative_time": 0.05,
+				"fov": 50.2,
+			},
+			{
+				"relative_time": 0.1,
+				"fov": 53.2,
+			}
+			]	
+		},
+		"littleshake":
+		{
+			"easing": "linear",
+			"perspective":true,
+			"states": 
+			[
+			{
+				"relative_time": 0,
+				"fov": 58.2,
+			},
+			{
+				"relative_time": 0.05,
+				"fov": 53.2,
+			},
+			{
+				"relative_time": 0.1,
+				"fov": 58.2,
+			}
+			]	
+		},
+		"heartshake":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"scale": 1.5,
+			},
+			{
+				"add_time": 0.1,
+				"scale": 2,
+			},
+			{
+				"add_time": 0.4,
+				"scale": 1.5,
+			}
+			]
+		},
+		"princessshake":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.35,
+				"y": -25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.15,
+				"y": 25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.35,
+				"y": -25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.15,
+				"y": 25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.35,
+				"y": -25,
+			}
+			]
+		},
+		"enemyshake":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.5,
+				"y": -25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.3,
+				"y": 25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.5,
+				"y": -25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.3,
+				"y": 25,
+			},
+			{
+				"add_time": 0.8,
+				"opacity":0.5,
+				"y": -25,
+			}
+			]
+		},
+		"heartfallleft1":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":0,
+				"y":300,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":50,
+				"y":150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":100,
+				"y":0,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":150,
+				"y":-150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0,
+				"scale":0.25,
+				"x":200,
+				"y":-300,
+			}
+			]
+		},
+		"heartfallleft2":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":-200,
+				"y":300,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":-150,
+				"y":150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":-100,
+				"y":0,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":-50,
+				"y":-150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0,
+				"scale":0.25,
+				"x":0,
+				"y":-300,
+			}
+			]
+		},
+		"heartfallright1":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":0,
+				"y":300,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":-50,
+				"y":150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":-100,
+				"y":0,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":-150,
+				"y":-150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0,
+				"scale":0.25,
+				"x":-200,
+				"y":-300,
+			}
+			]
+		},
+		"heartfallright2":
+		{
+			"easing": "easeInQuart",
+			"preserve_aspect":true,
+			"states":
+			[
+			{
+				"add_time": 0,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":200,
+				"y":300,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":150,
+				"y":150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.3,
+				"scale":0.25,
+				"x":100,
+				"y":0,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0.6,
+				"scale":1,
+				"x":50,
+				"y":-150,
+			},
+			{
+				"add_time": 0.2,
+				"opacity":0,
+				"scale":0.25,
+				"x":0,
+				"y":-300,
+			}
+			]
+		}
+	}
+}

@@ -16,6 +16,7 @@ namespace Naziki_Editor.Core.Abstractions
             StoryboardRoot storyboard,
             string outputPath,
             ProjectDataContext? context = null);
+        Task ExportCytoidStoryboardJsonAsync(string runtimeJson, string outputPath);
         Task SaveStoryboardMetaAsync(ProjectDataContext context, string storyboardPath);
         Task SaveProjectNepFileAsync(ProjectDataContext context, string? filePath = null);
 

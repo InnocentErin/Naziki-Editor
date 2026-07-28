@@ -18,7 +18,7 @@ public sealed class StoryboardPreviewServiceTests
     [Fact]
     public void PublishesStrictlyIncreasingVersionsAndSessionEnd()
     {
-        var service = new StoryboardPreviewService(new FakeWriter(), new FakeResources());
+        var service = new StoryboardPreviewService(new FakeBridge(), new FakeResources());
         var received = new List<StoryboardPreviewChangeSet>();
         using var subscription = service.Subscribe(received.Add);
 
@@ -35,7 +35,7 @@ public sealed class StoryboardPreviewServiceTests
     [Fact]
     public void DisposedSubscriptionStopsDelivery()
     {
-        var service = new StoryboardPreviewService(new FakeWriter(), new FakeResources());
+        var service = new StoryboardPreviewService(new FakeBridge(), new FakeResources());
         var count = 0;
         var subscription = service.Subscribe(_ => count++);
         subscription.Dispose();
@@ -46,7 +46,7 @@ public sealed class StoryboardPreviewServiceTests
     [Fact]
     public void Snapshot_NormalizesNullableNoteFlagsForProductionChartParser()
     {
-        var service = new StoryboardPreviewService(new FakeWriter(), new FakeResources());
+        var service = new StoryboardPreviewService(new FakeBridge(), new FakeResources());
         var context = new ProjectDataContext(MessageBroker.Default)
         {
             Storyboard = new StoryboardRoot(),
@@ -77,10 +77,51 @@ public sealed class StoryboardPreviewServiceTests
         Assert.Null(note[nameof(C2Note.NoteDirection)]);
     }
 
-    private sealed class FakeWriter : IStoryboardDocumentWriter
+    [Fact]
+    public void StartingNewSessionClearsPreviousLastKnownGoodStoryboard()
     {
-        public string Write(StoryboardRoot document) => "{}";
-        public string WriteNode(object node) => "{}";
+        var bridge = new ToggleBridge();
+        var service = new StoryboardPreviewService(bridge,
+            new FakeResources());
+        var context = new ProjectDataContext(MessageBroker.Default);
+
+        service.GetSnapshot(context);
+        bridge.Fail = true;
+        // Same session retains its last-known-good projection.
+        service.GetSnapshot(context);
+        service.StartSession();
+
+        Assert.Throws<Newtonsoft.Json.JsonSerializationException>(
+            () => service.GetSnapshot(context));
+    }
+
+    private sealed class FakeBridge : IStoryboardCanonicalBridge
+    {
+        public EditorStoryboardDocument Synchronize(ProjectDataContext context) =>
+            context.EditorStoryboard;
+        public StoryboardRuntimeExportResult Export(ProjectDataContext context) =>
+            new(new JObject(), []);
+        public StoryboardRoot CreateLegacyProjection(ProjectDataContext context) =>
+            new();
+        public string ComputeLegacyProjectionHash(StoryboardRoot storyboard) => "";
+    }
+
+    private sealed class ToggleBridge : IStoryboardCanonicalBridge
+    {
+        public bool Fail { get; set; }
+        public EditorStoryboardDocument Synchronize(ProjectDataContext context) =>
+            context.EditorStoryboard;
+        public StoryboardRuntimeExportResult Export(ProjectDataContext context) =>
+            Fail
+                ? new(new JObject(),
+                [
+                    new StoryboardImportIssue("FAILED", "$", "failed",
+                        StoryboardDiagnosticSeverity.Error)
+                ])
+                : new(new JObject { ["sprites"] = new JArray() }, []);
+        public StoryboardRoot CreateLegacyProjection(ProjectDataContext context) =>
+            new();
+        public string ComputeLegacyProjectionHash(StoryboardRoot storyboard) => "";
     }
 
     private sealed class FakeResources : IProjectResourceService

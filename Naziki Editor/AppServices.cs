@@ -39,6 +39,7 @@ using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.Features.Audio.Playback;
 using Naziki_Editor.Shared.Input;
 using Naziki_Editor.Views.Loading;
+using Naziki_Editor.Core.Storyboard.Canonical;
 
 namespace Naziki_Editor
 {
@@ -72,6 +73,16 @@ namespace Naziki_Editor
             services.AddSingleton<IStoryboardPropertyCatalog, StoryboardPropertyCatalogService>();
             services.AddSingleton<IStoryboardDocumentReader, StoryboardDocumentReader>();
             services.AddSingleton<IStoryboardDocumentWriter, StoryboardDocumentWriter>();
+            services.AddSingleton<IEditorStoryboardSerializer, EditorStoryboardSerializer>();
+            services.AddSingleton<IEditorStoryboardValidator, EditorStoryboardValidator>();
+            services.AddSingleton<IStoryboardImportService, StoryboardImportService>();
+            services.AddSingleton<IStoryboardTimePositionResolver, StoryboardTimePositionResolver>();
+            services.AddSingleton<INoteQueryService, NoteQueryService>();
+            services.AddSingleton<IStoryboardMaterializer, StoryboardMaterializer>();
+            services.AddSingleton<IStoryboardRuntimeExporter, StoryboardRuntimeExporter>();
+            services.AddSingleton<IStoryboardSourceStore, StoryboardSourceStore>();
+            services.AddSingleton<IEditorStoryboardEditService, EditorStoryboardEditService>();
+            services.AddSingleton<IStoryboardCanonicalBridge, StoryboardCanonicalBridge>();
             services.AddSingleton<StoryboardPreviewService>();
             services.AddSingleton<IStoryboardPreviewDataSource>(sp => sp.GetRequiredService<StoryboardPreviewService>());
             services.AddSingleton<IStoryboardChangeFeed>(sp => sp.GetRequiredService<StoryboardPreviewService>());
@@ -151,7 +162,6 @@ namespace Naziki_Editor
 
             // 初始化静态服务定位器（Core/View 层静态类需要 IDialogService）
             Core.Timeline.Shared.TimelineLayoutEngine.Initialize(dialogService);
-            Core.Compilation.StoryboardCompiler.Initialize(dialogService);
             BoundedSliderControl.Initialize(dialogService);
 
             // 初始化设置系统：注册默认分类并加载已保存的设置

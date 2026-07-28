@@ -9,7 +9,7 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class NazikiProjectModel
     {
-        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 2;
+        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 3;
         // 1. 创世元数据
         public string ProjectName { get; set; } = "未命名项目";
         public string EditorVersion { get; set; } = "1.0.0";
@@ -19,6 +19,8 @@ namespace Naziki_Editor.Models
         // 2. 核心血脉的“引路石”（相对路径或绝对路径）
         public string? LevelFilePath { get; set; }
         public string? StoryboardExportPath { get; set; }
+        [JsonProperty("storyboard_source_path")]
+        public string? StoryboardSourcePath { get; set; } = ".naziki/storyboard.editor.json";
         public string? ChartFilePath { get; set; }
         public string? AudioFilePath { get; set; }
         public string? BackgroundPath { get; set; }

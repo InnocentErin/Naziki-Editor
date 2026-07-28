@@ -94,7 +94,7 @@ namespace Naziki_Editor.Core.Services
                         string json = File.ReadAllText(nemFile);
 
                         var capsule = JsonConvert.DeserializeObject<NemDocument>(json);
-                        if (capsule?.FormatVersion != 2) continue;
+                        if (capsule?.FormatVersion is not (2 or 3)) continue;
                         var payloadToken = Newtonsoft.Json.Linq.JObject.Parse(json)["payload"];
                         var miniRoot = payloadToken == null
                             ? null

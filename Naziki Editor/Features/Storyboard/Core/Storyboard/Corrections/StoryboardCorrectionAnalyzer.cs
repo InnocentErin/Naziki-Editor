@@ -13,13 +13,16 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
 
     private readonly IStoryboardTimeResolver _timeResolver;
     private readonly IStoryboardDocumentWriter _writer;
+    private readonly bool _legacyConflictDiagnostics;
 
     public StoryboardCorrectionAnalyzer(
         IStoryboardTimeResolver timeResolver,
-        IStoryboardDocumentWriter writer)
+        IStoryboardDocumentWriter writer,
+        bool legacyConflictDiagnostics = false)
     {
         _timeResolver = timeResolver;
         _writer = writer;
+        _legacyConflictDiagnostics = legacyConflictDiagnostics;
     }
 
     public StoryboardCorrectionReport Scan(
@@ -56,10 +59,18 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
         var triggerOnly = baseState?.Time is null &&
                           !string.IsNullOrWhiteSpace(entity.Id) &&
                           triggerSpawnIds.Contains(entity.Id);
+        var controller = entity is C2SceneController or C2NoteController;
+        var firstState = entity.GetKeyframes().Cast<object>()
+            .OfType<ObjectState>().FirstOrDefault();
+        var firstStateActivates = firstState?.Time is not null ||
+                                  firstState?.RelativeTime is not null ||
+                                  firstState?.AddTime is not null;
 
-        if (baseState?.Time is null && !triggerOnly)
+        if (baseState?.Time is null && !triggerOnly &&
+            (_legacyConflictDiagnostics ||
+             (!controller && !firstStateActivates)))
         {
-            var first = entity.GetKeyframes().Cast<object>().OfType<ObjectState>().FirstOrDefault();
+            var first = firstState;
             var repairable = first?.Time is not null &&
                              resolution.BaseTimeWasInferred &&
                              !resolution.Problems.Any(problem =>
@@ -109,7 +120,7 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
         }
 
         // 缺失基准时间先通过“提升首关键帧”解决，避免同时显示派生的基准冲突。
-        if (baseState?.Time is null) return;
+        if (baseState?.Time is null && _legacyConflictDiagnostics) return;
 
         var ordered = resolution.Occurrences.OrderBy(item => item.EffectiveTime).ToArray();
         var groupIndex = 0;
@@ -123,6 +134,19 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
             if (end - groupIndex > 1)
             {
                 var group = ordered[groupIndex..end];
+                if (!_legacyConflictDiagnostics)
+                {
+                    group = group.GroupBy(occurrence =>
+                            SemanticKey(occurrence.State))
+                        .Where(items => items.Count() > 1)
+                        .Select(items => items.ToArray())
+                        .FirstOrDefault() ?? [];
+                    if (group.Length == 0)
+                    {
+                        groupIndex = end;
+                        continue;
+                    }
+                }
                 var participants = group.Select((occurrence, index) =>
                     Participant(
                         occurrence.State,
@@ -136,7 +160,9 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
                 {
                     Id = $"{path}|same-time|{effectiveTime:R}",
                     Kind = StoryboardCorrectionKind.SameTimeConflict,
-                    Code = "STATE_TIME_CONFLICT",
+                    Code = _legacyConflictDiagnostics
+                        ? "STATE_TIME_CONFLICT"
+                        : "STATE_EXACT_DUPLICATE",
                     Path = path,
                     CollectionName = collection,
                     EntityType = entity.GetType().Name,
@@ -150,6 +176,15 @@ public sealed class StoryboardCorrectionAnalyzer : IStoryboardCorrectionAnalyzer
             }
             groupIndex = end;
         }
+    }
+
+    private string SemanticKey(ObjectState state)
+    {
+        var node = JObject.Parse(_writer.WriteNode(state));
+        node.Remove("time");
+        node.Remove("relative_time");
+        node.Remove("add_time");
+        return node.ToString(Newtonsoft.Json.Formatting.None);
     }
 
     private StoryboardCorrectionParticipant Participant(

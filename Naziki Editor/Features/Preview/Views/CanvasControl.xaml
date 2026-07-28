@@ -173,6 +173,25 @@
                 </Grid>
             </Grid>
         </TabItem>
+        <TabItem Header="运行导出预览">
+            <Grid Background="{DynamicResource MainBgColor}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0"
+                        Background="{DynamicResource MenuBgColor}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="0,0,0,1"
+                        Padding="10,7">
+                    <TextBlock Text="只读 · 该 JSON 与 Unity 预览及磁盘导出使用同一物化链路"
+                               Foreground="{DynamicResource TipsColor}"/>
+                </Border>
+                <controls:JsonCodeEditor Grid.Row="1"
+                                         x:Name="RuntimeJsonEditor"
+                                         IsReadOnly="True"/>
+            </Grid>
+        </TabItem>
     </TabControl>
     <loading:LoadingOverlay x:Name="LoadingOverlay" Panel.ZIndex="100"/>
     </Grid>

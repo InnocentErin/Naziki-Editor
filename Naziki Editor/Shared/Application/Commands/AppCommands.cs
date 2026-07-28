@@ -1,5 +1,4 @@
 using Naziki_Editor.Core.Abstractions;
-using Naziki_Editor.Core.Chart;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using System;
@@ -7,6 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using Naziki_Editor.Features.Project.Resources;
 
 namespace Naziki_Editor.Core.Commands
@@ -21,6 +23,8 @@ namespace Naziki_Editor.Core.Commands
         private readonly INotificationService _notificationService;
         private readonly IStoryboardDocumentValidator _storyboardValidator;
         private readonly IProjectResourceService _projectResources;
+        private readonly IStoryboardSourceStore _storyboardSourceStore;
+        private readonly IStoryboardCanonicalBridge _storyboardBridge;
 
         public AppCommands(
             IProjectService projectService,
@@ -30,7 +34,9 @@ namespace Naziki_Editor.Core.Commands
             ICompilationService compilationService,
             INotificationService notificationService,
             IStoryboardDocumentValidator storyboardValidator,
-            IProjectResourceService projectResources)
+            IProjectResourceService projectResources,
+            IStoryboardSourceStore storyboardSourceStore,
+            IStoryboardCanonicalBridge storyboardBridge)
         {
             _projectService = projectService;
             _dialogService = dialogService;
@@ -40,6 +46,8 @@ namespace Naziki_Editor.Core.Commands
             _notificationService = notificationService;
             _storyboardValidator = storyboardValidator;
             _projectResources = projectResources;
+            _storyboardSourceStore = storyboardSourceStore;
+            _storyboardBridge = storyboardBridge;
         }
 
         // ==========================================
@@ -106,6 +114,26 @@ namespace Naziki_Editor.Core.Commands
                 _historyService.RecordSnapshot(context.Storyboard);
             }
 
+            if (projectData.FormatVersion == 3)
+            {
+                var sourcePath = context.StoryboardSourcePath;
+                if (string.IsNullOrWhiteSpace(sourcePath) ||
+                    !File.Exists(sourcePath))
+                    throw new FileNotFoundException(
+                        "工程缺少规范故事板源文件 storyboard.editor.json。",
+                        sourcePath);
+                context.EditorStoryboard = _storyboardSourceStore.Load(sourcePath);
+            }
+            else
+            {
+                context.EditorStoryboard = _storyboardBridge.Synchronize(context);
+                context.IsLegacyProjectMigrationPending = true;
+            }
+#pragma warning disable CS0618
+            context.LegacyStoryboardProjectionHash =
+                _storyboardBridge.ComputeLegacyProjectionHash(context.Storyboard);
+#pragma warning restore CS0618
+
             // ==========================================
             // 🔴 【第三优先级】：加载完成后，通知 UI 刷新
             // ==========================================
@@ -171,11 +199,30 @@ namespace Naziki_Editor.Core.Commands
                 }
             }
 
+            IReadOnlyList<FileSnapshot> snapshots = [];
+            var exportHashBeforeSave =
+                context.EditorStoryboard.Metadata.LastExportHash;
             try
             {
-                var sourceErrors = _storyboardValidator
-                    .Validate(context.Storyboard, context)
-                    .Where(item => item.Severity == StoryboardDiagnosticSeverity.Error)
+                if (HasExternalStoryboardConflict(context))
+                {
+                    var choice = _dialogService.ShowConfirm(
+                        "检测到运行导出 JSON 已被外部程序修改。\n\n" +
+                        "“是”：重新导入外部 JSON 并替换规范源（模板绑定和逐 note 覆盖可能丢失）；\n" +
+                        "“否”：保留规范源并覆盖外部运行 JSON；\n" +
+                        "“取消”：中止本次保存。",
+                        "故事板外部修改冲突",
+                        DialogMessageType.Warning);
+                    if (choice == ConfirmResult.Cancel) return;
+                    if (choice == ConfirmResult.Yes)
+                        ReimportExternalStoryboard(context);
+                }
+
+                snapshots = CaptureSaveTargets(context);
+                var runtime = _storyboardBridge.Export(context);
+                var sourceErrors = runtime.Issues
+                    .Where(item => item.Severity ==
+                                   StoryboardDiagnosticSeverity.Error)
                     .ToArray();
                 _messageBroker.Publish("RefreshStoryboardDiagnostics");
                 if (sourceErrors.Length > 0)
@@ -185,15 +232,25 @@ namespace Naziki_Editor.Core.Commands
                             .Select(error => $"{error.Path}: {error.Message}")));
 
                 // 🧙‍♂️ 1/2. 影子分离、展平编译与模板元数据同步已下沉到 ICompilationService
-                var shadowStoryboard = _compilationService.CompileForExport(context);
+                // The canonical bridge materialized and validated the runtime
+                // document above. Saving must not invoke the legacy flattener.
 
                 // 💾 3. 谱面主文件物理落盘 (纯净无套娃官方格式)
-                await _projectService.ExportCytoidStoryboardAsync(
-                    shadowStoryboard, context.StoryboardPath, context);
+                await _projectService.ExportCytoidStoryboardJsonAsync(
+                    runtime.Json.ToString(Formatting.Indented),
+                    context.StoryboardPath);
+                context.EditorStoryboard.Metadata.LastExportHash = Hash(
+                    runtime.Json.ToString(Formatting.None));
 
                 // 📒 4. 写入元数据小账本
                 _compilationService.SyncTemplateMetadata(context);
-                await _projectService.SaveStoryboardMetaAsync(context, context.StoryboardPath);
+                context.EditorStoryboard.Metadata.LegacyMeta =
+                    JObject.FromObject(context.StoryboardMeta);
+                context.EditorStoryboard.Metadata.ControlBoardIdMaps =
+                    new Dictionary<string, string>(
+                        context.ProjectData?.ControlBoardIdMaps ??
+                        new Dictionary<string, string>(),
+                        StringComparer.Ordinal);
 
                 // 保存原本的工程配置文件 `.nep`
                 _projectService.SaveProjectNepFile(context, context.ProjectFilePath);
@@ -202,9 +259,116 @@ namespace Naziki_Editor.Core.Commands
             }
             catch (Exception ex)
             {
+                context.EditorStoryboard.Metadata.LastExportHash =
+                    exportHashBeforeSave;
+                RestoreSnapshots(snapshots);
                 _dialogService.ShowErrorDialog("时空网关在写入磁盘时爆炸啦 QAQ：\n" + ex.Message, "物理写盘错误", ex.ToString());
             }
         }
+
+        private bool HasExternalStoryboardConflict(ProjectDataContext context)
+        {
+            var expected = context.EditorStoryboard.Metadata.LastExportHash;
+            if (string.IsNullOrWhiteSpace(expected) ||
+                string.IsNullOrWhiteSpace(context.StoryboardPath) ||
+                !File.Exists(context.StoryboardPath))
+                return false;
+            try
+            {
+                var normalized = JToken.Parse(
+                    File.ReadAllText(context.StoryboardPath))
+                    .ToString(Formatting.None);
+                return !string.Equals(expected, Hash(normalized),
+                    StringComparison.Ordinal);
+            }
+            catch (JsonException)
+            {
+                return true;
+            }
+        }
+
+        private void ReimportExternalStoryboard(ProjectDataContext context)
+        {
+            var path = context.StoryboardPath ??
+                       throw new InvalidOperationException(
+                           "运行导出路径未设置。");
+            var json = File.ReadAllText(path);
+            var imported = AppServices.GetService<IStoryboardImportService>()
+                .Import(json, context.Chart, context.StoryboardMeta,
+                    context.ProjectData?.ControlBoardIdMaps);
+            if (!imported.CanReplace)
+                throw new JsonSerializationException(string.Join(
+                    Environment.NewLine,
+                    imported.Issues.Where(issue =>
+                            issue.Severity ==
+                            StoryboardDiagnosticSeverity.Error)
+                        .Select(issue =>
+                        $"{issue.Path}: {issue.Message}")));
+            context.EditorStoryboard = imported.Document;
+#pragma warning disable CS0618
+            context.Storyboard = AppServices
+                .GetService<IStoryboardDocumentReader>().Read(json);
+            context.LegacyStoryboardProjectionHash =
+                _storyboardBridge.ComputeLegacyProjectionHash(
+                    context.Storyboard);
+#pragma warning restore CS0618
+        }
+
+        private static string Hash(string text) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))
+                .ToLowerInvariant();
+
+        private IReadOnlyList<FileSnapshot> CaptureSaveTargets(
+            ProjectDataContext context)
+        {
+            var sourcePath = string.IsNullOrWhiteSpace(
+                context.StoryboardSourcePath)
+                ? _storyboardSourceStore.GetDefaultSourcePath(
+                    context.ProjectFilePath)
+                : context.StoryboardSourcePath;
+            return new[]
+                {
+                    context.StoryboardPath,
+                    sourcePath,
+                    context.ProjectFilePath
+                }
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(path => File.Exists(path)
+                    ? new FileSnapshot(path!, true,
+                        File.ReadAllBytes(path!))
+                    : new FileSnapshot(path!, false, null))
+                .ToArray();
+        }
+
+        private static void RestoreSnapshots(
+            IEnumerable<FileSnapshot> snapshots)
+        {
+            foreach (var snapshot in snapshots.Reverse())
+            {
+                try
+                {
+                    if (snapshot.Existed)
+                    {
+                        Directory.CreateDirectory(
+                            Path.GetDirectoryName(snapshot.Path)!);
+                        File.WriteAllBytes(snapshot.Path,
+                            snapshot.Contents ?? []);
+                    }
+                    else if (File.Exists(snapshot.Path))
+                    {
+                        File.Delete(snapshot.Path);
+                    }
+                }
+                catch
+                {
+                    // Keep reporting the original save failure.
+                }
+            }
+        }
+
+        private sealed record FileSnapshot(
+            string Path, bool Existed, byte[]? Contents);
 
         // ==========================================
         // 📥 导入谱面

@@ -25,6 +25,9 @@ namespace Naziki_Editor.Core.Project
         private readonly IStoryboardDocumentReader _storyboardReader;
         private readonly IStoryboardDocumentWriter _storyboardWriter;
         private readonly IStoryboardDocumentValidator _storyboardValidator;
+        private readonly IStoryboardSourceStore _storyboardSourceStore;
+        private readonly IStoryboardCanonicalBridge _storyboardBridge;
+        private readonly IStoryboardImportService _storyboardImporter;
 
         public ProjectService(
             IMessageBroker messageBroker,
@@ -32,7 +35,10 @@ namespace Naziki_Editor.Core.Project
             IStoryboardParser storyboardParser,
             IStoryboardDocumentReader storyboardReader,
             IStoryboardDocumentWriter storyboardWriter,
-            IStoryboardDocumentValidator storyboardValidator)
+            IStoryboardDocumentValidator storyboardValidator,
+            IStoryboardSourceStore storyboardSourceStore,
+            IStoryboardCanonicalBridge storyboardBridge,
+            IStoryboardImportService storyboardImporter)
         {
             _messageBroker = messageBroker;
             _errorHandler = errorHandler;
@@ -40,6 +46,9 @@ namespace Naziki_Editor.Core.Project
             _storyboardReader = storyboardReader;
             _storyboardWriter = storyboardWriter;
             _storyboardValidator = storyboardValidator;
+            _storyboardSourceStore = storyboardSourceStore;
+            _storyboardBridge = storyboardBridge;
+            _storyboardImporter = storyboardImporter;
         }
 
         public Task<ProjectDataContext?> LoadProjectAsync(string filePath)
@@ -89,6 +98,25 @@ namespace Naziki_Editor.Core.Project
             return Task.CompletedTask;
         }
 
+        public Task ExportCytoidStoryboardJsonAsync(
+            string runtimeJson, string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(runtimeJson))
+                throw new ArgumentException(
+                    "Runtime storyboard JSON is required.",
+                    nameof(runtimeJson));
+            if (string.IsNullOrWhiteSpace(outputPath))
+                throw new ArgumentException(
+                    "Output path is required.", nameof(outputPath));
+            var token = JToken.Parse(runtimeJson);
+            if (token is not JObject)
+                throw new JsonSerializationException(
+                    "Runtime storyboard root must be an object.");
+            WriteAllTextAtomic(outputPath,
+                token.ToString(Formatting.Indented));
+            return Task.CompletedTask;
+        }
+
         public Task SaveStoryboardMetaAsync(ProjectDataContext context, string storyboardPath)
         {
             SaveStoryboardMeta(context, storyboardPath);
@@ -122,15 +150,21 @@ namespace Naziki_Editor.Core.Project
                         $"FilePath: {filePath}");
                     return null;
                 }
-                if (projectData.FormatVersion != 2)
+                if (projectData.FormatVersion is not (2 or 3))
                     throw new JsonSerializationException(
                         $"不支持的项目格式版本 {projectData.FormatVersion}；当前版本仅支持 .nep v2。");
 
                 var context = new ProjectDataContext(_messageBroker)
                 {
                     ProjectFilePath = filePath,
-                    ProjectData = projectData
+                    ProjectData = projectData,
+                    IsLegacyProjectMigrationPending =
+                        projectData.FormatVersion == 2
                 };
+                if (projectData.FormatVersion == 3 &&
+                    !string.IsNullOrWhiteSpace(projectData.StoryboardSourcePath))
+                    context.StoryboardSourcePath = ResolveProjectPath(
+                        filePath, projectData.StoryboardSourcePath);
 
                 return context;
             }
@@ -161,14 +195,32 @@ namespace Naziki_Editor.Core.Project
             if (string.IsNullOrEmpty(targetPath)) throw new InvalidOperationException("工程文件路径未设置");
             if (context.ProjectData == null) throw new InvalidOperationException("工程数据为空");
 
+            string? sourcePath = null;
+            string? previousSource = null;
+            var sourceExisted = false;
+            var wasMigrationPending = context.IsLegacyProjectMigrationPending;
             try
             {
+                var canonical = _storyboardBridge.Synchronize(context);
+                sourcePath = ResolveSourcePath(targetPath, context);
+                sourceExisted = File.Exists(sourcePath);
+                if (sourceExisted) previousSource = File.ReadAllText(sourcePath);
+                if (context.IsLegacyProjectMigrationPending)
+                    BackupLegacyStoryboard(context, targetPath);
+                _storyboardSourceStore.Save(sourcePath, canonical);
+                context.ProjectData.FormatVersion = 3;
+                context.ProjectData.StoryboardSourcePath =
+                    ToProjectRelativePath(targetPath, sourcePath);
+                context.StoryboardSourcePath = sourcePath;
+                context.IsLegacyProjectMigrationPending = false;
                 context.ProjectData.LastModifiedTime = DateTime.Now;
                 string json = JsonConvert.SerializeObject(context.ProjectData, Formatting.Indented);
                 WriteAllTextAtomic(targetPath, json);
             }
             catch (JsonException ex)
             {
+                context.IsLegacyProjectMigrationPending = wasMigrationPending;
+                RestoreSource(sourcePath, sourceExisted, previousSource);
                 _errorHandler.HandleException(ex, ErrorSeverity.Error, "DataValidation",
                     "工程数据序列化失败", "ProjectService.SaveProjectNepFile",
                     $"FilePath: {targetPath}");
@@ -176,9 +228,17 @@ namespace Naziki_Editor.Core.Project
             }
             catch (IOException ex)
             {
+                context.IsLegacyProjectMigrationPending = wasMigrationPending;
+                RestoreSource(sourcePath, sourceExisted, previousSource);
                 _errorHandler.HandleException(ex, ErrorSeverity.Critical, "FileIO",
                     "写入工程文件 (.nep) 时发生 I/O 错误", "ProjectService.SaveProjectNepFile",
                     $"FilePath: {targetPath}");
+                throw;
+            }
+            catch
+            {
+                context.IsLegacyProjectMigrationPending = wasMigrationPending;
+                RestoreSource(sourcePath, sourceExisted, previousSource);
                 throw;
             }
         }
@@ -214,7 +274,9 @@ namespace Naziki_Editor.Core.Project
             {
                 MaterialType = materialType,
                 MaterialName = Path.GetFileNameWithoutExtension(fileName),
-                Payload = miniRoot
+                Payload = miniRoot,
+                EditorPayload = _storyboardImporter.Import(
+                    _storyboardWriter.Write(miniRoot)).Document
             };
             var capsuleJson = JObject.FromObject(capsule);
             capsuleJson["payload"] = JObject.Parse(_storyboardWriter.Write(miniRoot));
@@ -369,6 +431,79 @@ namespace Naziki_Editor.Core.Project
                     "读取谱面文件时发生 I/O 错误", "ProjectService.SilentImportChart",
                     $"FilePath: {chartPath}");
                 return null;
+            }
+        }
+
+        private string ResolveSourcePath(string projectFilePath,
+            ProjectDataContext context)
+        {
+            var configured = context.ProjectData?.StoryboardSourcePath;
+            return string.IsNullOrWhiteSpace(configured)
+                ? _storyboardSourceStore.GetDefaultSourcePath(projectFilePath)
+                : ResolveProjectPath(projectFilePath, configured);
+        }
+
+        private static string ResolveProjectPath(string projectFilePath,
+            string configuredPath)
+        {
+            if (Path.IsPathRooted(configuredPath))
+                return Path.GetFullPath(configuredPath);
+            var projectDirectory = Path.GetDirectoryName(
+                                       Path.GetFullPath(projectFilePath))
+                                   ?? throw new InvalidOperationException(
+                                       "Cannot resolve project directory.");
+            var resolved = Path.GetFullPath(Path.Combine(projectDirectory,
+                configuredPath.Replace('/', Path.DirectorySeparatorChar)));
+            var root = projectDirectory.TrimEnd(Path.DirectorySeparatorChar,
+                           Path.AltDirectorySeparatorChar) +
+                       Path.DirectorySeparatorChar;
+            if (!resolved.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException(
+                    "Storyboard source path escapes the project directory.");
+            return resolved;
+        }
+
+        private static string ToProjectRelativePath(string projectFilePath,
+            string absolutePath)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(projectFilePath))
+                            ?? throw new InvalidOperationException(
+                                "Cannot resolve project directory.");
+            return Path.GetRelativePath(directory, absolutePath)
+                .Replace('\\', '/');
+        }
+
+        private static void BackupLegacyStoryboard(ProjectDataContext context,
+            string projectFilePath)
+        {
+            if (string.IsNullOrWhiteSpace(context.StoryboardPath) ||
+                !File.Exists(context.StoryboardPath))
+                return;
+            var directory = Path.GetDirectoryName(Path.GetFullPath(projectFilePath))
+                            ?? throw new InvalidOperationException(
+                                "Cannot resolve project directory.");
+            var migrationDirectory = Path.Combine(directory, ".naziki",
+                "migrations");
+            Directory.CreateDirectory(migrationDirectory);
+            var backupPath = Path.Combine(migrationDirectory,
+                $"storyboard.v2.{DateTime.UtcNow:yyyyMMddHHmmssfff}.json");
+            File.Copy(context.StoryboardPath, backupPath, false);
+        }
+
+        private static void RestoreSource(string? sourcePath, bool existed,
+            string? previous)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath)) return;
+            try
+            {
+                if (existed && previous is not null)
+                    WriteAllTextAtomic(sourcePath, previous);
+                else if (File.Exists(sourcePath))
+                    File.Delete(sourcePath);
+            }
+            catch
+            {
+                // The original save exception has priority.
             }
         }
 

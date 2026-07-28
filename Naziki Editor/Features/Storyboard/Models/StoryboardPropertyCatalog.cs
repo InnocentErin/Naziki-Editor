@@ -21,4 +21,6 @@ public sealed class StoryboardPropertyDefinition
     [JsonProperty("min")] public double? Min { get; set; }
     [JsonProperty("max")] public double? Max { get; set; }
     [JsonProperty("default")] public Newtonsoft.Json.Linq.JToken? Default { get; set; }
+    [JsonProperty("array_semantics")]
+    public string ArraySemantics { get; set; } = "value";
 }

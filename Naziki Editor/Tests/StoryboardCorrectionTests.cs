@@ -390,7 +390,9 @@ public sealed class StoryboardCorrectionTests
         Services()
     {
         var writer = new StoryboardDocumentWriter();
-        var analyzer = new StoryboardCorrectionAnalyzer(new StoryboardTimeResolver(), writer);
+        var analyzer = new StoryboardCorrectionAnalyzer(
+            new StoryboardTimeResolver(), writer,
+            legacyConflictDiagnostics: true);
         var service = new StoryboardCorrectionService(
             analyzer, writer, new EditorSnapshotSerializer());
         return (analyzer, service);

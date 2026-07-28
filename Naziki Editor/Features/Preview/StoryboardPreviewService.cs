@@ -1,5 +1,6 @@
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.State;
+using Naziki_Editor.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
@@ -12,18 +13,19 @@ public sealed class StoryboardPreviewService :
     IStoryboardChangeFeed,
     IStoryboardPreviewPublisher
 {
-    private readonly IStoryboardDocumentWriter _writer;
+    private readonly IStoryboardCanonicalBridge _bridge;
     private readonly IProjectResourceService _resources;
     private readonly object _syncRoot = new();
     private readonly List<Action<StoryboardPreviewChangeSet>> _subscribers = [];
     private long _version;
     private string _sessionId = Guid.NewGuid().ToString("N");
+    private string? _lastKnownGoodStoryboardJson;
 
     public StoryboardPreviewService(
-        IStoryboardDocumentWriter writer,
+        IStoryboardCanonicalBridge bridge,
         IProjectResourceService resources)
     {
-        _writer = writer;
+        _bridge = bridge;
         _resources = resources;
     }
     public long CurrentVersion => Interlocked.Read(ref _version);
@@ -37,11 +39,21 @@ public sealed class StoryboardPreviewService :
         var assetRoot = _resources.ResolvePath(context, ProjectResourceKind.Asset) ?? projectDirectory;
 
         var levelPath = _resources.ResolvePath(context, ProjectResourceKind.Level);
+        var exported = _bridge.Export(context);
+        if (exported.Success)
+            _lastKnownGoodStoryboardJson = exported.Json.ToString(Formatting.None);
+        else if (_lastKnownGoodStoryboardJson is null)
+            throw new JsonSerializationException(string.Join(
+                Environment.NewLine,
+                exported.Issues.Where(issue =>
+                        issue.Severity == StoryboardDiagnosticSeverity.Error)
+                    .Select(issue => $"{issue.Path}: {issue.Message}")));
+
         return new StoryboardPreviewSnapshot(
             _sessionId,
             CurrentVersion,
             context.ProjectFilePath,
-            _writer.Write(context.Storyboard),
+            _lastKnownGoodStoryboardJson!,
             SerializeChartForPreview(context.Chart),
             assetRoot,
             playbackTime)
@@ -135,6 +147,7 @@ public sealed class StoryboardPreviewService :
     {
         _sessionId = Guid.NewGuid().ToString("N");
         Interlocked.Exchange(ref _version, 0);
+        _lastKnownGoodStoryboardJson = null;
     }
 
     private void Publish(StoryboardPreviewChangeSet changes)

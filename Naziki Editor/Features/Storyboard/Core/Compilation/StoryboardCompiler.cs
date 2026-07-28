@@ -9,6 +9,7 @@ using Naziki_Editor.Core;
 
 namespace Naziki_Editor.Core.Compilation
 {
+    [Obsolete("Legacy regression fixture only. Runtime export uses IStoryboardRuntimeExporter.")]
     public class StoryboardCompiler
     {
         private static IDialogService? _dialogService;

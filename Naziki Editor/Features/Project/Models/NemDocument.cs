@@ -9,7 +9,7 @@ namespace Naziki_Editor.Models
     // ==========================================
     public class NemDocument
     {
-        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 2;
+        [JsonProperty("format_version")] public int FormatVersion { get; set; } = 3;
         // 素材的种类："Text", "Line", "Template" 等
         [JsonProperty("material_type")] public string MaterialType { get; set; }
 
@@ -17,6 +17,9 @@ namespace Naziki_Editor.Models
         [JsonProperty("material_name")] public string MaterialName { get; set; }
 
         [JsonProperty("payload")] public StoryboardRoot Payload { get; set; } = new();
+
+        [JsonProperty("editor_payload", NullValueHandling = NullValueHandling.Ignore)]
+        public EditorStoryboardDocument? EditorPayload { get; set; }
 
         // 制造日期
         [JsonProperty("creation_time")] public DateTime CreationTime { get; set; } = DateTime.Now;

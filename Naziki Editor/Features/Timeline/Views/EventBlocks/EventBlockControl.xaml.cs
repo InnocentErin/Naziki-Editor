@@ -1,6 +1,5 @@
 ﻿using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
-using Naziki_Editor.Core.Chart;
 using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Timeline.Shared;
 using Naziki_Editor.Core.Timeline.EventBlocks.Abstractions;
@@ -17,6 +16,8 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Views
 {
@@ -29,7 +30,7 @@ namespace Naziki_Editor.Views
         private ProjectDataContext _context;
         private double _pixelsPerSecond = 100.0;
         private IEventBlockService _clipService;
-        private INoteSelectorService _noteSelectorService;
+        private INoteQueryService? _noteQueryService;
         private readonly IMessageBroker _messageBroker;
         private readonly IDialogService _dialogService;
         private UI.Rendering.NoteVisualEngine _noteVisualEngine;
@@ -101,16 +102,20 @@ namespace Naziki_Editor.Views
             object targetObj = targetProp?.GetValue(noteCtrl.BaseState);
             if (targetObj == null || _context?.Chart == null) return;
 
-            string targetStr = targetObj.ToString().Trim();
-            var selector = _noteSelectorService.ParseSelector(targetStr);
-            if (selector == null) return;
+            var query = ParseNoteQuery(targetObj);
+            if (query == null) return;
 
             // 🔬 2. 使用 Core 层音符选择器服务过滤音符
-            var matchedNotes = _noteSelectorService.SelectNotes(_context.Chart, selector);
+            _noteQueryService ??= AppServices.GetService<INoteQueryService>();
+            var matchedNotes = _noteQueryService.Match(_context.Chart, query);
             if (matchedNotes.Count == 0) return; // 没匹配到，保持方块安静
 
             // 📐 3. 绘制高亮背景区间 (时空边界结界！)
-            var (minSec, maxSec) = _noteSelectorService.GetMatchedTimeRange(_context.Chart, selector, _context.TimeEngine);
+            var minSec = matchedNotes.Min(note =>
+                _context.TimeEngine.TickToSeconds(note.tick));
+            var maxSec = matchedNotes.Max(note =>
+                _context.TimeEngine.TickToSeconds(
+                    note.tick + Math.Max(0, note.hold_tick)));
 
             double startX = minSec * _pixelsPerSecond;
             double endX = maxSec * _pixelsPerSecond;
@@ -142,8 +147,44 @@ namespace Naziki_Editor.Views
 
             // 🎵 5. 终极偷天换日投影：召唤底部音符刻度工厂！
             var subCanvas = new Canvas { IsHitTestVisible = false };
-            _noteVisualEngine.RenderNoteRuler(subCanvas, matchedNotes, _context.TimeEngine, _pixelsPerSecond, false);
+            _noteVisualEngine.RenderNoteRuler(subCanvas, matchedNotes.ToList(), _context.TimeEngine, _pixelsPerSecond, false);
             NodeCanvas.Children.Add(subCanvas);
+        }
+
+        private static NoteQuery? ParseNoteQuery(object value)
+        {
+            if (value is int id)
+                return new NoteQuery { Start = id, End = id };
+            JToken? token = value as JToken;
+            if (token is null)
+            {
+                var raw = value.ToString()?.Trim();
+                if (int.TryParse(raw, out id))
+                    return new NoteQuery { Start = id, End = id };
+                if (string.IsNullOrWhiteSpace(raw) || !raw.StartsWith("{"))
+                    return null;
+                try { token = JToken.Parse(raw); }
+                catch (JsonException) { return null; }
+            }
+            if (token.Type == JTokenType.Integer)
+            {
+                id = token.Value<int>();
+                return new NoteQuery { Start = id, End = id };
+            }
+            if (token is not JObject selector) return null;
+            var query = new NoteQuery
+            {
+                Start = selector.Value<int?>("start"),
+                End = selector.Value<int?>("end"),
+                Direction = selector.Value<int?>("direction"),
+                MinX = selector.Value<double?>("min_x"),
+                MaxX = selector.Value<double?>("max_x")
+            };
+            if (selector["type"] is JArray types)
+                query.Types.AddRange(types.Values<int>());
+            else if (selector["type"]?.Type == JTokenType.Integer)
+                query.Types.Add(selector.Value<int>("type"));
+            return query;
         }
 
 
@@ -159,7 +200,7 @@ namespace Naziki_Editor.Views
             _noteVisualEngine = noteVisualEngine;
             _clipService.SetContext(context);
             _clipService.SetPixelsPerSecond(pixelsPerSecond);
-            _noteSelectorService = new NoteSelectorService();
+            _noteQueryService ??= AppServices.GetService<INoteQueryService>();
 
             CurrentTrackIndex = trackIndex;
             MaxTrackIndex = maxTrackIndex;
