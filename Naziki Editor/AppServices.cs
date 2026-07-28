@@ -38,6 +38,7 @@ using Naziki_Editor.Features.Preview;
 using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.Features.Audio.Playback;
 using Naziki_Editor.Shared.Input;
+using Naziki_Editor.Views.Loading;
 
 namespace Naziki_Editor
 {
@@ -101,6 +102,7 @@ namespace Naziki_Editor
             
             // UI层服务 - 单例
             services.AddSingleton<IDialogService, WpfDialogService>();
+            services.AddSingleton<ILoadingService, LoadingService>();
             services.AddSingleton<EditorResourceManager>();
             services.AddSingleton<UI.Rendering.NoteVisualEngine>();
             services.AddSingleton<UI.Rendering.GlobalRenderEngine>();

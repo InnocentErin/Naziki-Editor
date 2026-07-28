@@ -40,6 +40,7 @@ namespace Naziki_Editor.Views
         private readonly IPreviewPlaybackController _previewPlayback;
         private readonly IPlaybackCoordinator _playback;
         private readonly ISettingsStore _settings;
+        private readonly ILoadingService _loading;
         private string _aspectRatio = "16:9";
         private bool _reloadInProgress;
 
@@ -66,6 +67,8 @@ namespace Naziki_Editor.Views
             _previewPlayback = AppServices.GetService<IPreviewPlaybackController>();
             _playback = AppServices.GetService<IPlaybackCoordinator>();
             _settings = AppServices.GetService<ISettingsStore>();
+            _loading = AppServices.GetService<ILoadingService>();
+            _loading.Register(this, LoadingOverlay);
             _aspectRatio = PreviewSettingsProvider.ParseAspectRatio(
                 _settings.Get("Editor.PreviewAspectRatio", "16:9"));
             _unityHost = new UnityPreviewHwndHost();
@@ -89,6 +92,7 @@ namespace Naziki_Editor.Views
 
         private async Task OpenNativePreviewAsync(IntPtr handle)
         {
+            using var loading = _loading.Begin(this, "请稍等，正在加载预览");
             try
             {
                 var (width, height) = GetPreviewPixelSize();
@@ -153,6 +157,7 @@ namespace Naziki_Editor.Views
                 return;
 
             _reloadInProgress = true;
+            using var loading = _loading.Begin(this, "请稍等，正在加载预览");
             SetReloadButtonsEnabled(false);
             var restoreTime = _playback.CurrentTime;
             var restorePlaying = _playback.IsPlaying;
@@ -215,6 +220,7 @@ namespace Naziki_Editor.Views
             if (_reloadInProgress)
                 return;
             _reloadInProgress = true;
+            using var loading = _loading.Begin(this, "请稍等，正在加载预览");
             SetReloadButtonsEnabled(false);
             var restoreTime = _playback.CurrentTime;
             var restorePlaying = _playback.IsPlaying;
@@ -257,6 +263,7 @@ namespace Naziki_Editor.Views
         private async void BtnRetryPreview_Click(object sender, RoutedEventArgs e)
         {
             BtnRetryPreview.IsEnabled = false;
+            using var loading = _loading.Begin(this, "请稍等，正在加载预览");
             try { await _previewSession.RetryAsync(); }
             finally { BtnRetryPreview.IsEnabled = true; }
         }

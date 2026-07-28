@@ -12,6 +12,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Threading.Tasks;
+using Naziki_Editor.Views.Loading;
 
 namespace Naziki_Editor.ProjectManagement
 {
@@ -20,6 +22,8 @@ namespace Naziki_Editor.ProjectManagement
         private readonly IDialogService _dialogService;
         private readonly AppCommands _appCommands;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILoadingService _loading;
+        private bool _projectOpening;
 
         // 💾 档案馆模型：专门用来存储单条历史足迹
         public class ProjectHistoryItem
@@ -36,6 +40,8 @@ namespace Naziki_Editor.ProjectManagement
             _dialogService = dialogService;
             _appCommands = appCommands;
             _serviceProvider = serviceProvider;
+            _loading = AppServices.GetService<ILoadingService>();
+            _loading.Register(this, LoadingOverlay);
 
             // 📡 在构造时死死拴住线缆：监听左侧历史列表的"点选"动作！
             HistoryListBox.SelectionChanged += HistoryListBox_SelectionChanged;
@@ -144,8 +150,9 @@ namespace Naziki_Editor.ProjectManagement
         // ==========================================
         // 📡 历史记录点击响应：核心路径双向交叉安检
         // ==========================================
-        private void HistoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void HistoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_projectOpening) return;
             if (HistoryListBox.SelectedItem is ListBoxItem selectedItem && selectedItem.Tag is ProjectHistoryItem historyItem)
             {
                 // 🔥 关键防死锁：点完立刻清空选中状态，确保用户连续点击同一个失效文件时依然能疯狂弹窗！
@@ -156,17 +163,22 @@ namespace Naziki_Editor.ProjectManagement
                 {
                     try
                     {
-                        string jsonText = File.ReadAllText(historyItem.FilePath);
+                        _projectOpening = true;
+                        SetProjectActionsEnabled(false);
+                        using var loading = _loading.Begin(this, "请稍等，正在打开项目");
+                        string jsonText = await File.ReadAllTextAsync(historyItem.FilePath);
                         NazikiProjectModel project = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
 
                         if (project == null) throw new Exception("工程文件配置已损坏！");
 
                         // 刷新最后宠幸时间，并带进主大本营
                         AddToHistory(historyItem.FilePath, historyItem.ProjectName);
-                        LaunchMainWindow(historyItem.FilePath, project);
+                        await LaunchMainWindowAsync(historyItem.FilePath, project);
                     }
                     catch (Exception ex)
                     {
+                        _projectOpening = false;
+                        SetProjectActionsEnabled(true);
                         _dialogService.ShowErrorDialog($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败", ex.ToString());
                     }
                 }
@@ -198,8 +210,9 @@ namespace Naziki_Editor.ProjectManagement
         // ==========================================
         // ✨ 右侧操作：新建项目文件
         // ==========================================
-        private void BtnCreateProject_Click(object sender, RoutedEventArgs e)
+        private async void BtnCreateProject_Click(object sender, RoutedEventArgs e)
         {
+            if (_projectOpening) return;
             var wizard = new Naziki_Editor.Views.Dialogs.NewProjectDialog
             {
                 Owner = this
@@ -207,15 +220,19 @@ namespace Naziki_Editor.ProjectManagement
             if (wizard.ShowDialog() == true && wizard.CreatedProject is { } created)
             {
                 AddToHistory(created.ProjectFilePath, created.Project.ProjectName);
-                LaunchMainWindow(created.ProjectFilePath, created.Project);
+                _projectOpening = true;
+                SetProjectActionsEnabled(false);
+                using var loading = _loading.Begin(this, "请稍等，正在打开项目");
+                await LaunchMainWindowAsync(created.ProjectFilePath, created.Project);
             }
         }
 
         // ==========================================
         // 📂 右侧操作：手动打开项目文件
         // ==========================================
-        private void BtnOpenProject_Click(object sender, RoutedEventArgs e)
+        private async void BtnOpenProject_Click(object sender, RoutedEventArgs e)
         {
+            if (_projectOpening) return;
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Title = "打开 Naziki 工程文件",
@@ -227,7 +244,10 @@ namespace Naziki_Editor.ProjectManagement
                 string nepPath = openFileDialog.FileName;
                 try
                 {
-                    string jsonText = File.ReadAllText(nepPath);
+                    _projectOpening = true;
+                    SetProjectActionsEnabled(false);
+                    using var loading = _loading.Begin(this, "请稍等，正在打开项目");
+                    string jsonText = await File.ReadAllTextAsync(nepPath);
                     NazikiProjectModel project = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
 
                     if (project == null) throw new Exception("工程文件内容损坏或为空！");
@@ -235,19 +255,22 @@ namespace Naziki_Editor.ProjectManagement
                     // 🌟 登记入册！把手动打开的健康项目也加入最近列表
                     AddToHistory(nepPath, project.ProjectName);
 
-                    LaunchMainWindow(nepPath, project);
+                    await LaunchMainWindowAsync(nepPath, project);
                 }
                 catch (Exception ex)
                 {
+                    _projectOpening = false;
+                    SetProjectActionsEnabled(true);
                     _dialogService.ShowErrorDialog($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败", ex.ToString());
                 }
             }
         }
 
-        private void LaunchMainWindow(string projectFilePath, NazikiProjectModel projectData)
+        private async Task LaunchMainWindowAsync(string projectFilePath, NazikiProjectModel projectData)
         {
             MainWindow editorWindow = _serviceProvider.GetRequiredService<MainWindow>();
             editorWindow.Show();
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
             // 🛡️ 关键修复：将 Application.Current.MainWindow 显式指向编辑器主窗口，
             // 防止后续 ErrorDialog 等弹窗将 Owner 设置为已关闭的 ProjectHubWindow 而触发穿模崩溃。
@@ -255,6 +278,13 @@ namespace Naziki_Editor.ProjectManagement
 
             _appCommands.DoLoadProject(projectFilePath, projectData, editorWindow.Context);
             this.Close(); // 顺利进城，摧毁传送门
+        }
+
+        private void SetProjectActionsEnabled(bool enabled)
+        {
+            BtnCreateProject.IsEnabled = enabled;
+            BtnOpenProject.IsEnabled = enabled;
+            HistoryListBox.IsEnabled = enabled;
         }
     }
 }

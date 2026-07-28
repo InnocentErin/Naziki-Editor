@@ -4,8 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Naziki_Editor.Views.Controls"
+             xmlns:loading="clr-namespace:Naziki_Editor.Views.Loading"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="800">
+    <Grid>
     <TabControl x:Name="CanvasTabControl"
                 TabStripPlacement="Top"
                 Background="{DynamicResource MainBgColor}"
@@ -172,4 +174,6 @@
             </Grid>
         </TabItem>
     </TabControl>
+    <loading:LoadingOverlay x:Name="LoadingOverlay" Panel.ZIndex="100"/>
+    </Grid>
 </UserControl>
