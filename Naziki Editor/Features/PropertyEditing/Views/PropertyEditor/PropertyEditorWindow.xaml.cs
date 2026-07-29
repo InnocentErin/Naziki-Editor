@@ -19,6 +19,7 @@ namespace Naziki_Editor.Views.PropertyEditor
         private string _originalId;
         private bool _isTemplateMode = false;
         private string _templateName;
+        private string? _canonicalTemplateId;
         private C2Template _editingTemplate;
 
         private IStoryboardEntity _mainObject;
@@ -152,6 +153,20 @@ namespace Naziki_Editor.Views.PropertyEditor
             }
         }
 
+        public PropertyEditorWindow(string templateName,
+            C2Template targetTemplate,
+            ProjectDataContext context,
+            IDialogService dialogService,
+            IStoryboardRepository storyboardRepository,
+            IPropertyEditorService propertyEditorService,
+            IMessageBroker messageBroker,
+            string canonicalTemplateId)
+            : this(templateName, targetTemplate, context, dialogService,
+                storyboardRepository, propertyEditorService, messageBroker)
+        {
+            _canonicalTemplateId = canonicalTemplateId;
+        }
+
         // ==========================================
         // 💾 终极落盘总线
         // ==========================================
@@ -171,6 +186,18 @@ namespace Naziki_Editor.Views.PropertyEditor
             {
                 string newName = ModIdentity.TxtObjectId.Text.Trim();
                 if (string.IsNullOrEmpty(newName)) { _dialogService.ShowMessage("模板名称不能为空！", "拦截"); return; }
+
+                if (!string.IsNullOrWhiteSpace(_canonicalTemplateId))
+                {
+                    Tag = new CanonicalTemplateEditResult(
+                        _canonicalTemplateId,
+                        _templateName,
+                        newName,
+                        _editingTemplate);
+                    DialogResult = true;
+                    Close();
+                    return;
+                }
 
                 if (newName != _templateName)
                 {

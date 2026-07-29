@@ -30,6 +30,7 @@ namespace Naziki_Editor.Core
             
             // 🏷️ 扫描线与色彩
             new TrackBlueprint { GroupName = "扫描线与色彩", JsonName = "scanline_opacity", DisplayName = "扫描线透明度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "扫描线与色彩", JsonName = "scanline_smoothing", DisplayName = "扫描线平滑", DataType = TrackDataType.Boolean },
             new TrackBlueprint { GroupName = "扫描线与色彩", JsonName = "override_scanline_pos", DisplayName = "允许覆盖扫描线坐标", DataType = TrackDataType.Boolean },
             new TrackBlueprint { GroupName = "扫描线与色彩", JsonName = "scanline_pos", DisplayName = "扫描线 Y 坐标", DataType = TrackDataType.Float },
             new TrackBlueprint { GroupName = "扫描线与色彩", JsonName = "scanline_color", DisplayName = "扫描线覆盖色", DataType = TrackDataType.Color },
@@ -70,6 +71,15 @@ namespace Naziki_Editor.Core
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatical", DisplayName = "开启色差干扰", DataType = TrackDataType.Boolean },
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatical_intensity", DisplayName = "色差强度", DataType = TrackDataType.Float },
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatical_speed", DisplayName = "色差速度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatic", DisplayName = "开启色散", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatic_intensity", DisplayName = "色散强度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatic_start", DisplayName = "色散起点", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "chromatic_end", DisplayName = "色散终点", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "artifact", DisplayName = "开启伪影", DataType = TrackDataType.Boolean },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "artifact_intensity", DisplayName = "伪影强度", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "artifact_colorisation", DisplayName = "伪影着色", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "artifact_parasite", DisplayName = "伪影寄生", DataType = TrackDataType.Float },
+            new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "artifact_noise", DisplayName = "伪影噪声", DataType = TrackDataType.Float },
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "noise", DisplayName = "开启噪点滤镜", DataType = TrackDataType.Boolean },
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "noise_intensity", DisplayName = "噪点强度 (0~1)", DataType = TrackDataType.Float },
             new TrackBlueprint { GroupName = "干扰特效 (Distort)", JsonName = "tape", DisplayName = "开启屏幕翻转(Tape)", DataType = TrackDataType.Boolean },

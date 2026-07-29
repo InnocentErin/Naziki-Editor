@@ -508,6 +508,8 @@ public sealed class UnityStoryboardPreviewHost :
         }
         catch (Exception ex)
         {
+            if (ex is PreviewUnityRuntimeException)
+                return;
             SetDiagnostics(PreviewAvailabilityState.Faulted,
                 [new PreviewDiagnostic(
                     "PREVIEW_SNAPSHOT_FAILED",
@@ -569,6 +571,8 @@ public sealed class UnityStoryboardPreviewHost :
         }
         catch (Exception ex)
         {
+            if (ex is PreviewUnityRuntimeException)
+                return;
             SetDiagnostics(PreviewAvailabilityState.Faulted,
                 [new PreviewDiagnostic(
                     "PREVIEW_UPDATE_FAILED",
@@ -689,10 +693,86 @@ public sealed class UnityStoryboardPreviewHost :
                     message.Payload.Value<long?>("droppedTelemetryMessages") ?? 0);
                 Changed?.Invoke(this, EventArgs.Empty);
                 break;
+            case "preview.telemetry":
+                TryHandleUnityRuntimeException(message.Payload);
+                break;
             case "preview.error":
                 RejectPending(message);
                 break;
         }
+    }
+
+    private void TryHandleUnityRuntimeException(JObject telemetry)
+    {
+        var raw = telemetry.Value<string>("cytoidGameCoreV2");
+        if (string.IsNullOrWhiteSpace(raw))
+            return;
+
+        JObject envelope;
+        try
+        {
+            envelope = JObject.Parse(raw);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (!string.Equals(envelope.Value<string>("type"), "session.result",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var error = envelope["payload"]?["error"] as JObject;
+        if (error is null)
+            return;
+
+        var message = error.Value<string>("message");
+        if (string.IsNullOrWhiteSpace(message))
+            message = "Unity 初始化关卡时发生了未提供详情的运行时异常。";
+        var path = error["details"]?.Value<string>("path") ??
+                   ExtractJsonPath(message);
+        var exception = new PreviewUnityRuntimeException(message);
+
+        var rejectedAny = false;
+        foreach (var item in _pendingVersions.ToArray())
+        {
+            if (!_pendingVersions.TryRemove(item.Key, out var pending))
+                continue;
+            pending.Completion.TrySetException(exception);
+            rejectedAny = true;
+        }
+        foreach (var item in _pendingCommands.ToArray())
+        {
+            if (!_pendingCommands.TryRemove(item.Key, out var pending))
+                continue;
+            pending.TrySetException(exception);
+            rejectedAny = true;
+        }
+
+        Pause();
+        SetDiagnostics(PreviewAvailabilityState.InvalidData,
+            [new PreviewDiagnostic(
+                "PREVIEW_UNITY_RUNTIME_EXCEPTION",
+                message,
+                PreviewDiagnosticSeverity.Error,
+                PreviewDiagnosticSource.Unity,
+                path,
+                Suggestion: error.Value<string>("code"))]);
+        if (rejectedAny)
+            CompleteChangeQueue();
+    }
+
+    private static string? ExtractJsonPath(string message)
+    {
+        const string marker = "Path '";
+        var start = message.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+            return null;
+        start += marker.Length;
+        var end = message.IndexOf('\'', start);
+        return end > start ? $"$.{message[start..end]}" : null;
     }
 
     private void AcceptPending(string requestId, long targetVersion)
@@ -723,12 +803,26 @@ public sealed class UnityStoryboardPreviewHost :
 
     private void RejectPending(PreviewProtocolMessage message)
     {
+        var rejectedPending = false;
         if (_pendingCommands.TryRemove(message.RequestId, out var command))
+        {
             command.TrySetException(new InvalidOperationException(
                 message.Payload.Value<string>("message") ?? "Unity rejected the preview command."));
+            rejectedPending = true;
+        }
         if (_pendingVersions.TryRemove(message.RequestId, out var pending))
+        {
             pending.Completion.TrySetException(new InvalidOperationException(
                 message.Payload.Value<string>("message") ?? "Unity rejected the preview version."));
+            rejectedPending = true;
+        }
+        // A session.result runtime exception may arrive before Unity emits its
+        // delayed generic rejection. Keep the actionable root exception.
+        if (!rejectedPending && _diagnostics.Any(item =>
+                item.Code == "PREVIEW_UNITY_RUNTIME_EXCEPTION"))
+        {
+            return;
+        }
         Pause();
         SetDiagnostics(PreviewAvailabilityState.InvalidData,
             [new PreviewDiagnostic(
@@ -1004,4 +1098,7 @@ public sealed class UnityStoryboardPreviewHost :
         PreviewVfsVersion Vfs,
         PreviewPlaybackState PlaybackState,
         TaskCompletionSource<bool> Completion);
+
+    private sealed class PreviewUnityRuntimeException(string message)
+        : InvalidOperationException(message);
 }

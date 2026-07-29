@@ -21,6 +21,12 @@ namespace Naziki_Editor.Models
         public string? StoryboardExportPath { get; set; }
         [JsonProperty("storyboard_source_path")]
         public string? StoryboardSourcePath { get; set; } = ".naziki/storyboard.editor.json";
+        [JsonIgnore]
+        public bool StoryboardSourceRecoveredDuringLoad { get; set; }
+        [JsonProperty("storyboard_source_hash")]
+        public string? StoryboardSourceHash { get; set; }
+        [JsonProperty("storyboard_export_hash")]
+        public string? StoryboardExportHash { get; set; }
         public string? ChartFilePath { get; set; }
         public string? AudioFilePath { get; set; }
         public string? BackgroundPath { get; set; }

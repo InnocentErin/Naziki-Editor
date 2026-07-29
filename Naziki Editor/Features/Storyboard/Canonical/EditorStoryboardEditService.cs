@@ -135,6 +135,145 @@ public sealed class EditorStoryboardEditService :
         Touch(document);
     }
 
+    public EditorStoryboardTemplate AddTemplate(
+        EditorStoryboardDocument document, string name)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        name = ValidateTemplateName(name);
+        if (document.Templates.ContainsKey(name))
+            throw new InvalidOperationException(
+                $"模板“{name}”已经存在。");
+
+        var template = new EditorStoryboardTemplate
+        {
+            TemplateId = StoryboardStableId.Create(document.DocumentId,
+                "template", Guid.NewGuid().ToString("N")),
+            Name = name,
+            Source = new EditorSourceInfo
+            {
+                Path = $"$.templates.{name}",
+                SourceOrder = document.Templates.Count
+            }
+        };
+        document.Templates.Add(name, template);
+        Touch(document);
+        return template;
+    }
+
+    public void UpdateTemplate(EditorStoryboardDocument document,
+        string templateId, EditorStoryboardTemplate replacement)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(replacement);
+        var (key, existing) = FindTemplate(document, templateId);
+
+        var oldFrames = existing.Frames
+            .OrderBy(frame => frame.Sequence).ToArray();
+        var newFrames = replacement.Frames
+            .OrderBy(frame => frame.Sequence).ToArray();
+        var oldFrameIds = oldFrames.Select(frame => frame.FrameId)
+            .ToHashSet(StringComparer.Ordinal);
+        var claimedOldIds = newFrames.Select(frame => frame.FrameId)
+            .Where(oldFrameIds.Contains)
+            .ToHashSet(StringComparer.Ordinal);
+        for (var index = 0; index < Math.Min(oldFrames.Length,
+                 newFrames.Length); index++)
+        {
+            if (!oldFrameIds.Contains(newFrames[index].FrameId) &&
+                !claimedOldIds.Contains(oldFrames[index].FrameId))
+            {
+                newFrames[index].FrameId = oldFrames[index].FrameId;
+                claimedOldIds.Add(oldFrames[index].FrameId);
+            }
+        }
+
+        var retainedFrameIds = newFrames.Select(frame => frame.FrameId)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var binding in EnumerateBindings(document)
+                     .Where(binding => string.Equals(binding.TemplateName,
+                         existing.Name, StringComparison.Ordinal)))
+        {
+            foreach (var removedId in binding.FrameOverrides.Keys
+                         .Where(id => !retainedFrameIds.Contains(id)).ToArray())
+            {
+                binding.OrphanedOverrides[removedId] =
+                    binding.FrameOverrides[removedId];
+                binding.FrameOverrides.Remove(removedId);
+            }
+        }
+
+        replacement.TemplateId = existing.TemplateId;
+        replacement.Name = existing.Name;
+        replacement.Source.SourceOrder = existing.Source.SourceOrder;
+        document.Templates[key] = replacement;
+        Touch(document);
+    }
+
+    public void RenameTemplate(EditorStoryboardDocument document,
+        string templateId, string newName)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        newName = ValidateTemplateName(newName);
+        var (oldName, template) = FindTemplate(document, templateId);
+        if (string.Equals(oldName, newName, StringComparison.Ordinal))
+            return;
+        if (document.Templates.ContainsKey(newName))
+            throw new InvalidOperationException(
+                $"模板“{newName}”已经存在。");
+
+        document.Templates.Remove(oldName);
+        template.Name = newName;
+        template.Source.Path = $"$.templates.{newName}";
+        document.Templates.Add(newName, template);
+        foreach (var binding in EnumerateBindings(document))
+        {
+            if (string.Equals(binding.TemplateName, oldName,
+                    StringComparison.Ordinal))
+            {
+                binding.TemplateName = newName;
+            }
+        }
+        Touch(document);
+    }
+
+    public IReadOnlyList<string> GetTemplateDependents(
+        EditorStoryboardDocument document, string templateId)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var (_, template) = FindTemplate(document, templateId);
+        var result = new List<string>();
+        foreach (var entity in document.Entities)
+        {
+            if (References(entity.RootTemplate, template.Name))
+                result.Add($"实体 {entity.EditorId}");
+            foreach (var frame in entity.Frames.Where(frame =>
+                         References(frame.Template, template.Name)))
+                result.Add($"实体 {entity.EditorId} / 帧 {frame.FrameId}");
+        }
+        foreach (var owner in document.Templates.Values.Where(owner =>
+                     owner.TemplateId != template.TemplateId))
+        {
+            if (References(owner.RootTemplate, template.Name))
+                result.Add($"模板 {owner.Name}");
+            foreach (var frame in owner.Frames.Where(frame =>
+                         References(frame.Template, template.Name)))
+                result.Add($"模板 {owner.Name} / 帧 {frame.FrameId}");
+        }
+        return result;
+    }
+
+    public void DeleteTemplate(EditorStoryboardDocument document,
+        string templateId)
+    {
+        var (key, template) = FindTemplate(document, templateId);
+        var dependents = GetTemplateDependents(document, template.TemplateId);
+        if (dependents.Count > 0)
+            throw new InvalidOperationException(
+                $"模板“{template.Name}”仍被以下对象引用：{string.Join("、", dependents)}");
+        document.Templates.Remove(key);
+        Touch(document);
+    }
+
     private static EditorStoryboardEntity FindEntity(
         EditorStoryboardDocument document, string entityId)
     {
@@ -155,6 +294,53 @@ public sealed class EditorStoryboardEditService :
                    .SingleOrDefault(frame => frame.FrameId == frameId) ??
                throw new KeyNotFoundException(
                    $"Canonical frame '{frameId}' was not found.");
+    }
+
+    private static (string Key, EditorStoryboardTemplate Template) FindTemplate(
+        EditorStoryboardDocument document, string templateId)
+    {
+        var pair = document.Templates.FirstOrDefault(item =>
+            string.Equals(item.Value.TemplateId, templateId,
+                StringComparison.Ordinal));
+        return pair.Value is null
+            ? throw new KeyNotFoundException(
+                $"Canonical template '{templateId}' was not found.")
+            : (pair.Key, pair.Value);
+    }
+
+    private static IEnumerable<EditorTemplateBinding> EnumerateBindings(
+        EditorStoryboardDocument document)
+    {
+        foreach (var entity in document.Entities)
+        {
+            if (entity.RootTemplate is not null)
+                yield return entity.RootTemplate;
+            foreach (var frame in entity.Frames)
+                if (frame.Template is not null)
+                    yield return frame.Template;
+        }
+        foreach (var template in document.Templates.Values)
+        {
+            if (template.RootTemplate is not null)
+                yield return template.RootTemplate;
+            foreach (var frame in template.Frames)
+                if (frame.Template is not null)
+                    yield return frame.Template;
+        }
+    }
+
+    private static bool References(EditorTemplateBinding? binding,
+        string templateName) =>
+        binding is not null &&
+        string.Equals(binding.TemplateName, templateName,
+            StringComparison.Ordinal);
+
+    private static string ValidateTemplateName(string name)
+    {
+        name = name?.Trim() ?? "";
+        if (name.Length == 0)
+            throw new ArgumentException("模板名称不能为空。", nameof(name));
+        return name;
     }
 
     private static void Touch(EditorStoryboardDocument document) =>

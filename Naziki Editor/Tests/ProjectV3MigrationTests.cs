@@ -18,118 +18,107 @@ namespace Naziki_Editor.Tests;
 
 public sealed class ProjectV3MigrationTests
 {
-    [Fact]
-    public void V2OpenIsReadOnlyUntilExplicitSaveThenCreatesV3SourceAndBackup()
+    [Theory]
+    [InlineData("""{"ProjectName":"missing"}""")]
+    [InlineData("""{"format_version":2,"ProjectName":"v2"}""")]
+    [InlineData("""{"format_version":4,"ProjectName":"future"}""")]
+    public void LoadRejectsProjectsWithoutExplicitV3(string nep)
     {
-        var directory = Path.Combine(Path.GetTempPath(),
-            "naziki-v3-migration-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var projectPath = Path.Combine(directory, "legacy.nep");
-            var storyboardPath = Path.Combine(directory, "storyboard.json");
-            File.WriteAllText(storyboardPath, """
-            {
-              "sprites": [{
-                "id": "sprite",
-                "path": "a.png",
-                "states": [{"time": 1, "opacity": 1}]
-              }]
-            }
-            """);
-            var project = new NazikiProjectModel
-            {
-                FormatVersion = 2,
-                ProjectName = "legacy",
-                StoryboardExportPath = "storyboard.json"
-            };
-            File.WriteAllText(projectPath,
-                JsonConvert.SerializeObject(project, Formatting.Indented));
+        using var directory = new TemporaryDirectory();
+        var projectPath = Path.Combine(directory.Path, "invalid.nep");
+        File.WriteAllText(projectPath, nep);
 
-            var service = CreateService();
-            var context = service.LoadProjectData(projectPath)!;
+        var exception = Assert.Throws<JsonSerializationException>(() =>
+            CreateService().LoadProjectData(projectPath));
 
-            Assert.True(context.IsLegacyProjectMigrationPending);
-            Assert.False(Directory.Exists(
-                Path.Combine(directory, ".naziki")));
-
-            var loaded = service.LoadProjectStoryboard(
-                storyboardPath, context.ProjectData);
-#pragma warning disable CS0618
-            context.Storyboard = loaded.Storyboard!;
-#pragma warning restore CS0618
-            context.StoryboardMeta = loaded.Meta;
-            context.StoryboardPath = storyboardPath;
-            service.SaveProjectNepFile(context, projectPath);
-
-            var savedProject = JObject.Parse(File.ReadAllText(projectPath));
-            Assert.Equal(3, savedProject.Value<int>("format_version"));
-            Assert.Equal(".naziki/storyboard.editor.json",
-                savedProject.Value<string>("storyboard_source_path"));
-            var sourcePath = Path.Combine(directory, ".naziki",
-                "storyboard.editor.json");
-            Assert.True(File.Exists(sourcePath));
-            Assert.Equal(1,
-                JObject.Parse(File.ReadAllText(sourcePath))
-                    .Value<int>("schema_version"));
-            Assert.Single(Directory.GetFiles(Path.Combine(directory,
-                ".naziki", "migrations"), "storyboard.v2.*.json"));
-            Assert.False(context.IsLegacyProjectMigrationPending);
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-                Directory.Delete(directory, true);
-        }
+        Assert.Contains("format_version", exception.Message);
+        Assert.False(Directory.Exists(
+            Path.Combine(directory.Path, ".naziki")));
     }
 
     [Fact]
-    public void FailedV3SourceWriteKeepsNepV2AndRemovesPartialSource()
+    public void MissingCanonicalSourceIsRebuiltFromRuntime()
     {
-        var directory = Path.Combine(Path.GetTempPath(),
-            "naziki-v3-rollback-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var projectPath = Path.Combine(directory, "legacy.nep");
-            var storyboardPath = Path.Combine(directory, "storyboard.json");
-            File.WriteAllText(storyboardPath,
-                """{"sprites":[{"id":"a","time":0}]}""");
-            var originalNep = JsonConvert.SerializeObject(
-                new NazikiProjectModel
-                {
-                    FormatVersion = 2,
-                    StoryboardExportPath = "storyboard.json"
-                }, Formatting.Indented);
-            File.WriteAllText(projectPath, originalNep);
-            var throwingStore = new ThrowAfterPartialWriteStore();
-            var service = CreateService(throwingStore);
-            var context = service.LoadProjectData(projectPath)!;
-            var loaded = service.LoadProjectStoryboard(storyboardPath,
-                context.ProjectData);
-#pragma warning disable CS0618
-            context.Storyboard = loaded.Storyboard!;
-#pragma warning restore CS0618
-            context.StoryboardPath = storyboardPath;
+        using var directory = new TemporaryDirectory();
+        var projectPath = CreateV3Project(directory.Path,
+            """{"sprites":[{"id":"sprite","time":0,"path":"a.png"}]}""");
 
-            Assert.Throws<IOException>(() =>
-                service.SaveProjectNepFile(context, projectPath));
+        var context = CreateService().LoadProjectData(projectPath)!;
 
-            Assert.True(JToken.DeepEquals(JToken.Parse(originalNep),
-                JToken.Parse(File.ReadAllText(projectPath))));
-            Assert.False(File.Exists(Path.Combine(directory, ".naziki",
-                "storyboard.editor.json")));
-            Assert.True(context.IsLegacyProjectMigrationPending);
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-                Directory.Delete(directory, true);
-        }
+        var sourcePath = Path.Combine(directory.Path, ".naziki",
+            "storyboard.editor.json");
+        Assert.True(File.Exists(sourcePath));
+        Assert.Single(context.EditorStoryboard.Entities);
+        Assert.True(context.ProjectData
+            .StoryboardSourceRecoveredDuringLoad);
+        Assert.Equal(".naziki/storyboard.editor.json",
+            JObject.Parse(File.ReadAllText(projectPath))
+                .Value<string>("storyboard_source_path"));
+        Assert.Equal("sprite",
+            context.EditorStoryboard.Entities[0].RuntimeId?.Literal);
     }
 
-    private static ProjectService CreateService(
-        IStoryboardSourceStore? sourceStoreOverride = null)
+    [Fact]
+    public void CorruptCanonicalSourceIsBackedUpAndRebuilt()
+    {
+        using var directory = new TemporaryDirectory();
+        var projectPath = CreateV3Project(directory.Path,
+            """{"texts":[{"id":"text","time":0,"text":"ok"}]}""");
+        var sourcePath = Path.Combine(directory.Path, ".naziki",
+            "storyboard.editor.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
+        File.WriteAllText(sourcePath, "{not valid");
+
+        var context = CreateService().LoadProjectData(projectPath)!;
+
+        Assert.Single(context.EditorStoryboard.Entities);
+        Assert.Single(Directory.GetFiles(Path.Combine(directory.Path,
+            ".naziki", "recovery"),
+            "storyboard.editor.corrupt.*.json"));
+        Assert.Equal(1, JObject.Parse(File.ReadAllText(sourcePath))
+            .Value<int>("schema_version"));
+    }
+
+    [Fact]
+    public void MissingSourceAndRuntimeRejectsV3WithoutCreatingData()
+    {
+        using var directory = new TemporaryDirectory();
+        var projectPath = Path.Combine(directory.Path, "broken.nep");
+        File.WriteAllText(projectPath,
+            JsonConvert.SerializeObject(new NazikiProjectModel
+            {
+                FormatVersion = 3,
+                StoryboardExportPath = "level/storyboard.json",
+                StoryboardSourcePath =
+                    ".naziki/storyboard.editor.json"
+            }));
+
+        Assert.Throws<InvalidDataException>(() =>
+            CreateService().LoadProjectData(projectPath));
+        Assert.False(File.Exists(Path.Combine(directory.Path,
+            ".naziki", "storyboard.editor.json")));
+    }
+
+    private static string CreateV3Project(
+        string directory, string runtimeJson)
+    {
+        var level = Path.Combine(directory, "level");
+        Directory.CreateDirectory(level);
+        File.WriteAllText(Path.Combine(level, "storyboard.json"),
+            runtimeJson);
+        var projectPath = Path.Combine(directory, "project.nep");
+        File.WriteAllText(projectPath,
+            JsonConvert.SerializeObject(new NazikiProjectModel
+            {
+                FormatVersion = 3,
+                StoryboardExportPath = "level/storyboard.json",
+                StoryboardSourcePath =
+                    ".naziki/storyboard.editor.json"
+            }, Formatting.Indented));
+        return projectPath;
+    }
+
+    private static ProjectService CreateService()
     {
         var messages = MessageBroker.Default;
         var errors = new ErrorHandler(messages);
@@ -139,37 +128,41 @@ public sealed class ProjectV3MigrationTests
         var analyzer = new StoryboardCorrectionAnalyzer(
             new StoryboardTimeResolver(), writer);
         var validator = new StoryboardDocumentValidator(analyzer,
-            new Naziki_Editor.Core.Compilation.StoryboardTemplatePropertyMapper());
+            new Naziki_Editor.Core.Compilation
+                .StoryboardTemplatePropertyMapper());
         var importer = new StoryboardImportService();
         var serializer = new EditorStoryboardSerializer();
-        var sourceStore = sourceStoreOverride ??
-                          new StoryboardSourceStore(serializer);
+        var sourceStore = new StoryboardSourceStore(serializer);
         var materializer = new StoryboardMaterializer(
-            new StoryboardTimePositionResolver(), new NoteQueryService());
+            new StoryboardTimePositionResolver(),
+            new NoteQueryService());
         var exporter = new StoryboardRuntimeExporter(materializer);
         var bridge = new StoryboardCanonicalBridge(importer, exporter,
             reader, writer);
+        var coordinator = new StoryboardImportCoordinator(
+            importer, exporter, sourceStore, serializer,
+            reader, bridge, messages);
         return new ProjectService(messages, errors,
             new StoryboardParser(errors), reader, writer, validator,
-            sourceStore, bridge, importer);
+            sourceStore, bridge, importer, coordinator);
     }
 
-    private sealed class ThrowAfterPartialWriteStore :
-        IStoryboardSourceStore
+    private sealed class TemporaryDirectory : IDisposable
     {
-        public string GetDefaultSourcePath(string projectFilePath) =>
-            Path.Combine(Path.GetDirectoryName(projectFilePath)!,
-                ".naziki", "storyboard.editor.json");
-
-        public EditorStoryboardDocument Load(string sourcePath) =>
-            throw new NotSupportedException();
-
-        public void Save(string sourcePath,
-            EditorStoryboardDocument document)
+        public TemporaryDirectory()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
-            File.WriteAllText(sourcePath, "partial");
-            throw new IOException("simulated source write failure");
+            Path = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "naziki-v3-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

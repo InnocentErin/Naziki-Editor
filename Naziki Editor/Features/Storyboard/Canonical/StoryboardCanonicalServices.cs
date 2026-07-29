@@ -137,6 +137,8 @@ public sealed class StoryboardImportService : IStoryboardImportService
     private static readonly Dictionary<string, string> Aliases =
         new(StringComparer.Ordinal)
         {
+            ["arcade_inteference_size"] = "arcade_interference_size",
+            ["arcade_inteference_speed"] = "arcade_interference_speed",
             ["arcade_interferance_size"] = "arcade_interference_size",
             ["arcade_interferance_speed"] = "arcade_interference_speed",
             ["x_offset"] = "dx",

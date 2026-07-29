@@ -6,7 +6,9 @@
   ],
   "known_properties": [
     "align", "arcade", "arcade_contrast", "arcade_intensity", "arcade_interference_size",
-    "arcade_interference_speed", "background_dim", "bloom", "bloom_intensity", "brightness",
+    "arcade_interference_speed", "artifact", "artifact_colorisation", "artifact_intensity",
+    "artifact_noise", "artifact_parasite", "background_dim", "bloom", "bloom_intensity", "brightness",
+    "chromatic", "chromatic_end", "chromatic_intensity", "chromatic_start",
     "chromatical", "chromatical_fade", "chromatical_intensity", "chromatical_speed",
     "color_adjustment", "color_filter", "color_filter_color", "combo", "contrast", "direction",
     "dream", "dream_intensity", "dx", "dy", "end", "fill_color", "fill_width", "fisheye",
@@ -18,13 +20,15 @@
     "override_ring_color", "override_rot_x", "override_rot_y", "override_rot_z",
     "override_scanline_pos", "override_x", "override_y", "override_z", "perspective", "pivot_x",
     "pivot_y", "preserve_aspect", "radial_blur", "radial_blur_intensity", "ring_color",
-    "saturation", "scanline_color", "scanline_opacity", "scanline_pos", "score", "sepia",
+    "saturation", "scanline_color", "scanline_opacity", "scanline_pos", "scanline_smoothing", "score", "sepia",
     "sepia_intensity", "shockwave", "shockwave_speed", "size", "size_multiplier", "speed",
     "start", "storyboard_opacity", "style", "tape", "ui_opacity", "vignette",
     "vignette_color", "vignette_end", "vignette_intensity", "vignette_start", "w",
     "x_multiplier", "y_multiplier"
   ],
   "aliases": {
+    "arcade_inteference_size": "arcade_interference_size",
+    "arcade_inteference_speed": "arcade_interference_speed",
     "arcade_interferance_size": "arcade_interference_size",
     "arcade_interferance_speed": "arcade_interference_speed",
     "x_offset": "dx",
@@ -64,6 +68,16 @@
     { "json_name": "spawn", "levels": ["trigger"], "value_type": "string-array", "ui": "list", "timeline": "none", "array_semantics": "value" },
     { "json_name": "notes", "levels": ["trigger"], "value_type": "integer-array", "ui": "list", "timeline": "none", "array_semantics": "value" },
     { "json_name": "note_fill_colors", "levels": ["controller-state"], "value_type": "color-array", "ui": "color-list", "timeline": "composite", "array_semantics": "value" },
+    { "json_name": "scanline_smoothing", "levels": ["controller-state"], "value_type": "boolean", "ui": "toggle", "timeline": "discrete" },
+    { "json_name": "artifact", "levels": ["controller-state"], "value_type": "boolean", "ui": "toggle", "timeline": "discrete" },
+    { "json_name": "artifact_intensity", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "artifact_colorisation", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "artifact_parasite", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "artifact_noise", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "chromatic", "levels": ["controller-state"], "value_type": "boolean", "ui": "toggle", "timeline": "discrete" },
+    { "json_name": "chromatic_intensity", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "chromatic_start", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
+    { "json_name": "chromatic_end", "levels": ["controller-state"], "value_type": "number", "ui": "number", "timeline": "continuous" },
     { "json_name": "uses", "levels": ["trigger"], "value_type": "integer", "ui": "integer", "timeline": "none" }
   ]
 }

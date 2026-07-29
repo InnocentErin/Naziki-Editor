@@ -316,7 +316,10 @@ public sealed class StoryboardDocumentValidator : IStoryboardDocumentValidator
                 _ => issue.Entity
             };
             Add(node, output, issue.Code, issue.Path, issue.Message,
-                    StoryboardDiagnosticSeverity.Error);
+                string.Equals(issue.Code, "STATE_EXACT_DUPLICATE",
+                    StringComparison.Ordinal)
+                    ? StoryboardDiagnosticSeverity.Info
+                    : StoryboardDiagnosticSeverity.Error);
         }
     }
 

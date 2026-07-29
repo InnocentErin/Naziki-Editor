@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Messaging;
@@ -75,6 +76,107 @@ public sealed class NativePreviewInfrastructureTests
         Assert.Contains(result.Diagnostics, item => item.Code == "PREVIEW_LEVEL_MISSING");
         Assert.Contains(result.Diagnostics, item => item.Code == "PREVIEW_CHART_MISSING");
         Assert.Contains(result.Diagnostics, item => item.Code == "PREVIEW_MUSIC_MISSING");
+    }
+
+    [Fact]
+    public void PreviewValidation_ReportsUnityChartWirePath()
+    {
+        var validator = new PreviewValidationService(
+            new FakeStoryboardValidator());
+        var context = new ProjectDataContext(MessageBroker.Default)
+        {
+            Storyboard = new StoryboardRoot()
+        };
+        var snapshot = new StoryboardPreviewSnapshot(
+            "session",
+            5,
+            null,
+            "{}",
+            """
+            {
+              "music_offset": null,
+              "time_base": 480,
+              "page_list": [{"start_tick":0,"end_tick":480}],
+              "tempo_list": [{"tick":0,"value":500000}],
+              "note_list": [],
+              "event_order_list": []
+            }
+            """,
+            null,
+            0)
+        {
+            LevelJson = "{}"
+        };
+
+        var result = validator.Validate(context, snapshot);
+
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "PREVIEW_CHART_WIRE_INVALID" &&
+            item.Path == "$.music_offset");
+    }
+
+    [Fact]
+    public void UnityHost_SurfacesTelemetryRuntimeExceptionImmediately()
+    {
+        var transport = new FakePreviewTransport();
+        using var settings = new PreviewSettingsProvider(
+            new FakeSettingsStore());
+        using var host = new UnityStoryboardPreviewHost(
+            transport,
+            new FakePreviewProcess(),
+            new FakePreviewVfs(),
+            new FakePreviewValidation(),
+            settings);
+        var inner = new JObject
+        {
+            ["schema"] = "cytoid.game-core.v2",
+            ["type"] = "session.result",
+            ["payload"] = new JObject
+            {
+                ["error"] = new JObject
+                {
+                    ["code"] = "runtime_exception",
+                    ["message"] =
+                        "Error converting null to System.Double. Path 'music_offset'."
+                }
+            }
+        };
+
+        transport.Raise(new PreviewProtocolMessage(
+            "preview.telemetry",
+            "unbound",
+            "telemetry",
+            0,
+            0,
+            0,
+            new JObject
+            {
+                ["cytoidGameCoreV2"] =
+                    inner.ToString(Newtonsoft.Json.Formatting.None)
+            }));
+
+        Assert.Equal(PreviewAvailabilityState.InvalidData,
+            host.Availability);
+        var diagnostic = Assert.Single(host.Diagnostics);
+        Assert.Equal("PREVIEW_UNITY_RUNTIME_EXCEPTION",
+            diagnostic.Code);
+        Assert.Equal("$.music_offset", diagnostic.Path);
+        Assert.Contains("System.Double", diagnostic.Message);
+
+        transport.Raise(new PreviewProtocolMessage(
+            "preview.rejected",
+            "unbound",
+            "late-timeout",
+            0,
+            0,
+            0,
+            new JObject
+            {
+                ["code"] = "preview_open_failed",
+                ["message"] = "Exceed Timeout:00:00:30"
+            }));
+        Assert.Equal("PREVIEW_UNITY_RUNTIME_EXCEPTION",
+            Assert.Single(host.Diagnostics).Code);
     }
 
     [Theory]
@@ -173,6 +275,58 @@ public sealed class NativePreviewInfrastructureTests
         public IReadOnlyList<StoryboardDiagnostic> Validate(StoryboardRoot document) => [];
         public IReadOnlyList<StoryboardDiagnostic> Validate(StoryboardRoot document, ProjectDataContext? context) => [];
         public IReadOnlyList<StoryboardDiagnostic> ValidateEntity(IStoryboardEntity entity, string path = "$") => [];
+    }
+
+    private sealed class FakePreviewTransport : IUnityPreviewTransport
+    {
+        public bool IsConnected => false;
+        public string PipeName => "fake";
+        public event EventHandler<PreviewProtocolMessage>? MessageReceived;
+        public event EventHandler<bool>? ConnectionChanged;
+        public Task StartAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public Task SendAsync(PreviewProtocolMessage message,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public Task StopAsync() => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public void Raise(PreviewProtocolMessage message) =>
+            MessageReceived?.Invoke(this, message);
+    }
+
+    private sealed class FakePreviewProcess : IUnityPreviewProcessService
+    {
+        public bool IsRunning => false;
+        public string RuntimePath => "";
+        public event EventHandler<int?>? Exited;
+        public Task StartAsync(UnityPreviewLaunchOptions options,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public Task ReparentAsync(IntPtr parentWindow,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public Task StopAsync(TimeSpan gracefulTimeout,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public void Dispose() { }
+    }
+
+    private sealed class FakePreviewVfs : IPreviewVfsMaterializer
+    {
+        public Task<PreviewVfsVersion> MaterializeAsync(
+            StoryboardPreviewSnapshot snapshot,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task PruneAsync(string sessionId,
+            IReadOnlySet<long> protectedVersions, long maximumBytes) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class FakePreviewValidation : IPreviewValidationService
+    {
+        public PreviewValidationResult Validate(ProjectDataContext context,
+            StoryboardPreviewSnapshot snapshot) =>
+            PreviewValidationResult.Valid(snapshot.Version);
     }
 
     private sealed class FakeSettingsStore : ISettingsStore

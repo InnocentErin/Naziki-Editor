@@ -5,6 +5,7 @@ using Naziki_Editor.Core.Serialization;
 using Naziki_Editor.Models;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Naziki_Editor.Tests;
@@ -129,5 +130,35 @@ public sealed class StoryboardSerializationTests
             .Distinct(StringComparer.Ordinal);
 
         Assert.DoesNotContain(declared, name => !covered.Contains(name));
+    }
+
+    [Fact]
+    public void PropertyCatalogCoversEveryUnityControllerParserField()
+    {
+        var relative = Path.Combine("External", "original_player", "engines",
+            "unity", "Assets", "Scripts", "Storyboard", "Controllers",
+            "ControllerStateParser.cs");
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null &&
+               !File.Exists(Path.Combine(directory.FullName, relative)))
+        {
+            directory = directory.Parent;
+        }
+        Assert.NotNull(directory);
+
+        var parser = File.ReadAllText(Path.Combine(directory!.FullName,
+            relative));
+        var parserFields = Regex.Matches(parser,
+                """SelectToken\("([^"]+)"\)""")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var covered = _catalog.Catalog.Properties
+            .Select(item => item.JsonName)
+            .Concat(_catalog.Catalog.KnownProperties)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.DoesNotContain(parserFields,
+            field => !covered.Contains(field));
     }
 }

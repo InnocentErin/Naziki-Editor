@@ -23,16 +23,29 @@ public sealed class PreviewValidationService : IPreviewValidationService
 
     private readonly IStoryboardDocumentValidator _storyboardValidator;
     private readonly IProjectReadinessService? _readiness;
+    private readonly IChartPreviewWireAdapter _chartWire;
 
-    public PreviewValidationService(IStoryboardDocumentValidator storyboardValidator) =>
+    public PreviewValidationService(IStoryboardDocumentValidator storyboardValidator)
+    {
         _storyboardValidator = storyboardValidator;
+        _chartWire = new ChartPreviewWireAdapter();
+    }
 
     public PreviewValidationService(
         IStoryboardDocumentValidator storyboardValidator,
         IProjectReadinessService readiness)
+        : this(storyboardValidator, readiness, new ChartPreviewWireAdapter())
+    {
+    }
+
+    public PreviewValidationService(
+        IStoryboardDocumentValidator storyboardValidator,
+        IProjectReadinessService readiness,
+        IChartPreviewWireAdapter chartWire)
     {
         _storyboardValidator = storyboardValidator;
         _readiness = readiness;
+        _chartWire = chartWire;
     }
 
     public PreviewValidationResult Validate(ProjectDataContext context, StoryboardPreviewSnapshot snapshot)
@@ -90,6 +103,15 @@ public sealed class PreviewValidationService : IPreviewValidationService
         {
             ValidateJson(snapshot.ChartJson, PreviewDiagnosticSource.Chart, diagnostics);
             ValidateChart(snapshot.ChartJson, diagnostics);
+            foreach (var issue in _chartWire.Validate(snapshot.ChartJson))
+            {
+                diagnostics.Add(Error(
+                    "PREVIEW_CHART_WIRE_INVALID",
+                    issue.Message,
+                    PreviewDiagnosticSource.Chart,
+                    issue.Path,
+                    "请重新导入或修复该谱面字段后再启动 Unity 预览。"));
+            }
         }
         else
             diagnostics.Add(Error("PREVIEW_CHART_MISSING", "当前项目没有可供原生播放器读取的谱面。", PreviewDiagnosticSource.Chart, "$.chart"));

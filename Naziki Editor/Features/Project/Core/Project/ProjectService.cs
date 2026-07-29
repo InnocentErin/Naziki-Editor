@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
@@ -28,6 +30,7 @@ namespace Naziki_Editor.Core.Project
         private readonly IStoryboardSourceStore _storyboardSourceStore;
         private readonly IStoryboardCanonicalBridge _storyboardBridge;
         private readonly IStoryboardImportService _storyboardImporter;
+        private readonly IStoryboardImportCoordinator _storyboardImportCoordinator;
 
         public ProjectService(
             IMessageBroker messageBroker,
@@ -38,7 +41,8 @@ namespace Naziki_Editor.Core.Project
             IStoryboardDocumentValidator storyboardValidator,
             IStoryboardSourceStore storyboardSourceStore,
             IStoryboardCanonicalBridge storyboardBridge,
-            IStoryboardImportService storyboardImporter)
+            IStoryboardImportService storyboardImporter,
+            IStoryboardImportCoordinator storyboardImportCoordinator)
         {
             _messageBroker = messageBroker;
             _errorHandler = errorHandler;
@@ -49,6 +53,7 @@ namespace Naziki_Editor.Core.Project
             _storyboardSourceStore = storyboardSourceStore;
             _storyboardBridge = storyboardBridge;
             _storyboardImporter = storyboardImporter;
+            _storyboardImportCoordinator = storyboardImportCoordinator;
         }
 
         public Task<ProjectDataContext?> LoadProjectAsync(string filePath)
@@ -140,7 +145,12 @@ namespace Naziki_Editor.Core.Project
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var projectData = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
+                var root = JObject.Parse(jsonText);
+                if (root["format_version"]?.Type != JTokenType.Integer ||
+                    root.Value<int>("format_version") != 3)
+                    throw new JsonSerializationException(
+                        "不支持的工程版本：当前编辑器仅打开明确标注 format_version: 3 的 .nep 工程。");
+                var projectData = root.ToObject<NazikiProjectModel>();
                 if (projectData == null)
                 {
                     _errorHandler.HandleException(
@@ -150,22 +160,36 @@ namespace Naziki_Editor.Core.Project
                         $"FilePath: {filePath}");
                     return null;
                 }
-                if (projectData.FormatVersion is not (2 or 3))
+                if (projectData.FormatVersion != 3)
                     throw new JsonSerializationException(
-                        $"不支持的项目格式版本 {projectData.FormatVersion}；当前版本仅支持 .nep v2。");
+                        $"不支持的项目格式版本 {projectData.FormatVersion}；当前版本仅支持 .nep v3。");
 
                 var context = new ProjectDataContext(_messageBroker)
                 {
                     ProjectFilePath = filePath,
-                    ProjectData = projectData,
-                    IsLegacyProjectMigrationPending =
-                        projectData.FormatVersion == 2
+                    ProjectData = projectData
                 };
-                if (projectData.FormatVersion == 3 &&
-                    !string.IsNullOrWhiteSpace(projectData.StoryboardSourcePath))
+                if (!string.IsNullOrWhiteSpace(
+                        projectData.StoryboardSourcePath))
                     context.StoryboardSourcePath = ResolveProjectPath(
                         filePath, projectData.StoryboardSourcePath);
 
+                if (!string.IsNullOrWhiteSpace(
+                        projectData.ChartFilePath))
+                {
+                    var chartPath = ResolveProjectPath(
+                        filePath, projectData.ChartFilePath);
+                    if (File.Exists(chartPath))
+                    {
+                        context.Chart = SilentImportChart(chartPath);
+                        if (context.Chart is { time_base: not 0 })
+                            context.TimeEngine = new ChartTimeEngine(
+                                context.Chart.tempo_list,
+                                context.Chart.time_base);
+                    }
+                }
+                _storyboardImportCoordinator.EnsureCanonicalSource(
+                    context);
                 return context;
             }
             catch (JsonException ex)
@@ -198,28 +222,35 @@ namespace Naziki_Editor.Core.Project
             string? sourcePath = null;
             string? previousSource = null;
             var sourceExisted = false;
-            var wasMigrationPending = context.IsLegacyProjectMigrationPending;
             try
             {
+                if (context.ProjectData.FormatVersion != 3)
+                    throw new InvalidDataException(
+                        "当前编辑器仅保存 format_version: 3 的工程。");
                 var canonical = _storyboardBridge.Synchronize(context);
                 sourcePath = ResolveSourcePath(targetPath, context);
                 sourceExisted = File.Exists(sourcePath);
                 if (sourceExisted) previousSource = File.ReadAllText(sourcePath);
-                if (context.IsLegacyProjectMigrationPending)
-                    BackupLegacyStoryboard(context, targetPath);
                 _storyboardSourceStore.Save(sourcePath, canonical);
                 context.ProjectData.FormatVersion = 3;
                 context.ProjectData.StoryboardSourcePath =
                     ToProjectRelativePath(targetPath, sourcePath);
                 context.StoryboardSourcePath = sourcePath;
-                context.IsLegacyProjectMigrationPending = false;
+                context.ProjectData.StoryboardSourceHash = Hash(
+                    File.ReadAllText(sourcePath));
+                if (!string.IsNullOrWhiteSpace(
+                        context.StoryboardPath) &&
+                    File.Exists(context.StoryboardPath))
+                    context.ProjectData.StoryboardExportHash = Hash(
+                        JToken.Parse(File.ReadAllText(
+                                context.StoryboardPath))
+                            .ToString(Formatting.None));
                 context.ProjectData.LastModifiedTime = DateTime.Now;
                 string json = JsonConvert.SerializeObject(context.ProjectData, Formatting.Indented);
                 WriteAllTextAtomic(targetPath, json);
             }
             catch (JsonException ex)
             {
-                context.IsLegacyProjectMigrationPending = wasMigrationPending;
                 RestoreSource(sourcePath, sourceExisted, previousSource);
                 _errorHandler.HandleException(ex, ErrorSeverity.Error, "DataValidation",
                     "工程数据序列化失败", "ProjectService.SaveProjectNepFile",
@@ -228,7 +259,6 @@ namespace Naziki_Editor.Core.Project
             }
             catch (IOException ex)
             {
-                context.IsLegacyProjectMigrationPending = wasMigrationPending;
                 RestoreSource(sourcePath, sourceExisted, previousSource);
                 _errorHandler.HandleException(ex, ErrorSeverity.Critical, "FileIO",
                     "写入工程文件 (.nep) 时发生 I/O 错误", "ProjectService.SaveProjectNepFile",
@@ -237,7 +267,6 @@ namespace Naziki_Editor.Core.Project
             }
             catch
             {
-                context.IsLegacyProjectMigrationPending = wasMigrationPending;
                 RestoreSource(sourcePath, sourceExisted, previousSource);
                 throw;
             }
@@ -447,7 +476,8 @@ namespace Naziki_Editor.Core.Project
             string configuredPath)
         {
             if (Path.IsPathRooted(configuredPath))
-                return Path.GetFullPath(configuredPath);
+                throw new InvalidDataException(
+                    "v3 工程资源路径必须是工程内相对路径。");
             var projectDirectory = Path.GetDirectoryName(
                                        Path.GetFullPath(projectFilePath))
                                    ?? throw new InvalidOperationException(
@@ -471,23 +501,6 @@ namespace Naziki_Editor.Core.Project
                                 "Cannot resolve project directory.");
             return Path.GetRelativePath(directory, absolutePath)
                 .Replace('\\', '/');
-        }
-
-        private static void BackupLegacyStoryboard(ProjectDataContext context,
-            string projectFilePath)
-        {
-            if (string.IsNullOrWhiteSpace(context.StoryboardPath) ||
-                !File.Exists(context.StoryboardPath))
-                return;
-            var directory = Path.GetDirectoryName(Path.GetFullPath(projectFilePath))
-                            ?? throw new InvalidOperationException(
-                                "Cannot resolve project directory.");
-            var migrationDirectory = Path.Combine(directory, ".naziki",
-                "migrations");
-            Directory.CreateDirectory(migrationDirectory);
-            var backupPath = Path.Combine(migrationDirectory,
-                $"storyboard.v2.{DateTime.UtcNow:yyyyMMddHHmmssfff}.json");
-            File.Copy(context.StoryboardPath, backupPath, false);
         }
 
         private static void RestoreSource(string? sourcePath, bool existed,
@@ -524,5 +537,10 @@ namespace Naziki_Editor.Core.Project
                 if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
         }
+
+        private static string Hash(string text) =>
+            Convert.ToHexString(SHA256.HashData(
+                    Encoding.UTF8.GetBytes(text)))
+                .ToLowerInvariant();
     }
 }

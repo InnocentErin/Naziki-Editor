@@ -136,10 +136,26 @@ namespace Naziki_Editor.Views
             selectedPath ??= _dialogService.ShowOpenFileDialog(title, filter);
             if (string.IsNullOrWhiteSpace(selectedPath)) return;
 
+            var previousChartPath = Context.ProjectData.ChartFilePath;
+            var previousChart = Context.Chart;
+            var previousTimeEngine = Context.TimeEngine;
+            var chartCommitted = false;
+            var previousResourcePath = kind switch
+            {
+                ProjectResourceKind.Level =>
+                    Context.ProjectData.LevelFilePath,
+                ProjectResourceKind.Chart =>
+                    Context.ProjectData.ChartFilePath,
+                ProjectResourceKind.Music =>
+                    Context.ProjectData.AudioFilePath,
+                ProjectResourceKind.Background =>
+                    Context.ProjectData.BackgroundPath,
+                _ => null
+            };
+            var resourceCommitted = false;
             try
             {
                 await _projectResources.ImportAsync(Context, kind, selectedPath);
-                _projectService.SaveProjectNepFile(Context, Context.ProjectFilePath);
                 var resolved = _projectResources.ResolvePath(Context, kind)!;
                 switch (kind)
                 {
@@ -149,21 +165,64 @@ namespace Naziki_Editor.Views
                             ?? throw new InvalidDataException("复制后的谱面无法加载。");
                         Context.Chart = chart;
                         Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
+                        await AppServices
+                            .GetService<IStoryboardImportCoordinator>()
+                            .CommitCurrentAsync(Context);
+                        chartCommitted = true;
+                        resourceCommitted = true;
                         _messageBroker.Publish("ChartImported");
                         break;
                     }
-                    case ProjectResourceKind.Music:
+                }
+                if (kind != ProjectResourceKind.Chart)
+                {
+                    _projectService.SaveProjectNepFile(
+                        Context, Context.ProjectFilePath);
+                    resourceCommitted = true;
+                    if (kind == ProjectResourceKind.Music)
                         await LoadProjectAudioAsync(resolved);
-                        break;
+                }
+                else
+                {
+                    resourceCommitted = chartCommitted;
                 }
 
                 _notificationService.ShowSuccess($"{ResourceName(kind)}已复制进工程并完成同步。");
             }
             catch (Exception ex)
             {
+                if (!resourceCommitted)
+                {
+                    switch (kind)
+                    {
+                        case ProjectResourceKind.Level:
+                            Context.ProjectData.LevelFilePath =
+                                previousResourcePath;
+                            break;
+                        case ProjectResourceKind.Chart:
+                            Context.ProjectData.ChartFilePath =
+                                previousChartPath;
+                            Context.Chart = previousChart;
+                            Context.TimeEngine =
+                                previousTimeEngine;
+                            break;
+                        case ProjectResourceKind.Music:
+                            Context.ProjectData.AudioFilePath =
+                                previousResourcePath;
+                            break;
+                        case ProjectResourceKind.Background:
+                            Context.ProjectData.BackgroundPath =
+                                previousResourcePath;
+                            break;
+                    }
+                }
                 _dialogService.ShowErrorDialog(
-                    $"{ResourceName(kind)}导入失败：\n{ex.Message}",
-                    "资源导入失败",
+                    resourceCommitted
+                        ? $"{ResourceName(kind)}已写入工程，但界面加载失败：\n{ex.Message}"
+                        : $"{ResourceName(kind)}导入失败：\n{ex.Message}",
+                    resourceCommitted
+                        ? "界面加载失败"
+                        : "资源导入失败",
                     ex.ToString());
             }
         }
@@ -405,6 +464,10 @@ namespace Naziki_Editor.Views
                         this.OpenTemplatePropertyEditor(templateKey, template);
                     }
                 }
+                else if (obj is EditorStoryboardTemplate canonicalTemplate)
+                {
+                    OpenCanonicalTemplatePropertyEditor(canonicalTemplate);
+                }
             });
 
             // 频道 3：听候“谱面缺失结界”里的按钮召唤，当点击“导入谱面”时，跨空触发导入！
@@ -520,55 +583,35 @@ namespace Naziki_Editor.Views
                 }
             };
 
-            EventList.OnStoryboardLoaded += async (path, root) =>
+            EventList.OnStoryboardLoaded += async path =>
             {
+                var importCommitted = false;
                 try
                 {
-                    // Normalize and validate before copying a resource or
-                    // replacing either in-memory document.
-                    var importService =
-                        AppServices.GetService<IStoryboardImportService>();
-                    var wireWriter =
-                        AppServices.GetService<IStoryboardDocumentWriter>();
-                    var imported = importService.Import(
-                        wireWriter.Write(root), Context.Chart,
-                        Context.StoryboardMeta,
-                        Context.ProjectData?.ControlBoardIdMaps);
-                    var importErrors = imported.Issues.Where(issue =>
-                        issue.Severity ==
-                        StoryboardDiagnosticSeverity.Error).ToArray();
-                    if (!imported.CanReplace)
-                        throw new JsonSerializationException(string.Join(
-                            Environment.NewLine,
-                            importErrors.Select(issue =>
-                                $"{issue.Path}: {issue.Message}")));
-
                     if (Context.ProjectData != null && !string.IsNullOrWhiteSpace(Context.ProjectFilePath))
                     {
                         await _projectResources.ImportAsync(
                             Context,
                             ProjectResourceKind.Storyboard,
                             path);
+                        importCommitted = true;
                         Context.StoryboardPath =
                             _projectResources.ResolvePath(Context, ProjectResourceKind.Storyboard) ?? path;
                     }
                     else
                     {
-                        Context.StoryboardPath = path;
+                        throw new InvalidOperationException(
+                            "必须先创建或打开 v3 工程，才能导入故事板。");
                     }
 
-                    Context.Storyboard = root;
-                    Context.EditorStoryboard = imported.Document!;
                     Context.LegacyStoryboardProjectionHash =
                         AppServices.GetService<IStoryboardCanonicalBridge>()
-                            .ComputeLegacyProjectionHash(root);
+                            .ComputeLegacyProjectionHash(
+                                Context.Storyboard);
 
                     CanvasArea.TrackSelectedObject(null);
                     CanvasArea.RefreshJsonView();
                     _isVisualDirty = false;
-
-                    if (Context.ProjectData != null)
-                        SaveProjectNepFile();
 
                     _historyService.Reset();
                     _historyService.RecordSnapshot(Context.Storyboard);
@@ -580,8 +623,12 @@ namespace Naziki_Editor.Views
                 catch (Exception ex)
                 {
                     _dialogService.ShowErrorDialog(
-                        $"故事板导入失败：\n{ex.Message}",
-                        "资源导入失败",
+                        importCommitted
+                            ? $"故事板已安全写入工程，但界面刷新失败：\n{ex.Message}"
+                            : $"故事板导入失败：\n{ex.Message}",
+                        importCommitted
+                            ? "界面刷新失败"
+                            : "资源导入失败",
                         ex.ToString());
                 }
             };
@@ -1605,31 +1652,23 @@ namespace Naziki_Editor.Views
         private void AddNewTemplateEvent()
         {
             if (Context == null || !Context.HasStoryboard) return;
-            var root = Context.Storyboard;
+            AppServices.GetService<IStoryboardCanonicalBridge>()
+                .Synchronize(Context);
+            var editService =
+                AppServices.GetService<IEditorStoryboardEditService>();
+            var newKey = "generic";
+            var suffix = 1;
+            while (Context.EditorStoryboard.Templates.ContainsKey(newKey))
+                newKey = $"generic_{suffix++}";
+            var newTemplate = editService.AddTemplate(
+                Context.EditorStoryboard, newKey);
 
-            // 1. 生成不冲突的初始名字
-            string newKey = _entityFactory.GenerateUniqueTemplateKey(root, "generic");
-
-            // 2. 赋予纯净的数据灵魂并登记到仓储
-            var newTemplate = _entityFactory.CreateTemplate(newKey);
-            _storyboardRepository.AddTemplate(root, newKey, newTemplate);
-
-            // 3. 在大本营的顺位账本上登记造册 (升级为全新的私有元数据包裹)
-            if (Context.StoryboardMeta != null)
-            {
-                if (Context.StoryboardMeta.TemplateMetas == null) Context.StoryboardMeta.TemplateMetas = new Dictionary<string, EditorTemplateMeta>();
-                Context.StoryboardMeta.TemplateMetas[newKey] = new EditorTemplateMeta { Type = TemplateType.Generic };
-            }
-
-            // 4. 惊醒时光机！让包括时间轴在内的所有全局视图准备刷新！
             Context.MarkAsModified();
-
-            // 5. 刷新左侧 UI（因为数据变了，通知 UI 重新加载）
+            RefreshLegacyTemplateViews();
             EventList.LoadStoryboardUI();
-
-            // 🌟 6. 【极度丝滑交互】：造出来的瞬间，直接弹出属性编辑器，不用打谱师再去双击！
-            OpenTemplatePropertyEditor(newKey, newTemplate);
-            TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
+            _previewPublisher.PublishReset("Storyboard.TemplateAdded");
+            OpenCanonicalTemplatePropertyEditor(newTemplate);
+            TimelineConsole.LoadStoryboardTimeline(Context);
         }
 
         private void MenuSave_Click(object sender, RoutedEventArgs e) => _commandDispatcher.Execute("SaveProject");
@@ -1705,6 +1744,89 @@ namespace Naziki_Editor.Views
                 PropertyPanel.SetSelectedObject(null);
                 TimelineConsole.LoadStoryboardTimeline(Context); // ✨ 补在这里！
             }
+        }
+
+        private void OpenCanonicalTemplatePropertyEditor(
+            EditorStoryboardTemplate template)
+        {
+            if (template is null)
+                return;
+            AppServices.GetService<IStoryboardCanonicalBridge>()
+                .Synchronize(Context);
+            template = Context.EditorStoryboard.Templates.Values
+                           .FirstOrDefault(item =>
+                               item.TemplateId == template.TemplateId) ??
+                       Context.EditorStoryboard.Templates.GetValueOrDefault(
+                           template.Name) ??
+                       throw new InvalidOperationException(
+                           $"模板“{template.Name}”已不存在。");
+            var adapter =
+                AppServices.GetService<IStoryboardTemplateViewAdapter>();
+            RefreshLegacyTemplateViews();
+            var wireView = adapter.CreateWireView(template);
+            var editorWindow =
+                new Naziki_Editor.Views.PropertyEditor.PropertyEditorWindow(
+                    template.Name,
+                    wireView,
+                    Context,
+                    _dialogService,
+                    _storyboardRepository,
+                    _propertyEditorService,
+                    _messageBroker,
+                    template.TemplateId)
+                {
+                    Owner = this,
+                    Title = $"模板编辑器 - [调整预设: {template.Name}]"
+                };
+
+            if (editorWindow.ShowDialog() != true ||
+                editorWindow.Tag is not CanonicalTemplateEditResult result)
+            {
+                return;
+            }
+
+            try
+            {
+                var replacement = adapter.ParseWireView(
+                    result.NewName, result.WireTemplate);
+                var editService =
+                    AppServices.GetService<IEditorStoryboardEditService>();
+                editService.UpdateTemplate(Context.EditorStoryboard,
+                    result.TemplateId, replacement);
+                if (!string.Equals(result.OriginalName, result.NewName,
+                        StringComparison.Ordinal))
+                {
+                    editService.RenameTemplate(Context.EditorStoryboard,
+                        result.TemplateId, result.NewName);
+                }
+
+                RefreshLegacyTemplateViews();
+                Context.MarkAsModified();
+                _previewPublisher.PublishReset("Storyboard.TemplateUpdated");
+                EventList.LoadStoryboardUI();
+                PropertyPanel.SetSelectedObject(null);
+                TimelineConsole.LoadStoryboardTimeline(Context);
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog(
+                    ex.Message, "模板更新失败", ex.ToString());
+            }
+        }
+
+        private void RefreshLegacyTemplateViews()
+        {
+            var adapter =
+                AppServices.GetService<IStoryboardTemplateViewAdapter>();
+            Context.Storyboard.templates =
+                Context.EditorStoryboard.Templates.Values
+                    .OrderBy(item => item.Source.SourceOrder)
+                    .ToDictionary(item => item.Name,
+                        adapter.CreateWireView,
+                        StringComparer.Ordinal);
+            Context.LegacyStoryboardProjectionHash =
+                AppServices.GetService<IStoryboardCanonicalBridge>()
+                    .ComputeLegacyProjectionHash(Context.Storyboard);
         }
 
         /// <summary>

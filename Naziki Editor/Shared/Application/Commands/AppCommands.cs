@@ -25,6 +25,7 @@ namespace Naziki_Editor.Core.Commands
         private readonly IProjectResourceService _projectResources;
         private readonly IStoryboardSourceStore _storyboardSourceStore;
         private readonly IStoryboardCanonicalBridge _storyboardBridge;
+        private readonly IStoryboardImportCoordinator _storyboardImportCoordinator;
 
         public AppCommands(
             IProjectService projectService,
@@ -36,7 +37,8 @@ namespace Naziki_Editor.Core.Commands
             IStoryboardDocumentValidator storyboardValidator,
             IProjectResourceService projectResources,
             IStoryboardSourceStore storyboardSourceStore,
-            IStoryboardCanonicalBridge storyboardBridge)
+            IStoryboardCanonicalBridge storyboardBridge,
+            IStoryboardImportCoordinator storyboardImportCoordinator)
         {
             _projectService = projectService;
             _dialogService = dialogService;
@@ -48,6 +50,7 @@ namespace Naziki_Editor.Core.Commands
             _projectResources = projectResources;
             _storyboardSourceStore = storyboardSourceStore;
             _storyboardBridge = storyboardBridge;
+            _storyboardImportCoordinator = storyboardImportCoordinator;
         }
 
         // ==========================================
@@ -116,23 +119,28 @@ namespace Naziki_Editor.Core.Commands
 
             if (projectData.FormatVersion == 3)
             {
-                var sourcePath = context.StoryboardSourcePath;
-                if (string.IsNullOrWhiteSpace(sourcePath) ||
-                    !File.Exists(sourcePath))
-                    throw new FileNotFoundException(
-                        "工程缺少规范故事板源文件 storyboard.editor.json。",
-                        sourcePath);
-                context.EditorStoryboard = _storyboardSourceStore.Load(sourcePath);
+                context.EditorStoryboard =
+                    _storyboardImportCoordinator.EnsureCanonicalSource(
+                        context);
             }
             else
             {
-                context.EditorStoryboard = _storyboardBridge.Synchronize(context);
-                context.IsLegacyProjectMigrationPending = true;
+                throw new InvalidDataException(
+                    "当前编辑器仅支持 format_version: 3 的工程。");
             }
 #pragma warning disable CS0618
             context.LegacyStoryboardProjectionHash =
                 _storyboardBridge.ComputeLegacyProjectionHash(context.Storyboard);
 #pragma warning restore CS0618
+            if (context.ProjectData
+                    .StoryboardSourceRecoveredDuringLoad)
+            {
+                _notificationService.ShowWarning(
+                    "规范故事板源已从运行故事板自动重建。模板绑定和逐 note 覆盖等编辑器专属信息无法恢复。",
+                    8000);
+                context.ProjectData
+                    .StoryboardSourceRecoveredDuringLoad = false;
+            }
 
             // ==========================================
             // 🔴 【第三优先级】：加载完成后，通知 UI 刷新

@@ -1,6 +1,7 @@
 using System.Text;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Naziki_Editor.Core.Abstractions;
@@ -26,8 +27,26 @@ public sealed class ProjectResourceServiceTests
         var chart = Path.Combine(source, "chart.json");
         var music = Path.Combine(source, "music.wav");
         var background = Path.Combine(source, "cover.png");
+        var storyboard = Path.Combine(source, "storyboard.json");
         await File.WriteAllTextAsync(level, ValidLevel);
         await File.WriteAllTextAsync(chart, ValidChart);
+        await File.WriteAllTextAsync(storyboard, """
+            {
+              "templates": {
+                "fade": {
+                  "states": [
+                    {"time": 0, "opacity": 0},
+                    {"time": 1, "opacity": 1}
+                  ]
+                }
+              },
+              "texts": [{
+                "text": "hello",
+                "time": [0, 2],
+                "template": "fade"
+              }]
+            }
+            """);
         WriteSilentWav(music);
         await File.WriteAllBytesAsync(background, Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXsAAAAASUVORK5CYII="));
@@ -37,7 +56,8 @@ public sealed class ProjectResourceServiceTests
             var service = new ProjectResourceService(new FakeStoryboardReader(), new FakeStoryboardWriter(), MessageBroker.Default);
             var projectFile = Path.Combine(projectDirectory, "portable.nep");
             var result = await service.CreateProjectAsync(new ProjectCreationRequest(
-                projectFile, "Portable", level, chart, music, background));
+                projectFile, "Portable", level, chart, music,
+                background, storyboard));
 
             Assert.Equal("assets", result.Project.MaterialFolderPath);
             Assert.Equal("level/level.json", result.Project.LevelFilePath);
@@ -54,6 +74,17 @@ public sealed class ProjectResourceServiceTests
             Assert.Equal(1, JObject.Parse(
                 await File.ReadAllTextAsync(editorSourcePath))
                 .Value<int>("schema_version"));
+            var runtime = JObject.Parse(await File.ReadAllTextAsync(
+                Path.Combine(projectDirectory, "level",
+                    "storyboard.json")));
+            Assert.Null(runtime["templates"]);
+            Assert.DoesNotContain(
+                runtime.Descendants().OfType<JProperty>(),
+                property => property.Name is "template" or "reset");
+            Assert.All(runtime.Descendants().OfType<JProperty>()
+                    .Where(property => property.Name == "time"),
+                property => Assert.NotEqual(JTokenType.Array,
+                    property.Value.Type));
             Assert.All(new[]
             {
                 result.Project.ChartFilePath,
@@ -92,13 +123,14 @@ public sealed class ProjectResourceServiceTests
     }
 
     [Fact]
-    public void ResolvePath_RejectsRelativeTraversalButAllowsLegacyAbsolutePath()
+    public void ResolvePath_RejectsTraversalAndAbsolutePathsInV3()
     {
         var service = new ProjectResourceService(new FakeStoryboardReader(), new FakeStoryboardWriter(), MessageBroker.Default);
         var project = Path.Combine(Path.GetTempPath(), "project", "test.nep");
         Assert.Throws<InvalidDataException>(() => service.ResolvePath(project, "../outside.wav"));
         var absolute = Path.Combine(Path.GetTempPath(), "legacy.wav");
-        Assert.Equal(Path.GetFullPath(absolute), service.ResolvePath(project, absolute));
+        Assert.Throws<InvalidDataException>(() =>
+            service.ResolvePath(project, absolute));
     }
 
     [Fact]

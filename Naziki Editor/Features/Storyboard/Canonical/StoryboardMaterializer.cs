@@ -207,11 +207,7 @@ public sealed class StoryboardMaterializer : IStoryboardMaterializer
         var effective = (JObject)baseState.DeepClone();
         var completed = new List<MaterializedStoryboardFrame>(frames.Count);
         foreach (var frame in frames
-                     .OrderBy(frame => frame.EffectiveTime ??
-                         (frame.Time.Kind ==
-                          StoryboardTimeAnchorKind.TriggerSpawn
-                             ? frame.Time.OffsetSeconds
-                             : double.PositiveInfinity))
+                     .OrderBy(UnityEffectiveTime)
                      .ThenBy(frame => frame.Sequence))
         {
             // A template branch or reset changes parser inheritance, but a
@@ -227,6 +223,14 @@ public sealed class StoryboardMaterializer : IStoryboardMaterializer
         }
         return completed;
     }
+
+    private static float UnityEffectiveTime(
+        MaterializedStoryboardFrame frame) =>
+        frame.Time.Kind == StoryboardTimeAnchorKind.TriggerSpawn
+            ? (float)frame.Time.OffsetSeconds
+            : frame.EffectiveTime.HasValue
+                ? (float)frame.EffectiveTime.Value
+                : float.PositiveInfinity;
 
     private void ExpandTemplateFrames(EditorStoryboardDocument document,
         EditorStoryboardTemplate template, EditorTemplateBinding binding,
@@ -478,7 +482,7 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
             {
                 promotedFrame = entity.Frames
                     .Where(frame => frame.EffectiveTime.HasValue)
-                    .OrderBy(frame => frame.EffectiveTime)
+                    .OrderBy(UnitySortTime)
                     .ThenBy(frame => frame.Sequence)
                     .FirstOrDefault();
                 if (promotedFrame is not null)
@@ -513,13 +517,23 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
             }
 
             var states = new JArray();
+            MaterializedStoryboardFrame? previousRuntimeFrame = promotedFrame;
             foreach (var frame in entity.Frames
-                         .OrderBy(frame => frame.EffectiveTime ??
-                                           double.PositiveInfinity)
+                         .OrderBy(UnitySortTime)
                          .ThenBy(frame => frame.Sequence))
             {
                 if (ReferenceEquals(frame, promotedFrame))
                     continue;
+                if (previousRuntimeFrame is not null &&
+                    IsEquivalentUnityFrame(previousRuntimeFrame, frame))
+                {
+                    issues.Add(new StoryboardImportIssue(
+                        "RUNTIME_FRAME_DUPLICATE_COALESCED",
+                        $"editor:{entity.EditorId}/frame:{frame.FrameId}",
+                        "同刻且完整状态、缓动和销毁语义均相同的关键帧已仅在运行投影中合并；规范源中的 FrameId 仍保留。",
+                        StoryboardDiagnosticSeverity.Info));
+                    continue;
+                }
                 var state = StoryboardCanonicalValues.ToWireObject(
                     frame.EffectiveState);
                 if (frame.Time.Kind == StoryboardTimeAnchorKind.TriggerSpawn)
@@ -539,6 +553,7 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
                     state["easing"] = frame.Easing;
                 if (frame.Destroy.HasValue) state["destroy"] = frame.Destroy.Value;
                 states.Add(state);
+                previousRuntimeFrame = frame;
             }
             if (states.Count > 0) json["states"] = states;
             collections[entity.Kind].Add(json);
@@ -562,6 +577,21 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
         ValidateReferences(root, chart, issues);
         return new StoryboardRuntimeExportResult(root, issues);
     }
+
+    private static float UnitySortTime(MaterializedStoryboardFrame frame) =>
+        frame.Time.Kind == StoryboardTimeAnchorKind.TriggerSpawn
+            ? (float)frame.Time.OffsetSeconds
+            : frame.EffectiveTime.HasValue
+                ? (float)frame.EffectiveTime.Value
+                : float.PositiveInfinity;
+
+    private static bool IsEquivalentUnityFrame(
+        MaterializedStoryboardFrame left,
+        MaterializedStoryboardFrame right) =>
+        UnitySortTime(left).Equals(UnitySortTime(right)) &&
+        JToken.DeepEquals(left.EffectiveState, right.EffectiveState) &&
+        string.Equals(left.Easing, right.Easing, StringComparison.Ordinal) &&
+        left.Destroy == right.Destroy;
 
     private static void AddCollection(JObject root, string name, JArray items)
     {

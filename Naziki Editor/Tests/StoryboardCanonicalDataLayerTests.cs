@@ -50,6 +50,15 @@ public sealed class StoryboardCanonicalDataLayerTests
                 frame.Time.Kind));
         Assert.DoesNotContain(result.Issues,
             issue => issue.Code == "ENTITY_NOT_ACTIVATABLE");
+        Assert.DoesNotContain(result.Issues,
+            issue => issue.Message.Contains("arcade_inteference_size",
+                StringComparison.Ordinal));
+        Assert.Contains(document.Entities
+                .Where(entity =>
+                    entity.Kind == EditorStoryboardEntityKind.SceneController)
+                .SelectMany(entity => entity.Frames),
+            frame => frame.Patch.Value<double?>(
+                "arcade_interference_size") == 2);
     }
 
     [Fact]
@@ -347,6 +356,15 @@ public sealed class StoryboardCanonicalDataLayerTests
             value => value.Type == JTokenType.String &&
                      (value.Value<string>()?.Contains("$note",
                          StringComparison.Ordinal) ?? false));
+        Assert.DoesNotContain(result.Json.Descendants().OfType<JProperty>(),
+            property => property.Name.Contains("inteference",
+                StringComparison.Ordinal) ||
+                        property.Name.Contains("interferance",
+                            StringComparison.Ordinal));
+        Assert.Contains(result.Json.Descendants().OfType<JProperty>(),
+            property =>
+                property.Name == "arcade_interference_size" &&
+                property.Value.Value<double>() == 2);
     }
 
     [Fact]
@@ -423,6 +441,37 @@ public sealed class StoryboardCanonicalDataLayerTests
         var spawned = (JObject)result.Json["sprites"]![1]!;
         Assert.Null(spawned["time"]);
         Assert.Equal(0.75, spawned.Value<double>("relative_time"));
+    }
+
+    [Fact]
+    public void RuntimeExporter_CoalescesOnlyFloatTimeEquivalentFrames()
+    {
+        var document = _importer.Import("""
+        {
+          "sprites": [{
+            "id": "flash",
+            "time": 0,
+            "opacity": 0,
+            "states": [
+              {"time": 1.0, "opacity": 0.5},
+              {"time": 1.0000000000000002, "opacity": 0.5},
+              {"time": 1.0000000000000004, "opacity": 1}
+            ]
+          }]
+        }
+        """).Document!;
+
+        var result = CreateExporter().Export(document, null, null);
+
+        Assert.True(result.Success);
+        Assert.Equal(3, document.Entities[0].Frames.Count);
+        var states = (JArray)result.Json["sprites"]![0]!["states"]!;
+        Assert.Equal(2, states.Count);
+        Assert.Equal(0.5, states[0]!.Value<double>("opacity"));
+        Assert.Equal(1, states[1]!.Value<double>("opacity"));
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "RUNTIME_FRAME_DUPLICATE_COALESCED" &&
+            issue.Severity == StoryboardDiagnosticSeverity.Info);
     }
 
     [Fact]
@@ -618,6 +667,92 @@ public sealed class StoryboardCanonicalDataLayerTests
         Assert.Equal(3, detached.Time.Seconds);
         Assert.Equal(1, detached.Patch.Value<double>("opacity"));
         Assert.Null(detached.Template);
+    }
+
+    [Fact]
+    public void CanonicalTemplateCommands_RenameBindingsAndProtectDependencies()
+    {
+        var document = _importer.Import("""
+        {
+          "templates": {
+            "pulse": {
+              "states": [{"relative_time": 1, "opacity": 1}]
+            }
+          },
+          "sprites": [{
+            "id": "a",
+            "time": 0,
+            "template": "pulse"
+          }]
+        }
+        """).Document!;
+        var edit = new EditorStoryboardEditService(CreateMaterializer());
+        var template = document.Templates["pulse"];
+
+        Assert.Single(edit.GetTemplateDependents(document,
+            template.TemplateId));
+        Assert.Throws<InvalidOperationException>(() =>
+            edit.DeleteTemplate(document, template.TemplateId));
+
+        edit.RenameTemplate(document, template.TemplateId, "flash");
+
+        Assert.False(document.Templates.ContainsKey("pulse"));
+        Assert.Same(template, document.Templates["flash"]);
+        Assert.Equal("flash",
+            document.Entities[0].RootTemplate!.TemplateName);
+    }
+
+    [Fact]
+    public void Example1_TemplateListProjectionContainsAllCanonicalTemplates()
+    {
+        var document = _importer.Import(
+            ReadFixture("storyboard_example1.json")).Document!;
+        var edit = new EditorStoryboardEditService(CreateMaterializer());
+
+        var items = StoryboardTemplateListProjection.Build(document, edit);
+
+        Assert.Equal(9, items.Count);
+        Assert.All(items, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(item.TemplateId));
+            Assert.Equal(item.Template.Name, item.Name);
+            Assert.Equal(item.Template.Frames.Count, item.FrameCount);
+        });
+    }
+
+    [Fact]
+    public void CanonicalTemplateView_RoundTripsThroughOfficialEditorShape()
+    {
+        var catalog = new StoryboardPropertyCatalogService();
+        var adapter = new StoryboardTemplateViewAdapter(
+            new StoryboardDocumentReader(catalog),
+            new StoryboardDocumentWriter(),
+            _importer);
+        var template = _importer.Import("""
+        {
+          "templates": {
+            "pulse": {
+              "opacity": 0.25,
+              "states": [
+                {"relative_time": 1, "opacity": 1},
+                {"relative_time": 0, "opacity": 0}
+              ]
+            }
+          }
+        }
+        """).Document!.Templates["pulse"];
+
+        var view = adapter.CreateWireView(template);
+        var restored = adapter.ParseWireView("pulse", view);
+
+        Assert.Equal(2, restored.Frames.Count);
+        Assert.Equal(template.Frames.Select(frame => frame.FrameId),
+            restored.Frames.Select(frame => frame.FrameId));
+        Assert.Equal(new[] { 1d, 1d },
+            restored.Frames.Select(frame => frame.Time.OffsetSeconds));
+        Assert.Equal(new[] { 1d, 0d },
+            restored.Frames.Select(frame =>
+                frame.Patch.Value<double>("opacity")));
     }
 
     [Fact]

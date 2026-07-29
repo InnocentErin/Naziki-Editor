@@ -82,7 +82,10 @@ namespace Naziki_Editor
             services.AddSingleton<IStoryboardRuntimeExporter, StoryboardRuntimeExporter>();
             services.AddSingleton<IStoryboardSourceStore, StoryboardSourceStore>();
             services.AddSingleton<IEditorStoryboardEditService, EditorStoryboardEditService>();
+            services.AddSingleton<IStoryboardTemplateViewAdapter, StoryboardTemplateViewAdapter>();
             services.AddSingleton<IStoryboardCanonicalBridge, StoryboardCanonicalBridge>();
+            services.AddSingleton<IStoryboardImportCoordinator, StoryboardImportCoordinator>();
+            services.AddSingleton<IChartPreviewWireAdapter, ChartPreviewWireAdapter>();
             services.AddSingleton<StoryboardPreviewService>();
             services.AddSingleton<IStoryboardPreviewDataSource>(sp => sp.GetRequiredService<StoryboardPreviewService>());
             services.AddSingleton<IStoryboardChangeFeed>(sp => sp.GetRequiredService<StoryboardPreviewService>());

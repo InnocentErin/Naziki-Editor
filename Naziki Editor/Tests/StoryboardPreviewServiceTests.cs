@@ -4,6 +4,7 @@ using Naziki_Editor.Models;
 using Xunit;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Naziki_Editor.Features.Project.Resources;
@@ -70,11 +71,41 @@ public sealed class StoryboardPreviewServiceTests
         };
 
         var snapshot = service.GetSnapshot(context);
-        var note = (JObject)JObject.Parse(snapshot.ChartJson!)["note_list"]![0]!;
+        var wire = JObject.Parse(snapshot.ChartJson!);
+        var note = (JObject)wire["note_list"]![0]!;
 
+        Assert.Equal(0d, wire.Value<double>("music_offset"));
+        Assert.Null(wire["skip_music_on_completion"]);
         Assert.False(note.Value<bool>("has_sibling"));
         Assert.False(note.Value<bool>("is_forward"));
         Assert.Null(note[nameof(C2Note.NoteDirection)]);
+        Assert.DoesNotContain(wire.DescendantsAndSelf().OfType<JValue>(),
+            value => value.Type == JTokenType.Null);
+        Assert.Empty(new ChartPreviewWireAdapter().Validate(
+            snapshot.ChartJson));
+    }
+
+    [Fact]
+    public void ChartWireValidation_ReportsExactUnityContractPath()
+    {
+        var issues = new ChartPreviewWireAdapter().Validate("""
+        {
+          "music_offset": null,
+          "time_base": 480,
+          "page_list": [],
+          "tempo_list": [],
+          "note_list": [{
+            "has_sibling": null,
+            "is_forward": false
+          }],
+          "event_order_list": []
+        }
+        """);
+
+        Assert.Contains(issues, issue =>
+            issue.Path == "$.music_offset");
+        Assert.Contains(issues, issue =>
+            issue.Path == "$.note_list[0].has_sibling");
     }
 
     [Fact]

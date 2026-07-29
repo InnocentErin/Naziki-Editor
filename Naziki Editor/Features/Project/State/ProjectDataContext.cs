@@ -17,7 +17,6 @@ namespace Naziki_Editor.State
         public EditorStoryboardDocument EditorStoryboard { get; set; } = new();
         public string StoryboardSourcePath { get; set; }
         public string LegacyStoryboardProjectionHash { get; set; }
-        public bool IsLegacyProjectMigrationPending { get; set; }
         // 🌟 现在的 StoryboardRoot 肚子里装的全是 C2 包装盒啦！
         [Obsolete("Use EditorStoryboard for new code. This is a compatibility projection.")]
         public StoryboardRoot Storyboard { get; set; } = new StoryboardRoot();

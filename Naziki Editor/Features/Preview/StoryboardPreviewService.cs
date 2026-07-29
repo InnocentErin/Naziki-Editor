@@ -2,7 +2,6 @@ using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.State;
 using Naziki_Editor.Models;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System.IO;
 using Naziki_Editor.Features.Project.Resources;
 
@@ -15,6 +14,7 @@ public sealed class StoryboardPreviewService :
 {
     private readonly IStoryboardCanonicalBridge _bridge;
     private readonly IProjectResourceService _resources;
+    private readonly IChartPreviewWireAdapter _chartWire;
     private readonly object _syncRoot = new();
     private readonly List<Action<StoryboardPreviewChangeSet>> _subscribers = [];
     private long _version;
@@ -23,10 +23,19 @@ public sealed class StoryboardPreviewService :
 
     public StoryboardPreviewService(
         IStoryboardCanonicalBridge bridge,
-        IProjectResourceService resources)
+        IProjectResourceService resources,
+        IChartPreviewWireAdapter chartWire)
     {
         _bridge = bridge;
         _resources = resources;
+        _chartWire = chartWire;
+    }
+
+    public StoryboardPreviewService(
+        IStoryboardCanonicalBridge bridge,
+        IProjectResourceService resources)
+        : this(bridge, resources, new ChartPreviewWireAdapter())
+    {
     }
     public long CurrentVersion => Interlocked.Read(ref _version);
 
@@ -54,7 +63,7 @@ public sealed class StoryboardPreviewService :
             CurrentVersion,
             context.ProjectFilePath,
             _lastKnownGoodStoryboardJson!,
-            SerializeChartForPreview(context.Chart),
+            _chartWire.Serialize(context.Chart),
             assetRoot,
             playbackTime)
         {
@@ -70,30 +79,6 @@ public sealed class StoryboardPreviewService :
                     .ToLowerInvariant()[..24],
             ProjectName = context.ProjectData?.ProjectName ?? "Naziki Preview"
         };
-    }
-
-    private static string? SerializeChartForPreview(Models.C2Chart? chart)
-    {
-        if (chart is null) return null;
-
-        var root = JObject.FromObject(chart);
-        if (root["note_list"] is JArray notes)
-        {
-            foreach (var note in notes.OfType<JObject>())
-            {
-                // The editor keeps these fields nullable so incomplete charts can be
-                // repaired. The production game model uses non-nullable booleans.
-                if (note["has_sibling"] is null || note["has_sibling"]!.Type == JTokenType.Null)
-                    note["has_sibling"] = false;
-                if (note["is_forward"] is null || note["is_forward"]!.Type == JTokenType.Null)
-                    note["is_forward"] = false;
-
-                // This property is editor metadata and is not part of ChartModel.Note.
-                note.Remove(nameof(Models.C2Note.NoteDirection));
-            }
-        }
-
-        return root.ToString(Formatting.None);
     }
 
     public IDisposable Subscribe(Action<StoryboardPreviewChangeSet> handler)

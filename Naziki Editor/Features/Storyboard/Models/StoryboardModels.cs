@@ -254,6 +254,7 @@ namespace Naziki_Editor.Models
         public float? StoryboardOpacity { get; set; }
         public float? UiOpacity { get; set; }
         public float? ScanlineOpacity { get; set; }
+        [JsonProperty("scanline_smoothing")] public bool? ScanlineSmoothing { get; set; }
         public float? BackgroundDim { get; set; }
         public float? NoteOpacityMultiplier { get; set; }
         public string ScanlineColor { get; set; }
@@ -268,6 +269,15 @@ namespace Naziki_Editor.Models
         public float? ChromaticalFade { get; set; }
         public float? ChromaticalIntensity { get; set; }
         public float? ChromaticalSpeed { get; set; }
+        [JsonProperty("chromatic")] public bool? Chromatic { get; set; }
+        [JsonProperty("chromatic_intensity")] public float? ChromaticIntensity { get; set; }
+        [JsonProperty("chromatic_start")] public float? ChromaticStart { get; set; }
+        [JsonProperty("chromatic_end")] public float? ChromaticEnd { get; set; }
+        [JsonProperty("artifact")] public bool? Artifact { get; set; }
+        [JsonProperty("artifact_intensity")] public float? ArtifactIntensity { get; set; }
+        [JsonProperty("artifact_colorisation")] public float? ArtifactColorisation { get; set; }
+        [JsonProperty("artifact_parasite")] public float? ArtifactParasite { get; set; }
+        [JsonProperty("artifact_noise")] public float? ArtifactNoise { get; set; }
         public bool? Bloom { get; set; }
         public float? BloomIntensity { get; set; }
         public bool? RadialBlur { get; set; }
@@ -378,6 +388,7 @@ namespace Naziki_Editor.Models
         [JsonProperty("storyboard_opacity")] public float? StoryboardOpacity { get; set; }
         [JsonProperty("ui_opacity")] public float? UiOpacity { get; set; }
         [JsonProperty("scanline_opacity")] public float? ScanlineOpacity { get; set; }
+        [JsonProperty("scanline_smoothing")] public bool? ScanlineSmoothing { get; set; }
         [JsonProperty("background_dim")] public float? BackgroundDim { get; set; }
         [JsonProperty("note_opacity_multiplier")] public float? NoteOpacityMultiplier { get; set; }
 
@@ -402,6 +413,15 @@ namespace Naziki_Editor.Models
         [JsonProperty("chromatical_fade")] public float? ChromaticalFade { get; set; }
         [JsonProperty("chromatical_intensity")] public float? ChromaticalIntensity { get; set; }
         [JsonProperty("chromatical_speed")] public float? ChromaticalSpeed { get; set; }
+        [JsonProperty("chromatic")] public bool? Chromatic { get; set; }
+        [JsonProperty("chromatic_intensity")] public float? ChromaticIntensity { get; set; }
+        [JsonProperty("chromatic_start")] public float? ChromaticStart { get; set; }
+        [JsonProperty("chromatic_end")] public float? ChromaticEnd { get; set; }
+        [JsonProperty("artifact")] public bool? Artifact { get; set; }
+        [JsonProperty("artifact_intensity")] public float? ArtifactIntensity { get; set; }
+        [JsonProperty("artifact_colorisation")] public float? ArtifactColorisation { get; set; }
+        [JsonProperty("artifact_parasite")] public float? ArtifactParasite { get; set; }
+        [JsonProperty("artifact_noise")] public float? ArtifactNoise { get; set; }
 
         [JsonProperty("bloom")] public bool? Bloom { get; set; }
         [JsonProperty("bloom_intensity")] public float? BloomIntensity { get; set; }

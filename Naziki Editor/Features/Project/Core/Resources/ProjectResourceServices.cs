@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Media.Imaging;
 using NAudio.Vorbis;
 using NAudio.Wave;
+using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core.Storyboard.Canonical;
@@ -162,6 +163,7 @@ public sealed class ProjectResourceService : IProjectResourceService
     private readonly IMessageBroker _messages;
     private readonly IStoryboardImportService _storyboardImporter;
     private readonly IStoryboardSourceStore _storyboardSourceStore;
+    private readonly IStoryboardImportCoordinator _storyboardImportCoordinator;
 
     public ProjectResourceService(
         IStoryboardDocumentReader storyboardReader,
@@ -178,13 +180,18 @@ public sealed class ProjectResourceService : IProjectResourceService
         IStoryboardDocumentWriter storyboardWriter,
         IMessageBroker messages,
         IStoryboardImportService storyboardImporter,
-        IStoryboardSourceStore storyboardSourceStore)
+        IStoryboardSourceStore storyboardSourceStore,
+        IStoryboardImportCoordinator? storyboardImportCoordinator = null)
     {
         _storyboardReader = storyboardReader;
         _storyboardWriter = storyboardWriter;
         _messages = messages;
         _storyboardImporter = storyboardImporter;
         _storyboardSourceStore = storyboardSourceStore;
+        _storyboardImportCoordinator = storyboardImportCoordinator ??
+            CreateDefaultCoordinator(storyboardReader,
+                storyboardWriter, messages, storyboardImporter,
+                storyboardSourceStore);
     }
 
     public string ResolvePath(string projectFilePath, string configuredPath)
@@ -195,7 +202,8 @@ public sealed class ProjectResourceService : IProjectResourceService
             throw new ArgumentException("资源路径不能为空。", nameof(configuredPath));
 
         if (Path.IsPathRooted(configuredPath))
-            return Path.GetFullPath(configuredPath);
+            throw new InvalidDataException(
+                "v3 工程资源路径必须是工程内相对路径。");
 
         var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectFilePath))
             ?? throw new InvalidOperationException("无法解析工程目录。");
@@ -227,6 +235,28 @@ public sealed class ProjectResourceService : IProjectResourceService
 
     public void ValidateSource(ProjectResourceKind kind, string sourcePath)
     {
+        if (kind == ProjectResourceKind.Storyboard)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) ||
+                !File.Exists(sourcePath))
+                throw new FileNotFoundException(
+                    "所选故事板文件不存在。", sourcePath);
+            if (!Path.GetExtension(sourcePath).Equals(
+                    ".json", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException(
+                    "故事板必须是 JSON 文件。");
+            var canonical = _storyboardImporter.Import(
+                File.ReadAllText(sourcePath));
+            if (!canonical.CanReplace)
+                throw new InvalidDataException(string.Join(
+                    Environment.NewLine,
+                    canonical.Issues.Where(issue =>
+                            issue.Severity ==
+                            StoryboardDiagnosticSeverity.Error)
+                        .Select(issue =>
+                            $"{issue.Path}: {issue.Message}")));
+            return;
+        }
         if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
             throw new FileNotFoundException("所选资源文件不存在。", sourcePath);
 
@@ -312,24 +342,8 @@ public sealed class ProjectResourceService : IProjectResourceService
                 request.MusicSourcePath, musicDirectory, createdFiles, cancellationToken).ConfigureAwait(false);
             var background = await CopyUniqueAsync(
                 request.BackgroundSourcePath, backgroundDirectory, createdFiles, cancellationToken).ConfigureAwait(false);
-            string storyboard;
-            if (!string.IsNullOrWhiteSpace(request.StoryboardSourcePath))
-            {
-                storyboard = await CopyUniqueAsync(
-                    request.StoryboardSourcePath!, levelDirectory, createdFiles, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                storyboard = GetUniqueDestinationPath(
-                    levelDirectory,
-                    "storyboard",
-                    ".json");
-                await WriteAtomicAsync(
-                    storyboard,
-                    _storyboardWriter.Write(new StoryboardRoot()),
-                    cancellationToken).ConfigureAwait(false);
-                createdFiles.Add(storyboard);
-            }
+            var storyboard = GetUniqueDestinationPath(
+                levelDirectory, "storyboard", ".json");
 
             var now = DateTime.Now;
             var project = new NazikiProjectModel
@@ -345,16 +359,39 @@ public sealed class ProjectResourceService : IProjectResourceService
                 StoryboardSourcePath = ".naziki/storyboard.editor.json",
                 MaterialFolderPath = "assets"
             };
-            var imported = _storyboardImporter.Import(
-                await File.ReadAllTextAsync(storyboard, cancellationToken)
-                    .ConfigureAwait(false));
-            if (!imported.CanReplace)
-                throw new InvalidDataException(string.Join(
-                    Environment.NewLine,
-                    imported.Issues.Select(issue =>
-                        $"{issue.Path}: {issue.Message}")));
+            var chartModel = JsonConvert.DeserializeObject<C2Chart>(
+                await File.ReadAllTextAsync(chart,
+                    cancellationToken).ConfigureAwait(false))
+                ?? throw new InvalidDataException(
+                    "谱面无法建立故事板时间环境。");
+            var timeEngine = new ChartTimeEngine(
+                chartModel.tempo_list, chartModel.time_base);
+            var storyboardInput =
+                string.IsNullOrWhiteSpace(
+                    request.StoryboardSourcePath)
+                    ? _storyboardWriter.Write(new StoryboardRoot())
+                    : await File.ReadAllTextAsync(
+                            request.StoryboardSourcePath!,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+            var candidate = _storyboardImportCoordinator.Prepare(
+                storyboardInput, chartModel, timeEngine);
+            project.StoryboardSourceHash = candidate.SourceHash;
+            project.StoryboardExportHash = candidate.RuntimeHash;
+            await WriteAtomicAsync(storyboard,
+                candidate.RuntimeJson.ToString(Formatting.Indented),
+                cancellationToken).ConfigureAwait(false);
+            createdFiles.Add(storyboard);
             var editorSource = _storyboardSourceStore.GetDefaultSourcePath(projectFile);
-            _storyboardSourceStore.Save(editorSource, imported.Document);
+            var editorSourceDirectory =
+                Path.GetDirectoryName(editorSource)!;
+            if (!Directory.Exists(editorSourceDirectory))
+            {
+                Directory.CreateDirectory(editorSourceDirectory);
+                createdDirectories.Add(editorSourceDirectory);
+            }
+            _storyboardSourceStore.Save(editorSource,
+                candidate.Document);
             createdFiles.Add(editorSource);
             await WriteAtomicAsync(
                 projectFile,
@@ -401,6 +438,15 @@ public sealed class ProjectResourceService : IProjectResourceService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (kind == ProjectResourceKind.Storyboard)
+        {
+            var committed =
+                await _storyboardImportCoordinator.ImportAndCommitAsync(
+                    context, sourcePath, cancellationToken)
+                    .ConfigureAwait(false);
+            return ToProjectRelativePath(context.ProjectFilePath,
+                committed.StoryboardRuntimePath);
+        }
         if (context.ProjectData is null || string.IsNullOrWhiteSpace(context.ProjectFilePath))
             throw new InvalidOperationException("必须先打开或创建工程。");
         ValidateSource(kind, sourcePath);
@@ -607,6 +653,25 @@ public sealed class ProjectResourceService : IProjectResourceService
             BitmapCacheOption.OnLoad);
         if (decoder.Frames.Count == 0 || decoder.Frames[0].PixelWidth <= 0 || decoder.Frames[0].PixelHeight <= 0)
             throw new InvalidDataException("图片文件无法解码。");
+    }
+
+    private static IStoryboardImportCoordinator CreateDefaultCoordinator(
+        IStoryboardDocumentReader reader,
+        IStoryboardDocumentWriter writer,
+        IMessageBroker messages,
+        IStoryboardImportService importer,
+        IStoryboardSourceStore sourceStore)
+    {
+        var serializer = new EditorStoryboardSerializer();
+        var materializer = new StoryboardMaterializer(
+            new StoryboardTimePositionResolver(),
+            new NoteQueryService());
+        var exporter = new StoryboardRuntimeExporter(materializer);
+        var bridge = new StoryboardCanonicalBridge(
+            importer, exporter, reader, writer);
+        return new StoryboardImportCoordinator(
+            importer, exporter, sourceStore, serializer,
+            reader, bridge, messages);
     }
 
     private static void EnsureInsideProject(string projectDirectory, string path)

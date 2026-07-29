@@ -31,6 +31,8 @@ namespace Naziki_Editor.Core
             // 3. ✨ 屏幕特效 (Effects) - 囊括所有高级滤镜属性！
             else if (new[] {
                 "Chromatical", "ChromaticalFade", "ChromaticalIntensity", "ChromaticalSpeed",
+                "Chromatic", "ChromaticIntensity", "ChromaticStart", "ChromaticEnd",
+                "Artifact", "ArtifactIntensity", "ArtifactColorisation", "ArtifactParasite", "ArtifactNoise",
                 "Bloom", "BloomIntensity", "RadialBlur", "RadialBlurIntensity",
                 "ColorAdjustment", "Brightness", "Saturation", "Contrast",
                 "ColorFilter", "ColorFilterColor", "GrayScale", "GrayScaleIntensity",

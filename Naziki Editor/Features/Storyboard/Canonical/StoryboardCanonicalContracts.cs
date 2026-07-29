@@ -134,6 +134,52 @@ public interface IStoryboardSourceStore
     void Save(string sourcePath, EditorStoryboardDocument document);
 }
 
+public sealed record StoryboardImportCandidate(
+    EditorStoryboardDocument Document,
+    JObject RuntimeJson,
+    StoryboardRoot LegacyProjection,
+    IReadOnlyList<StoryboardImportIssue> Issues,
+    string SourceHash,
+    string RuntimeHash);
+
+public sealed record StoryboardImportCommitResult(
+    EditorStoryboardDocument Document,
+    StoryboardRoot LegacyProjection,
+    string StoryboardSourcePath,
+    string StoryboardRuntimePath,
+    string RuntimeHash,
+    IReadOnlyList<StoryboardImportIssue> Issues);
+
+/// <summary>
+/// Owns the v3 import boundary. External Storyboard JSON is normalized and
+/// validated before project memory or any managed project file is replaced.
+/// </summary>
+public interface IStoryboardImportCoordinator
+{
+    StoryboardImportCandidate Prepare(
+        string json,
+        C2Chart? chart = null,
+        ITimeEngine? timeEngine = null,
+        StoryboardMeta? legacyMeta = null,
+        IReadOnlyDictionary<string, string>? controlBoardIds = null);
+
+    Task<StoryboardImportCommitResult> ImportAndCommitAsync(
+        ProjectDataContext context,
+        string externalStoryboardPath,
+        CancellationToken cancellationToken = default);
+
+    Task<StoryboardImportCommitResult> CommitCurrentAsync(
+        ProjectDataContext context,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads the canonical source, or reconstructs it from the managed runtime
+    /// file when a v3 project was left without a usable source.
+    /// </summary>
+    EditorStoryboardDocument EnsureCanonicalSource(
+        ProjectDataContext context);
+}
+
 public interface IEditorStoryboardEditService
 {
     void MoveFrame(EditorStoryboardDocument document, string frameId,
@@ -152,6 +198,38 @@ public interface IEditorStoryboardEditService
 
     void DetachRootTemplate(EditorStoryboardDocument document, string entityId,
         C2Chart? chart, ITimeEngine? timeEngine);
+
+    EditorStoryboardTemplate AddTemplate(EditorStoryboardDocument document,
+        string name);
+
+    void UpdateTemplate(EditorStoryboardDocument document, string templateId,
+        EditorStoryboardTemplate replacement);
+
+    void RenameTemplate(EditorStoryboardDocument document, string templateId,
+        string newName);
+
+    IReadOnlyList<string> GetTemplateDependents(
+        EditorStoryboardDocument document, string templateId);
+
+    void DeleteTemplate(EditorStoryboardDocument document, string templateId);
+}
+
+public sealed record CanonicalTemplateEditResult(
+    string TemplateId,
+    string OriginalName,
+    string NewName,
+    C2Template WireTemplate);
+
+/// <summary>
+/// Adapts canonical templates to the existing official Storyboard editing
+/// surface without making the runtime projection an editable source.
+/// </summary>
+public interface IStoryboardTemplateViewAdapter
+{
+    C2Template CreateWireView(EditorStoryboardTemplate template);
+
+    EditorStoryboardTemplate ParseWireView(string name,
+        C2Template wireTemplate);
 }
 
 /// <summary>

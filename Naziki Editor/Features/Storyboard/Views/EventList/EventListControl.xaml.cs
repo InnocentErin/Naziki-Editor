@@ -6,6 +6,8 @@ using Naziki_Editor.Core.Messaging;
 using Naziki_Editor.Core.Project;
 using Naziki_Editor.Core.Storyboard;
 using Naziki_Editor.Core.Shortcuts;
+using Naziki_Editor.Core.Storyboard.Canonical;
+using Naziki_Editor.Features.Preview;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
@@ -28,7 +30,7 @@ namespace Naziki_Editor.Views
         public bool OnShortcutFocusGained() => true;
         public void OnShortcutFocusLost() { }
 
-        public event Action<string, StoryboardRoot> OnStoryboardLoaded;
+        public event Action<string> OnStoryboardLoaded;
         public event Action<AssetBundle> OnAssetScanned;
         public event Action<object> OnEventNodeSelected;
 
@@ -102,15 +104,9 @@ namespace Naziki_Editor.Views
             {
                 try
                 {
-                    var result = _projectService.ImportStoryboard(openFileDialog.FileName, Context.ProjectData);
+                    var selectedPath = openFileDialog.FileName;
 
-                    // 🌟 物理接线：提前将路径汇报给大管家，确保 TryLoad 探头能拿到正确的坐标！
-                    Context.StoryboardPath = openFileDialog.FileName;
-                    Context.Storyboard = result.Storyboard;
-                    Context.StoryboardMeta = result.Meta;
-
-                    LoadStoryboardUI();
-                    OnStoryboardLoaded?.Invoke(openFileDialog.FileName, result.Storyboard);
+                    OnStoryboardLoaded?.Invoke(selectedPath);
                 }
                 catch (Exception ex)
                 {
@@ -240,15 +236,25 @@ namespace Naziki_Editor.Views
             NoteCtrlListBox.Visibility = noteItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             var templateItems = new List<EventListItemViewModel>();
-            if (root.templates?.Count > 0) foreach (var kvp in root.templates)
+            var templateEditService =
+                AppServices.GetService<IEditorStoryboardEditService>();
+            foreach (var item in StoryboardTemplateListProjection.Build(
+                         Context.EditorStoryboard, templateEditService))
+            {
                 templateItems.Add(new EventListItemViewModel
                 {
-                    Id = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key,
-                    DisplayContent = string.IsNullOrEmpty(kvp.Key) ? "未命名模板" : kvp.Key,
-                    DisplayTime = "",
-                    Tag = kvp.Value,
-                    SortTime = 0
+                    Id = string.IsNullOrEmpty(item.Name)
+                        ? "未命名模板"
+                        : item.Name,
+                    DisplayContent = string.IsNullOrEmpty(item.Name)
+                        ? "未命名模板"
+                        : item.Name,
+                    DisplayTime =
+                        $"{item.FrameCount} 帧 · {item.BindingCount} 个绑定",
+                    Tag = item,
+                    SortTime = item.SourceOrder
                 });
+            }
             templateItems = templateItems.OrderBy(s => s.SortTime).ToList();
             EventTemplateListBox.ItemsSource = templateItems;
             EventTemplateListBox.Visibility = templateItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -322,15 +328,12 @@ namespace Naziki_Editor.Views
         {
             if (sender == EventTemplateListBox)
             {
-                if (EventTemplateListBox.SelectedItem is EventListItemViewModel templateVm && templateVm.Tag is C2Template template)
+                if (EventTemplateListBox.SelectedItem is
+                    EventListItemViewModel templateVm &&
+                    templateVm.Tag is CanonicalTemplateListItem item)
                 {
-                    string templateKey = templateVm.Id;
-                    if (templateKey == "未命名模板") templateKey = "";
-
-                    if (templateKey != null)
-                    {
-                        _messageBroker.Publish("RequestOpenPropertyEditor", (object)template);
-                    }
+                    _messageBroker.Publish("RequestOpenPropertyEditor",
+                        (object)item.Template);
                     e.Handled = true;
                     return;
                 }
@@ -368,7 +371,15 @@ namespace Naziki_Editor.Views
 
             var root = Context.Storyboard;
             bool hasDeleted = false;
+            bool legacyEntityDeleted = false;
+            bool canonicalTemplateDeleted = false;
             var selectedItems = activeList.SelectedItems.Cast<EventListItemViewModel>().ToList();
+            if (selectedItems.Any(item =>
+                    item.Tag is CanonicalTemplateListItem))
+            {
+                AppServices.GetService<IStoryboardCanonicalBridge>()
+                    .Synchronize(Context);
+            }
 
             foreach (var vm in selectedItems)
             {
@@ -379,24 +390,60 @@ namespace Naziki_Editor.Views
                 {
                     _storyboardRepository.Remove(root, objToDelete);
                     hasDeleted = true;
+                    legacyEntityDeleted = true;
                 }
-                else if (tag is C2Template)
+                else if (tag is CanonicalTemplateListItem item)
                 {
-                    string templateKey = vm.Id;
-                    if (templateKey == "未命名模板") templateKey = "";
-
-                    if (templateKey != null && _storyboardRepository.ContainsTemplate(root, templateKey))
+                    try
                     {
-                        _storyboardRepository.RemoveTemplate(root, templateKey);
+                        var current = Context.EditorStoryboard.Templates.Values
+                                          .FirstOrDefault(template =>
+                                              template.TemplateId ==
+                                              item.TemplateId) ??
+                                      Context.EditorStoryboard.Templates
+                                          .GetValueOrDefault(item.Name) ??
+                                      throw new InvalidOperationException(
+                                          $"模板“{item.Name}”已不存在。");
+                        AppServices.GetService<IEditorStoryboardEditService>()
+                            .DeleteTemplate(Context.EditorStoryboard,
+                                current.TemplateId);
                         hasDeleted = true;
+                        canonicalTemplateDeleted = true;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        _notificationService.ShowWarning(ex.Message);
                     }
                 }
             }
 
             if (hasDeleted)
             {
+                if (canonicalTemplateDeleted)
+                    RefreshLegacyTemplates(!legacyEntityDeleted);
+                Context.MarkAsModified();
+                AppServices.GetService<IStoryboardPreviewPublisher>()
+                    .PublishReset("Storyboard.TemplateDeleted");
                 LoadStoryboardUI();
                 OnEventNodeSelected?.Invoke(null);
+            }
+        }
+
+        private void RefreshLegacyTemplates(bool updateProjectionHash)
+        {
+            var adapter =
+                AppServices.GetService<IStoryboardTemplateViewAdapter>();
+            Context.Storyboard.templates =
+                Context.EditorStoryboard.Templates.Values
+                    .OrderBy(item => item.Source.SourceOrder)
+                    .ToDictionary(item => item.Name,
+                        adapter.CreateWireView,
+                        StringComparer.Ordinal);
+            if (updateProjectionHash)
+            {
+                Context.LegacyStoryboardProjectionHash =
+                    AppServices.GetService<IStoryboardCanonicalBridge>()
+                        .ComputeLegacyProjectionHash(Context.Storyboard);
             }
         }
 

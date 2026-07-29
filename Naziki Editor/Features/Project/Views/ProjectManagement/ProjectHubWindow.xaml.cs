@@ -21,6 +21,7 @@ namespace Naziki_Editor.ProjectManagement
     {
         private readonly IDialogService _dialogService;
         private readonly AppCommands _appCommands;
+        private readonly IProjectService _projectService;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILoadingService _loading;
         private bool _projectOpening;
@@ -33,12 +34,15 @@ namespace Naziki_Editor.ProjectManagement
             public DateTime LastOpened { get; set; }
         }
 
-        public ProjectHubWindow(IDialogService dialogService, AppCommands appCommands, IServiceProvider serviceProvider)
+        public ProjectHubWindow(IDialogService dialogService,
+            AppCommands appCommands, IServiceProvider serviceProvider,
+            IProjectService projectService)
         {
             InitializeComponent();
 
             _dialogService = dialogService;
             _appCommands = appCommands;
+            _projectService = projectService;
             _serviceProvider = serviceProvider;
             _loading = AppServices.GetService<ILoadingService>();
             _loading.Register(this, LoadingOverlay);
@@ -166,8 +170,9 @@ namespace Naziki_Editor.ProjectManagement
                         _projectOpening = true;
                         SetProjectActionsEnabled(false);
                         using var loading = _loading.Begin(this, "请稍等，正在打开项目");
-                        string jsonText = await File.ReadAllTextAsync(historyItem.FilePath);
-                        NazikiProjectModel project = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
+                        var loaded = await _projectService.LoadProjectAsync(
+                            historyItem.FilePath);
+                        NazikiProjectModel project = loaded?.ProjectData;
 
                         if (project == null) throw new Exception("工程文件配置已损坏！");
 
@@ -247,8 +252,9 @@ namespace Naziki_Editor.ProjectManagement
                     _projectOpening = true;
                     SetProjectActionsEnabled(false);
                     using var loading = _loading.Begin(this, "请稍等，正在打开项目");
-                    string jsonText = await File.ReadAllTextAsync(nepPath);
-                    NazikiProjectModel project = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
+                    var loaded = await _projectService.LoadProjectAsync(
+                        nepPath);
+                    NazikiProjectModel project = loaded?.ProjectData;
 
                     if (project == null) throw new Exception("工程文件内容损坏或为空！");
 
