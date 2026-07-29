@@ -44,7 +44,12 @@ public sealed class StoryboardSourceStore : IStoryboardSourceStore
     public void Save(string sourcePath, EditorStoryboardDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        EnsureStructurallyValid(document);
+        // Serialize first so every write path passes through canonical unit
+        // normalization (including the empty-unit compatibility migration)
+        // before structural validation.
+        var serialized = _serializer.Serialize(document);
+        var normalized = _serializer.Deserialize(serialized);
+        EnsureStructurallyValid(normalized);
         var fullPath = Path.GetFullPath(sourcePath);
         var directory = Path.GetDirectoryName(fullPath)
                         ?? throw new IOException(
@@ -54,7 +59,7 @@ public sealed class StoryboardSourceStore : IStoryboardSourceStore
             $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
         try
         {
-            File.WriteAllText(temporary, _serializer.Serialize(document),
+            File.WriteAllText(temporary, serialized,
                 new UTF8Encoding(false));
             File.Move(temporary, fullPath, true);
         }

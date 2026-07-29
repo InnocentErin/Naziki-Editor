@@ -53,7 +53,11 @@ namespace Naziki_Editor.Core.Storyboard
             {
                 Id = GenerateTempId("line")
             };
-            line.BaseState.Width = 2.0f;
+            line.BaseState.Width = new UnitFloat
+            {
+                Value = 2.0f,
+                Unit = ReferenceUnit.World
+            };
             line.BaseState.Color = "#FFFFFF";
             line.BaseState.Pos = new List<LinePosition>
             {

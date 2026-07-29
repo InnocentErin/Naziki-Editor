@@ -1,12 +1,8 @@
 using System;
 using System.IO;
 using System.Windows;
-using Newtonsoft.Json;
-using Naziki_Editor.Models;
-using Naziki_Editor.Views;
 using Naziki_Editor.Views.Dialogs;
 using Naziki_Editor.ProjectManagement;
-using Naziki_Editor.Core.Commands;
 using Naziki_Editor.Features.Preview;
 
 namespace Naziki_Editor
@@ -67,39 +63,29 @@ namespace Naziki_Editor
         // ==========================================
         // 📡 全局唯一大总闸：双控流时空拦截网
         // ==========================================
-        private void Application_Startup(object sender, StartupEventArgs e)
+        private async void Application_Startup(object sender, StartupEventArgs e)
         {
             // 🗑️ 【已经把这里导致套娃的 --crash-watcher 召唤法阵删掉了！】
 
             // 🌟 主题初始化已迁移至 ThemeManager (AppServices.ConfigureServices 中自动调用)
 
+            // 所有启动入口都先显示项目中心。项目、资源和编辑器控件全部准备完成后，
+            // ProjectHubWindow 才会创建并显示 MainWindow，避免暴露半初始化界面。
+            ProjectHubWindow hubWindow = AppServices.GetService<ProjectManagement.ProjectHubWindow>();
+            hubWindow.Show();
+
             // 🚀 核心驱动 2：【.nep 项目双击直通车机制】
             if (e.Args.Length > 0 && File.Exists(e.Args[0]))
             {
                 string nepPath = e.Args[0];
-                if (Path.GetExtension(nepPath).ToLower() == ".nep")
+                if (string.Equals(
+                    Path.GetExtension(nepPath),
+                    ".nep",
+                    StringComparison.OrdinalIgnoreCase))
                 {
-                    try
-                    {
-                        string jsonText = File.ReadAllText(nepPath);
-                        NazikiProjectModel project = JsonConvert.DeserializeObject<NazikiProjectModel>(jsonText);
-
-                        if (project != null)
-                        {
-                            MainWindow mainWindow = AppServices.GetService<Views.MainWindow>();
-                            mainWindow.Show();
-                            AppCommands appCommands = AppServices.GetService<AppCommands>();
-                            appCommands.DoLoadProject(nepPath, project, mainWindow.Context);
-                            return;
-                        }
-                    }
-                    catch { }
+                    await hubWindow.OpenProjectAsync(nepPath);
                 }
             }
-
-            // 🕒 核心驱动 3：【普通启动流程】（设计师你之前删掉的窗口，小艾帮你加回来啦！）
-            ProjectHubWindow hubWindow = AppServices.GetService<ProjectManagement.ProjectHubWindow>();
-            hubWindow.Show();
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -108,7 +94,7 @@ namespace Naziki_Editor
             {
                 AppServices.GetService<IUnityPreviewSessionService>()
                     .ShutdownAsync()
-                    .Wait(TimeSpan.FromSeconds(3));
+                    .Wait(TimeSpan.FromSeconds(5));
             }
             catch
             {

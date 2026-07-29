@@ -144,7 +144,8 @@ public sealed class ProjectV3MigrationTests
             reader, bridge, messages);
         return new ProjectService(messages, errors,
             new StoryboardParser(errors), reader, writer, validator,
-            sourceStore, bridge, importer, coordinator);
+            sourceStore, bridge, importer, coordinator,
+            new Naziki_Editor.Core.Charting.ChartJsonCodec());
     }
 
     private sealed class TemporaryDirectory : IDisposable

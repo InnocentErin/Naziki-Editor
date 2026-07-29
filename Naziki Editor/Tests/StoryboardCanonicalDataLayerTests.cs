@@ -51,8 +51,9 @@ public sealed class StoryboardCanonicalDataLayerTests
         Assert.DoesNotContain(result.Issues,
             issue => issue.Code == "ENTITY_NOT_ACTIVATABLE");
         Assert.DoesNotContain(result.Issues,
-            issue => issue.Message.Contains("arcade_inteference_size",
-                StringComparison.Ordinal));
+            issue => issue.Code != "PROPERTY_NAME_NORMALIZED" &&
+                     issue.Message.Contains("arcade_inteference_size",
+                         StringComparison.Ordinal));
         Assert.Contains(document.Entities
                 .Where(entity =>
                     entity.Kind == EditorStoryboardEntityKind.SceneController)
@@ -119,6 +120,9 @@ public sealed class StoryboardCanonicalDataLayerTests
           "sprites": [{"id": "inactive", "path": "a.png"}]
         }
         """).Document!;
+        document.Entities[0].ActivationMode =
+            StoryboardActivationMode.Inactive;
+        document.Entities[0].ActivationTime = null;
         var validator = new EditorStoryboardValidator();
         var semantic = validator.Validate(document);
         Assert.Contains(semantic, issue =>
@@ -142,6 +146,42 @@ public sealed class StoryboardCanonicalDataLayerTests
         {
             Directory.Delete(directory, true);
         }
+    }
+
+    [Fact]
+    public void Importer_DefaultsUntimedSceneEntitiesToAbsoluteZero()
+    {
+        var result = _importer.Import("""
+        {
+          "sprites": [{"id": "sprite", "path": "a.png"}],
+          "texts": [{"id": "text", "text": "hello"}],
+          "videos": [{"id": "video", "path": "clip.mp4"}],
+          "controllers": [{"id": "controller"}]
+        }
+        """);
+
+        Assert.True(result.CanReplace);
+        Assert.All(result.Document!.Entities.Where(entity =>
+                entity.Kind is not EditorStoryboardEntityKind.SceneController),
+            entity =>
+            {
+                Assert.Equal(StoryboardActivationMode.Explicit,
+                    entity.ActivationMode);
+                Assert.Equal(StoryboardTimeAnchorKind.Absolute,
+                    entity.ActivationTime!.Kind);
+                Assert.Equal(0, entity.ActivationTime.Seconds);
+            });
+        var controller = Assert.Single(result.Document.Entities.Where(entity =>
+            entity.Kind == EditorStoryboardEntityKind.SceneController));
+        Assert.Equal(StoryboardActivationMode.GlobalController,
+            controller.ActivationMode);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "ENTITY_ACTIVATION_DEFAULTED" &&
+            issue.Severity == StoryboardDiagnosticSeverity.Warning);
+        Assert.DoesNotContain(result.Issues,
+            issue => issue.Code == "ENTITY_NOT_ACTIVATABLE");
+        Assert.True(CreateExporter().Export(
+            result.Document, null, null).Success);
     }
 
     [Fact]
@@ -397,6 +437,157 @@ public sealed class StoryboardCanonicalDataLayerTests
                 .Value<string>());
         Assert.DoesNotContain(exported.Json.Descendants().OfType<JObject>(),
             item => item.Value<string>("$naziki_type") == "unit_float");
+    }
+
+    [Fact]
+    public void UnityUnitObjects_MapAllExternalEnumValuesSemantically()
+    {
+        var units = new[]
+        {
+            "world", "stageX", "stageY", "noteX", "noteY",
+            "cameraX", "cameraY"
+        };
+        var states = new JArray();
+        for (var index = 0; index < units.Length; index++)
+            states.Add(new JObject
+            {
+                ["time"] = index + 1,
+                ["x"] = new JObject
+                {
+                    ["Value"] = index + 0.25,
+                    ["Unit"] = index,
+                    ["ScaleToCanvas"] = true,
+                    ["Span"] = false
+                }
+            });
+        var root = new JObject
+        {
+            ["sprites"] = new JArray(new JObject
+            {
+                ["id"] = "units",
+                ["time"] = 0,
+                ["states"] = states
+            })
+        };
+
+        var imported = _importer.Import(root.ToString());
+
+        Assert.True(imported.CanReplace);
+        var entity = Assert.Single(imported.Document!.Entities);
+        Assert.Equal(units, entity.Frames.Select(frame =>
+            ((JObject)frame.Patch["x"]!).Value<string>("unit")));
+        Assert.All(entity.Frames, frame =>
+        {
+            var typed = (JObject)frame.Patch["x"]!;
+            Assert.Null(typed["ScaleToCanvas"]);
+            Assert.Null(typed["Span"]);
+        });
+
+        var runtime = CreateExporter().Export(
+            imported.Document, null, null);
+        Assert.True(runtime.Success);
+        Assert.Equal(units.Select((unit, index) =>
+                $"{unit}:{(index + 0.25).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture)}"),
+            runtime.Json["sprites"]![0]!["states"]!
+                .Select(state => state!["x"]!.Value<string>()));
+    }
+
+    [Theory]
+    [InlineData("""{"Value":1}""", "UNIT_OBJECT_INVALID")]
+    [InlineData("""{"Value":"bad","Unit":1}""", "UNIT_VALUE_INVALID")]
+    [InlineData("""{"Value":1,"Unit":99}""", "UNIT_ENUM_UNKNOWN")]
+    [InlineData("""{"Value":1,"Unit":1.5}""", "UNIT_ENUM_UNKNOWN")]
+    [InlineData("\"unknown:1\"", "UNIT_NAME_UNKNOWN")]
+    public void InvalidUnitValues_BlockImportAtSourcePath(
+        string unitJson, string expectedCode)
+    {
+        var result = _importer.Import(
+            $$"""{"sprites":[{"id":"s","time":0,"x":{{unitJson}}}]}""");
+
+        Assert.False(result.CanReplace);
+        var issue = Assert.Single(result.Issues,
+            item => item.Code == expectedCode);
+        Assert.Equal("$.sprites[0].x", issue.Path);
+    }
+
+    [Fact]
+    public void EditorSerializer_MigratesEmptyCanonicalUnitToWorld()
+    {
+        var document = _serializer.Deserialize("""
+        {
+          "schema_version": 1,
+          "document_id": "document",
+          "entities": [{
+            "editor_id": "entity",
+            "source_group_id": "group",
+            "kind": "Sprite",
+            "source_order": 0,
+            "activation_mode": "Explicit",
+            "activation_time": {
+              "kind": "Absolute",
+              "seconds": 0
+            },
+            "base_patch": {
+              "z": {
+                "$naziki_type": "unit_float",
+                "unit": "",
+                "value": 0
+              }
+            },
+            "frames": [],
+            "source": { "path": "$.sprites[0]", "source_order": 0 }
+          }],
+          "templates": {},
+          "triggers": [],
+          "root_properties": {},
+          "metadata": {}
+        }
+        """);
+
+        var unit = (JObject)document.Entities[0].BasePatch["z"]!;
+        Assert.Equal("world", unit.Value<string>("unit"));
+        Assert.Contains(document.Metadata.ImportDiagnostics,
+            issue => issue.Code == "CANONICAL_UNIT_WORLD_MIGRATED");
+        Assert.Contains("\"unit\": \"world\"",
+            _serializer.Serialize(document), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SourceStore_NormalizesLegacyEmptyUnitBeforeValidationAndWrite()
+    {
+        var document = _importer.Import("""
+        {"sprites":[{"id":"sprite","time":0,"z":0}]}
+        """).Document!;
+        document.Entities[0].BasePatch["z"] = new JObject
+        {
+            ["$naziki_type"] = "unit_float",
+            ["unit"] = "",
+            ["value"] = 0
+        };
+        var directory = Path.Combine(Path.GetTempPath(),
+            "naziki-unit-store-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "storyboard.editor.json");
+        try
+        {
+            var store = new StoryboardSourceStore(_serializer,
+                new EditorStoryboardValidator());
+
+            store.Save(path, document);
+
+            var saved = JObject.Parse(File.ReadAllText(path));
+            Assert.Equal("world", saved.SelectToken(
+                "$.entities[0].base_patch.z.unit")?.Value<string>());
+            var reloaded = store.Load(path);
+            Assert.Equal("world",
+                ((JObject)reloaded.Entities[0].BasePatch["z"]!)
+                .Value<string>("unit"));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, true);
+        }
     }
 
     [Fact]
@@ -793,6 +984,131 @@ public sealed class StoryboardCanonicalDataLayerTests
             issue.Kind == StoryboardCorrectionKind.MissingBaseTime);
         Assert.DoesNotContain(report.Issues, issue =>
             issue.Kind == StoryboardCorrectionKind.SameTimeConflict);
+    }
+
+    [Fact]
+    public void Import_NormalizesPascalCaseAndPreservesParentReference()
+    {
+        var result = _importer.Import("""
+        {
+          "Sprites": [{
+            "Id": "child",
+            "ParentId": "anchor",
+            "Path": "image.png",
+            "Time": 0,
+            "ScaleToCanvas": true,
+            "Width": {
+              "Value": 1000,
+              "Unit": 1,
+              "ScaleToCanvas": true,
+              "Span": true
+            },
+            "States": [{ "RelativeTime": 1, "RotX": 15 }]
+          }],
+          "NoteControllers": [{
+            "Id": "anchor",
+            "Note": 7,
+            "Time": 0
+          }]
+        }
+        """, Chart((7, 0)));
+
+        Assert.True(result.CanReplace);
+        var child = Assert.Single(result.Document!.Entities.Where(entity =>
+            entity.Kind == EditorStoryboardEntityKind.Sprite));
+        Assert.Equal("anchor", child.ParentId!.Literal);
+        Assert.True(child.BasePatch.Value<bool>("scale_to_canvas"));
+        Assert.Equal(15, child.Frames[0].Patch.Value<double>("rot_x"));
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "PROPERTY_NAME_NORMALIZED");
+
+        var exported = CreateExporter().Export(result.Document,
+            Chart((7, 0)), Engine(Chart((7, 0))));
+        Assert.Equal("anchor",
+            exported.Json["sprites"]![0]!["parent_id"]!.Value<string>());
+        Assert.Equal("stageX:1000",
+            exported.Json["sprites"]![0]!["width"]!.Value<string>());
+    }
+
+    [Fact]
+    public void Import_MergesEquivalentCaseDuplicates()
+    {
+        var result = _importer.Import("""
+        { "sprites": [{ "id": "sprite", "time": 0, "Time": 0 }] }
+        """);
+
+        Assert.True(result.CanReplace);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "PROPERTY_NAME_DUPLICATE_MERGED");
+    }
+
+    [Fact]
+    public void Import_BlocksDifferentValuesThatNormalizeToSameProperty()
+    {
+        var result = _importer.Import("""
+        { "sprites": [{ "id": "sprite", "time": 0, "Time": 2 }] }
+        """);
+
+        Assert.False(result.CanReplace);
+        var conflict = Assert.Single(result.SourceConflicts!);
+        Assert.Equal("$.sprites[0]", conflict.Path);
+        Assert.Equal("time", conflict.CanonicalName);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "PROPERTY_NAME_CONFLICT");
+    }
+
+    [Fact]
+    public void Import_PreservesTemplateNamesButNormalizesTemplateProperties()
+    {
+        var result = _importer.Import("""
+        {
+          "Templates": {
+            "MyPascalTemplate": { "Opacity": 0.5 }
+          },
+          "Sprites": [{
+            "Id": "sprite",
+            "Path": "a.png",
+            "Time": 0,
+            "States": [{ "Template": "MyPascalTemplate", "Time": 1 }]
+          }]
+        }
+        """);
+
+        Assert.True(result.CanReplace);
+        Assert.True(result.Document!.Templates.ContainsKey(
+            "MyPascalTemplate"));
+        Assert.Equal(0.5,
+            result.Document.Templates["MyPascalTemplate"]
+                .BasePatch.Value<double>("opacity"));
+    }
+
+    [Fact]
+    public void Import_RejectsInvalidParentSemantics()
+    {
+        var wrongType = _importer.Import("""
+        {
+          "note_controllers": [{
+            "id": "note",
+            "parent_id": "anchor",
+            "note": 1,
+            "time": 0
+          }],
+          "sprites": [{ "id": "anchor", "time": 0 }]
+        }
+        """, Chart((1, 0)));
+        Assert.Contains(wrongType.Issues, issue =>
+            issue.Code == "PARENT_TYPE_INVALID");
+
+        var cycle = _importer.Import("""
+        {
+          "sprites": [
+            { "id": "a", "parent_id": "b", "time": 0 },
+            { "id": "b", "parent_id": "a", "time": 0 }
+          ]
+        }
+        """);
+        Assert.Contains(cycle.Issues, issue =>
+            issue.Code == "PARENT_CYCLE");
     }
 
     private static int Count(EditorStoryboardDocument document,

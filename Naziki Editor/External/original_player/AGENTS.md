@@ -8,7 +8,7 @@
 
 | Item | Value |
 |------|-------|
-| Unity editor | **6000.0.75f1** (`engines/unity/ProjectSettings/ProjectVersion.txt`) |
+| Unity editor | **6000.0.80f1** (`engines/unity/ProjectSettings/ProjectVersion.txt`) |
 | Language | C# |
 | Remote | `origin` → `https://github.com/Cytoid/cytoid-core-unity.git` |
 | Upstream reference | `upstream` → `https://github.com/Cytoid/Cytoid-private.git` (legacy production client) |
@@ -102,7 +102,7 @@ Editor: **Cytoid → Build Android/iOS Plugin Artifacts** (export + package in o
 Android batchmode:
 
 ```bash
-UNITY="/Applications/Unity/Hub/Editor/6000.0.75f1/Unity.app/Contents/MacOS/Unity"
+UNITY="/Applications/Unity/Hub/Editor/6000.0.80f1/Unity.app/Contents/MacOS/Unity"
 PROJECT="/path/to/Cytoid/engines/unity"
 
 "$UNITY" -batchmode \
@@ -142,7 +142,7 @@ Requires Unity export at `cytoid_flutter/android/unityLibrary/` (set `Cytoid.Flu
 
 ```bash
 cd cytoid_flutter
-export UNITY_PATH="/Applications/Unity/Hub/Editor/6000.0.75f1/Unity.app/Contents/MacOS/Unity"
+export UNITY_PATH="/Applications/Unity/Hub/Editor/6000.0.80f1/Unity.app/Contents/MacOS/Unity"
 ./scripts/export_unity_android.sh
 flutter run
 ```
@@ -220,7 +220,7 @@ If you change envelope types or payloads:
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-05 | Unity 6 (6000.0.75f1) core fork | IL2CPP / mobile toolchain modernization |
+| 2026-05 | Unity 6 (6000.0.80f1) core fork | IL2CPP / mobile toolchain modernization |
 | 2026-05 | Engine-agnostic host protocol | Flutter shell; future Godot adapter |
 | 2026-05 | `cytoid_game_core` plugin + versioned AAR artifacts | Example app and CI can avoid committing `unityLibrary` trees |
 | 2026-05 | Dual export targets (plugin `.cytoid_game_core/exports` vs `cytoid_flutter/android/unityLibrary`) | Plugin packaging vs full-app Gradle embed |

@@ -3,18 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Naziki Editor"
         WindowStyle="None"
-        ResizeMode="NoResize"
-        SizeToContent="Height"
-        Width="520"
-        MinWidth="520"
-        MaxWidth="750"
-        MinHeight="280"
+        ResizeMode="CanResize"
+        Width="820"
+        Height="600"
+        MinWidth="680"
+        MinHeight="360"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource BoardBgColor}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="8"/>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="8"/>
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -122,7 +121,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>  <!-- 标题栏 -->
                 <RowDefinition Height="Auto"/>  <!-- 消息内容 -->
-                <RowDefinition Height="*" MinHeight="80"/>  <!-- 错误详情文本框（撑满剩余空间） -->
+                <RowDefinition x:Name="DetailsRow" Height="*" MinHeight="140"/>  <!-- 错误详情文本框（撑满剩余空间） -->
                 <RowDefinition Height="Auto"/>  <!-- 按钮区域 -->
             </Grid.RowDefinitions>
 
@@ -165,13 +164,16 @@
                  中部：消息内容
                  ============================================ -->
             <Border Grid.Row="1" Padding="20,16,20,8">
-                <TextBlock x:Name="MessageBlock"
-                           Text=""
-                           Foreground="{DynamicResource MainTextColor}"
-                           FontSize="13"
-                           TextWrapping="Wrap"
-                           LineHeight="20"
-                           MaxWidth="710"/>
+                <ScrollViewer MaxHeight="160"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock x:Name="MessageBlock"
+                               Text=""
+                               Foreground="{DynamicResource MainTextColor}"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               LineHeight="20"/>
+                </ScrollViewer>
             </Border>
 
             <!-- ============================================
@@ -186,7 +188,7 @@
                          FontFamily="Consolas"
                          FontSize="12"
                          IsReadOnly="True"
-                         TextWrapping="Wrap"
+                         TextWrapping="NoWrap"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"
                          HorizontalScrollBarVisibility="Auto"

@@ -19,10 +19,15 @@ public sealed class EditorPreviewBridge : MonoBehaviour
 {
     public const string Protocol = "naziki.editor-preview.v1";
     const int MaxMessageBytes = 64 * 1024 * 1024;
+    public const int HostRevision = 4;
     static EditorPreviewBridge instance;
     static readonly object WriteLock = new object();
 
     readonly ConcurrentQueue<string> incoming = new ConcurrentQueue<string>();
+    readonly ConcurrentQueue<string> reliableOutgoing = new ConcurrentQueue<string>();
+    readonly ConcurrentQueue<UnityLogRecord> unityLogs = new ConcurrentQueue<UnityLogRecord>();
+    readonly ConcurrentDictionary<string, UnityLogAggregate> pendingUnityLogs =
+        new ConcurrentDictionary<string, UnityLogAggregate>();
     readonly ConcurrentDictionary<string, string> latestOutgoing = new ConcurrentDictionary<string, string>();
     readonly AutoResetEvent outgoingSignal = new AutoResetEvent(false);
     CancellationTokenSource lifetime;
@@ -42,10 +47,19 @@ public sealed class EditorPreviewBridge : MonoBehaviour
     bool adaptiveQuality = true;
     int overloadedSamples;
     int stableSamples;
+    int queuedUnityLogCount;
+    string unityVersion;
 
     void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         instance = this;
+        DontDestroyOnLoad(gameObject);
+        unityVersion = Application.unityVersion;
         sessionId = ReadArgument("--naziki-preview-session") ?? "unbound";
         nonce = ReadArgument("--naziki-preview-nonce") ?? string.Empty;
         var pipeName = ReadArgument("--naziki-preview-pipe");
@@ -56,6 +70,7 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         }
 
         lifetime = new CancellationTokenSource();
+        Application.logMessageReceivedThreaded += OnUnityLog;
         readerThread = new Thread(() => ConnectAndRead(pipeName, lifetime.Token))
         {
             IsBackground = true,
@@ -90,6 +105,7 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         }
 
         var game = FindObjectOfType<Game>();
+        DrainUnityLogs(game);
         if (game == null || !game.IsLoaded) return;
         telemetryElapsed += UnityEngine.Time.unscaledDeltaTime;
         performanceElapsed += UnityEngine.Time.unscaledDeltaTime;
@@ -125,6 +141,7 @@ public sealed class EditorPreviewBridge : MonoBehaviour
     void OnDestroy()
     {
         if (instance == this) instance = null;
+        Application.logMessageReceivedThreaded -= OnUnityLog;
         lifetime?.Cancel();
         outgoingSignal.Set();
         pipe?.Dispose();
@@ -143,7 +160,17 @@ public sealed class EditorPreviewBridge : MonoBehaviour
             SendProtocol("host.ready", Guid.NewGuid().ToString("N"), new JObject
             {
                 ["authenticationNonce"] = nonce,
-                ["unityVersion"] = Application.unityVersion
+                ["unityVersion"] = unityVersion,
+                ["hostRevision"] = HostRevision,
+                ["capabilities"] = new JObject
+                {
+                    ["officialRuntimeDataOnly"] = true,
+                    ["chartPreflightV2"] = true,
+                    ["unityLogV1"] = true,
+                    ["loadProgressV1"] = true,
+                    ["healthCheckV1"] = true,
+                    ["persistentBridgeV1"] = true
+                }
             });
             var header = new byte[4];
             while (!token.IsCancellationRequested)
@@ -197,7 +224,8 @@ public sealed class EditorPreviewBridge : MonoBehaviour
             ["TargetPreviewVersion"] = targetPreviewVersion,
             ["Payload"] = payload ?? new JObject()
         };
-        target.WriteFrame(message.ToString(Formatting.None));
+        target.reliableOutgoing.Enqueue(message.ToString(Formatting.None));
+        target.outgoingSignal.Set();
     }
 
     static void SendLatestProtocol(string type, string requestId, JObject payload)
@@ -227,6 +255,27 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         {
             outgoingSignal.WaitOne(100);
             if (token.IsCancellationRequested) return;
+            while (reliableOutgoing.TryDequeue(out var reliableMessage))
+            {
+                try { WriteFrame(reliableMessage); }
+                catch when (token.IsCancellationRequested) { return; }
+                catch
+                {
+                    Interlocked.Increment(ref droppedTelemetryMessages);
+                    return;
+                }
+            }
+            foreach (var item in pendingUnityLogs.ToArray())
+            {
+                if (!pendingUnityLogs.TryRemove(item.Key, out var entry)) continue;
+                try
+                {
+                    SendProtocol("preview.unityLog", Guid.NewGuid().ToString("N"),
+                        entry.ToPayload());
+                }
+                catch when (token.IsCancellationRequested) { return; }
+                catch { Interlocked.Increment(ref droppedTelemetryMessages); }
+            }
             foreach (var item in latestOutgoing.ToArray())
             {
                 if (!latestOutgoing.TryRemove(item.Key, out var json)) continue;
@@ -235,6 +284,103 @@ public sealed class EditorPreviewBridge : MonoBehaviour
                 catch { Interlocked.Increment(ref droppedTelemetryMessages); }
             }
         }
+    }
+
+    void OnUnityLog(string condition, string stackTrace, LogType type)
+    {
+        if (type == LogType.Log)
+            return;
+        if (condition != null &&
+            (condition.Contains("[EditorPreview] Pipe disconnected") ||
+             condition.Contains("preview.unityLog")))
+            return;
+        if (Interlocked.Increment(ref queuedUnityLogCount) > 256)
+        {
+            Interlocked.Decrement(ref queuedUnityLogCount);
+            Interlocked.Increment(ref droppedTelemetryMessages);
+            return;
+        }
+        unityLogs.Enqueue(new UnityLogRecord(condition ?? string.Empty,
+            stackTrace ?? string.Empty, type, DateTime.UtcNow));
+    }
+
+    void DrainUnityLogs(Game game)
+    {
+        while (unityLogs.TryDequeue(out var record))
+        {
+            Interlocked.Decrement(ref queuedUnityLogCount);
+            var fingerprint = record.Type + "\n" + record.Message + "\n" + record.StackTrace;
+            pendingUnityLogs.AddOrUpdate(
+                fingerprint,
+                _ => new UnityLogAggregate(
+                    record,
+                    UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
+                    UnityEngine.Time.frameCount,
+                    game != null && game.IsLoaded ? game.Time : 0,
+                    EditorPreviewController.CurrentPreviewVersion,
+                    unityVersion),
+                (_, existing) => existing.Increment(record.UtcTimestamp));
+        }
+        if (!pendingUnityLogs.IsEmpty)
+            outgoingSignal.Set();
+    }
+
+    sealed class UnityLogRecord
+    {
+        public readonly string Message;
+        public readonly string StackTrace;
+        public readonly LogType Type;
+        public readonly DateTime UtcTimestamp;
+        public UnityLogRecord(string message, string stackTrace, LogType type, DateTime utcTimestamp) =>
+            (Message, StackTrace, Type, UtcTimestamp) = (message, stackTrace, type, utcTimestamp);
+    }
+
+    sealed class UnityLogAggregate
+    {
+        readonly UnityLogRecord first;
+        readonly string scene;
+        readonly int frame;
+        readonly float previewTime;
+        readonly long snapshotVersion;
+        readonly string unityVersion;
+        int count = 1;
+        DateTime lastTimestamp;
+
+        public UnityLogAggregate(UnityLogRecord first, string scene, int frame,
+            float previewTime, long snapshotVersion, string unityVersion)
+        {
+            this.first = first;
+            this.scene = scene;
+            this.frame = frame;
+            this.previewTime = previewTime;
+            this.snapshotVersion = snapshotVersion;
+            this.unityVersion = unityVersion;
+            lastTimestamp = first.UtcTimestamp;
+        }
+
+        public UnityLogAggregate Increment(DateTime timestamp)
+        {
+            Interlocked.Increment(ref count);
+            lastTimestamp = timestamp;
+            return this;
+        }
+
+        public JObject ToPayload() => new JObject
+        {
+            ["severity"] = first.Type == LogType.Warning ? "Warning" :
+                first.Type == LogType.Assert ? "Critical" : "Error",
+            ["logType"] = first.Type.ToString(),
+            ["message"] = first.Message,
+            ["stackTrace"] = first.StackTrace,
+            ["scene"] = scene,
+            ["frame"] = frame,
+            ["previewTime"] = previewTime,
+            ["snapshotVersion"] = snapshotVersion,
+            ["repeatCount"] = Math.Max(1, Volatile.Read(ref count)),
+            ["firstTimestampUtc"] = first.UtcTimestamp.ToString("O"),
+            ["lastTimestampUtc"] = lastTimestamp.ToString("O"),
+            ["unityVersion"] = unityVersion
+        };
     }
 
     void WriteFrame(string json)

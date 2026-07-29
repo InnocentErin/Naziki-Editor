@@ -84,6 +84,43 @@ public sealed class StoryboardSerializationTests
     }
 
     [Fact]
+    public void UnitValuesAcceptObjectFormProducedByExternalEditors()
+    {
+        var reader = new StoryboardDocumentReader(_catalog);
+        var writer = new StoryboardDocumentWriter();
+        var root = reader.Read("""
+        {
+          "Sprites": [{
+            "Id": "s",
+            "Time": 0,
+            "Width": {
+              "Value": 1000,
+              "Unit": 1,
+              "ScaleToCanvas": true,
+              "Span": true
+            },
+            "Height": { "Value": 600, "Unit": 2 },
+            "X": { "Value": 0.25, "Unit": 0 }
+          }]
+        }
+        """);
+
+        var sprite = Assert.Single(root.sprites);
+        Assert.Equal(1000, sprite.BaseState.Width!.Value);
+        Assert.Equal(ReferenceUnit.StageX, sprite.BaseState.Width.Unit);
+        Assert.Equal(ReferenceUnit.StageY, sprite.BaseState.Height!.Unit);
+        Assert.Equal(ReferenceUnit.World, sprite.BaseState.X!.Unit);
+
+        var json = JObject.Parse(writer.Write(root));
+        Assert.Equal("stageX:1000",
+            json["sprites"]![0]!["width"]!.Value<string>());
+        Assert.Equal("stageY:600",
+            json["sprites"]![0]!["height"]!.Value<string>());
+        Assert.Equal("world:0.25",
+            json["sprites"]![0]!["x"]!.Value<string>());
+    }
+
+    [Fact]
     public void SnapshotPreservesSyntheticEditorIdentity()
     {
         var serializer = new EditorSnapshotSerializer();

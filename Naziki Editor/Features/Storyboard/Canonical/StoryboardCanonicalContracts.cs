@@ -10,9 +10,38 @@ public sealed record StoryboardImportIssue(
     string Message,
     StoryboardDiagnosticSeverity Severity);
 
+public sealed record StoryboardPropertyNameChange(
+    string Path,
+    string OriginalName,
+    string CanonicalName,
+    bool DuplicateMerged);
+
+public sealed record StoryboardPropertyConflictCandidate(
+    string OriginalName,
+    JToken Value);
+
+public sealed record StoryboardPropertyNameConflict(
+    string Path,
+    string CanonicalName,
+    IReadOnlyList<StoryboardPropertyConflictCandidate> Candidates);
+
+public sealed record StoryboardJsonNormalizationResult(
+    JToken Token,
+    IReadOnlyList<StoryboardPropertyNameChange> Changes,
+    IReadOnlyList<StoryboardPropertyNameConflict> Conflicts);
+
+public interface IStoryboardJsonNormalizer
+{
+    StoryboardJsonNormalizationResult Normalize(JToken source);
+    StoryboardJsonNormalizationResult Normalize(
+        JToken source,
+        IReadOnlyDictionary<string, string> conflictSelections);
+}
+
 public sealed record StoryboardImportResult(
     EditorStoryboardDocument? Document,
-    IReadOnlyList<StoryboardImportIssue> Issues)
+    IReadOnlyList<StoryboardImportIssue> Issues,
+    IReadOnlyList<StoryboardPropertyNameConflict>? SourceConflicts = null)
 {
     private static readonly HashSet<string> ReplacementBlockingCodes =
         new(StringComparer.Ordinal)
@@ -24,7 +53,12 @@ public sealed record StoryboardImportResult(
             "TIME_OFFSET_INVALID", "NOTE_BINDING_INVALID",
             "NOTE_QUERY_TYPE_INVALID", "NOTE_ARRAY_ITEM_INVALID",
             "MULTIPLE_TIME_ARRAY_FIELDS", "TIME_ARRAY_EMPTY",
-            "NOTE_ARRAY_EMPTY"
+            "NOTE_ARRAY_EMPTY", "PROPERTY_NAME_CONFLICT",
+            "PARENT_TYPE_INVALID", "PARENT_SELF_REFERENCE", "PARENT_CYCLE",
+            "PARENT_CREATION_ORDER_INVALID", "PARENT_NOTE_CONTEXT_MISSING",
+            "UNIT_OBJECT_INVALID", "UNIT_VALUE_INVALID",
+            "UNIT_ENUM_UNKNOWN", "UNIT_NAME_UNKNOWN",
+            "CANONICAL_UNIT_INVALID", "COLOR_OBJECT_INVALID"
         };
 
     public bool CanReplace => Document is not null &&

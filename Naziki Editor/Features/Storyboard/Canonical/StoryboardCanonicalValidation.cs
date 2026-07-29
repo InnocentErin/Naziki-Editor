@@ -1,4 +1,5 @@
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Serialization;
 using Naziki_Editor.Models;
 using Newtonsoft.Json.Linq;
 
@@ -128,11 +129,12 @@ public sealed class EditorStoryboardValidator : IEditorStoryboardValidator
         foreach (var unit in patch.DescendantsAndSelf().OfType<JObject>()
                      .Where(StoryboardCanonicalValues.IsUnitToken))
         {
-            if (unit["value"]?.Type is not
-                    (JTokenType.Integer or JTokenType.Float) ||
-                string.IsNullOrWhiteSpace(unit.Value<string>("unit")))
-                AddStructural(issues, "CANONICAL_UNIT_INVALID", path,
-                    "Typed unit values require numeric value and non-empty unit.");
+            if (!StoryboardUnitCodec.TryRead(unit, out _))
+                AddStructural(issues, "CANONICAL_UNIT_INVALID",
+                    string.IsNullOrWhiteSpace(unit.Path)
+                        ? path
+                        : $"{path}.{unit.Path}",
+                    "Typed unit values require a finite numeric value and a recognized non-empty unit.");
         }
     }
 

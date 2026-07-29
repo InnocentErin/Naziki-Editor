@@ -13,6 +13,7 @@
                 <ResourceDictionary Source="Themes/Base/Styles.xaml"/>
                 <ResourceDictionary Source="Themes/Base/TimelineStyles.xaml"/>
                 <ResourceDictionary Source="Themes/Base/TimelineTabs.xaml"/>
+                <ResourceDictionary Source="Themes/Base/EditorWorkspace.xaml"/>
                 <ResourceDictionary Source="Themes/Base/NotificationStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

@@ -11,7 +11,7 @@ namespace Naziki_Editor.Core.Abstractions
         /// <summary>
         /// 将目标 tick 转换为绝对秒数。
         /// </summary>
-        double TickToSeconds(int targetTick);
+        double TickToSeconds(double targetTick);
 
         /// <summary>
         /// 解析时间对象（纯数字或音符锚点表达式）为绝对秒数。

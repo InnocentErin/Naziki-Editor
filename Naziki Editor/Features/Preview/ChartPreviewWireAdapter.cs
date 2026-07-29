@@ -1,3 +1,4 @@
+using Naziki_Editor.Core.Charting;
 using Naziki_Editor.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -9,55 +10,78 @@ public sealed record ChartPreviewWireIssue(
     string Message);
 
 /// <summary>
-/// Defines the exact chart JSON contract accepted by the bundled Unity player.
-/// Editor-only nullable/metadata fields must not leak across this boundary.
+/// Produces a standard Cytoid chart payload for the bundled player.
+/// The player remains an unchanged consumer of the generated files.
 /// </summary>
 public interface IChartPreviewWireAdapter
 {
-    string? Serialize(C2Chart? chart);
+    string? Serialize(C2Chart? chart, ChartDocument? document = null);
+    IReadOnlyList<ChartDiagnostic> Diagnose(string? json);
+    IReadOnlyList<ChartDiagnostic> Diagnose(ChartDocument document);
     IReadOnlyList<ChartPreviewWireIssue> Validate(string? json);
 }
 
 public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
 {
-    public string? Serialize(C2Chart? chart)
+    private readonly IChartJsonCodec _codec;
+
+    public ChartPreviewWireAdapter()
+        : this(new ChartJsonCodec())
+    {
+    }
+
+    public ChartPreviewWireAdapter(IChartJsonCodec codec)
+    {
+        _codec = codec;
+    }
+
+    public string? Serialize(C2Chart? chart, ChartDocument? document = null)
     {
         if (chart is null)
             return null;
 
-        var root = JObject.FromObject(chart);
+        var json = document is not null &&
+                   ReferenceEquals(document.Projection, chart)
+            ? _codec.EncodeWire(document, ChartRuntimeProfile.Cytoid)
+            : _codec.EncodeWire(chart, ChartRuntimeProfile.Cytoid);
+        var root = JObject.Parse(json);
+        var wireNoteCount = (root["note_list"] as JArray)?.Count ?? -1;
+        var modelNoteCount = chart.note_list?.Count;
+        if (!modelNoteCount.HasValue)
+            throw new JsonSerializationException(
+                "谱面模型的 note_list 为 null，无法生成 Cytoid 预览数据。");
+        if (wireNoteCount != modelNoteCount.Value)
+            throw new JsonSerializationException(
+                $"谱面预览序列化前后音符数量不一致：内存 {modelNoteCount.Value}，输出 {wireNoteCount}。");
+        return json;
+    }
 
-        // Unity's ChartModel uses a non-nullable double.
-        if (root["music_offset"] is null ||
-            root["music_offset"]!.Type == JTokenType.Null)
+    public IReadOnlyList<ChartDiagnostic> Diagnose(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
         {
-            root["music_offset"] = 0d;
+            return
+            [
+                new ChartDiagnostic(
+                    "CHART_JSON_MISSING",
+                    "$.chart",
+                    "谱面 JSON 为空。",
+                    ChartDiagnosticSeverity.Error,
+                    ChartRuntimeProfile.Cytoid)
+            ];
         }
 
-        if (root["note_list"] is JArray notes)
-        {
-            foreach (var note in notes.OfType<JObject>())
-            {
-                // Unity's Note model uses non-nullable booleans.
-                if (note["has_sibling"] is null ||
-                    note["has_sibling"]!.Type == JTokenType.Null)
-                {
-                    note["has_sibling"] = false;
-                }
+        return _codec.Decode(json, ChartRuntimeProfile.Cytoid)
+            .Diagnostics;
+    }
 
-                if (note["is_forward"] is null ||
-                    note["is_forward"]!.Type == JTokenType.Null)
-                {
-                    note["is_forward"] = false;
-                }
-
-                // This property exists only in the editor model.
-                note.Remove(nameof(C2Note.NoteDirection));
-            }
-        }
-
-        RemoveNullOptionalValues(root);
-        return root.ToString(Formatting.None);
+    public IReadOnlyList<ChartDiagnostic> Diagnose(
+        ChartDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return _codec.Validate(
+            document.Source,
+            ChartRuntimeProfile.Cytoid);
     }
 
     public IReadOnlyList<ChartPreviewWireIssue> Validate(string? json)
@@ -76,7 +100,6 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
         }
 
         var issues = new List<ChartPreviewWireIssue>();
-        RequireNumber(root["music_offset"], "$.music_offset", issues);
         RequireInteger(root["time_base"], "$.time_base", issues);
         RequireArray(root["page_list"], "$.page_list", issues);
         RequireArray(root["tempo_list"], "$.tempo_list", issues);
@@ -85,6 +108,9 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
 
         if (root["note_list"] is JArray notes)
         {
+            if (notes.Count == 0)
+                issues.Add(new("$.note_list",
+                    "正式 Unity 播放器要求谱面至少包含一个音符。"));
             for (var index = 0; index < notes.Count; index++)
             {
                 if (notes[index] is not JObject note)
@@ -94,17 +120,12 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
                     continue;
                 }
 
-                RequireBoolean(note["has_sibling"],
-                    $"$.note_list[{index}].has_sibling", issues);
-                RequireBoolean(note["is_forward"],
-                    $"$.note_list[{index}].is_forward", issues);
-                if (note.Property(nameof(C2Note.NoteDirection)) is not null)
-                {
-                    issues.Add(new($"$.note_list[{index}].{nameof(C2Note.NoteDirection)}",
-                        "编辑器字段 NoteDirection 不应发送给 Unity。"));
-                }
             }
         }
+        if (root["page_list"] is JArray { Count: 0 })
+            issues.Add(new("$.page_list", "正式 Unity 播放器要求至少一个扫描页。"));
+        if (root["tempo_list"] is JArray { Count: 0 })
+            issues.Add(new("$.tempo_list", "正式 Unity 播放器要求至少一个 BPM 段。"));
 
         foreach (var value in Traverse(root).OfType<JValue>())
         {
@@ -123,34 +144,6 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
         return issues;
     }
 
-    private static void RemoveNullOptionalValues(JToken token)
-    {
-        if (token is JObject obj)
-        {
-            foreach (var property in obj.Properties().ToArray())
-            {
-                if (property.Value.Type == JTokenType.Null)
-                    property.Remove();
-                else
-                    RemoveNullOptionalValues(property.Value);
-            }
-        }
-        else if (token is JArray array)
-        {
-            foreach (var child in array)
-                RemoveNullOptionalValues(child);
-        }
-    }
-
-    private static void RequireNumber(
-        JToken? token,
-        string path,
-        ICollection<ChartPreviewWireIssue> issues)
-    {
-        if (token?.Type is not (JTokenType.Integer or JTokenType.Float))
-            issues.Add(new(path, "Unity 要求该字段为非空数值。"));
-    }
-
     private static void RequireInteger(
         JToken? token,
         string path,
@@ -158,15 +151,6 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
     {
         if (token?.Type != JTokenType.Integer)
             issues.Add(new(path, "Unity 要求该字段为整数。"));
-    }
-
-    private static void RequireBoolean(
-        JToken? token,
-        string path,
-        ICollection<ChartPreviewWireIssue> issues)
-    {
-        if (token?.Type != JTokenType.Boolean)
-            issues.Add(new(path, "Unity 要求该字段为非空布尔值。"));
     }
 
     private static void RequireArray(

@@ -27,7 +27,18 @@
                         BorderBrush="{DynamicResource BorderColor}"
                         BorderThickness="0,0,0,1"
                         Padding="10,6">
-                    <DockPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TxtPreviewState"
+                                   Grid.Column="0"
+                                   Text="正在准备 Unity Original Player…"
+                                   Foreground="{DynamicResource TipsColor}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button x:Name="BtnReloadPlayer"
                                 DockPanel.Dock="Right"
                                 Content="重载播放器"
@@ -50,11 +61,32 @@
                                 Visibility="Collapsed"
                                 Click="BtnRetryPreview_Click"/>
                         <Button x:Name="BtnPreviewDiagnostics"
-                                DockPanel.Dock="Right"
-                                Content="查看诊断"
-                                Padding="10,3"
-                                Visibility="Collapsed"
-                                Click="BtnPreviewDiagnostics_Click"/>
+                                Padding="8,3"
+                                Margin="8,0,0,0"
+                                ToolTip="查看 Unity 预览诊断"
+                                Click="BtnPreviewDiagnostics_Click">
+                            <Grid>
+                                <TextBlock x:Name="TxtDiagnosticIcon"
+                                           Text="⚠"
+                                           FontSize="16"/>
+                                <Border x:Name="DiagnosticBadge"
+                                        Background="#D32F2F"
+                                        CornerRadius="8"
+                                        MinWidth="16"
+                                        Height="16"
+                                        Padding="3,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="12,-8,-8,0"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="TxtDiagnosticBadge"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </Button>
                         <Button x:Name="BtnRepairResources"
                                 DockPanel.Dock="Right"
                                 Content="修复资源"
@@ -62,12 +94,8 @@
                                 Margin="0,0,8,0"
                                 Visibility="Collapsed"
                                 Click="BtnRepairResources_Click"/>
-                        <TextBlock x:Name="TxtPreviewState"
-                                   Text="正在准备 Unity Original Player…"
-                                   Foreground="{DynamicResource TipsColor}"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"/>
-                    </DockPanel>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <Grid Grid.Row="1" x:Name="UnityHostContainer"

@@ -8,6 +8,8 @@ public interface ILoadingService
 {
     void Register(FrameworkElement owner, FrameworkElement overlay);
     LoadingScope Begin(FrameworkElement owner, string message);
+    void Update(FrameworkElement owner, string message, double? progress = null);
+    void SetCancellation(FrameworkElement owner, Action? cancel);
 }
 
 public sealed class LoadingScope : IDisposable

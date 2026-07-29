@@ -3,6 +3,7 @@ using Naziki_Editor.Models;
 using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Messaging;
+using Naziki_Editor.Core.Charting;
 
 namespace Naziki_Editor.State
 {
@@ -24,9 +25,12 @@ namespace Naziki_Editor.State
         public StoryboardMeta StoryboardMeta { get; set; } = new StoryboardMeta();
 
         public C2Chart Chart { get; set; }
+        public ChartDocument? ChartDocument { get; set; }
         public ChartTimeEngine TimeEngine { get; set; }
 
-        public bool HasStoryboard => !EditorStoryboard.IsEmpty || Storyboard != null;
+        public bool HasStoryboard =>
+            !EditorStoryboard.IsEmpty ||
+            !string.IsNullOrWhiteSpace(StoryboardPath);
         public bool HasChart => Chart != null;
 
         public ProjectDataContext(IMessageBroker messageBroker)

@@ -6,6 +6,42 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid KeyboardNavigation.TabNavigation="Local">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border x:Name="TabHeaderSurface"
+                                Background="{DynamicResource MainBgColor}"
+                                BorderBrush="{DynamicResource BorderColor}"
+                                BorderThickness="0,0,0,1">
+                            <TabPanel x:Name="HeaderPanel"
+                                      IsItemsHost="True"
+                                      KeyboardNavigation.TabIndex="1"/>
+                        </Border>
+                        <Border Grid.Row="1"
+                                Background="{TemplateBinding Background}">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent"
+                                              KeyboardNavigation.TabIndex="2"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- The AvalonDock pane already identifies MainTimeline.
+                             Reveal sub-document tabs only when a micro timeline exists. -->
+                        <DataTrigger Binding="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
+                                     Value="1">
+                            <Setter TargetName="TabHeaderSurface"
+                                    Property="Visibility"
+                                    Value="Collapsed"/>
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="TimelineTabItemStyle" TargetType="TabItem">

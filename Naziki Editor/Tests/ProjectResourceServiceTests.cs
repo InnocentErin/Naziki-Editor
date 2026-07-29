@@ -17,6 +17,40 @@ namespace Naziki_Editor.Tests;
 public sealed class ProjectResourceServiceTests
 {
     [Fact]
+    public void ValidateSource_AllowsPlayablePageOverlapEffects()
+    {
+        var path = Path.Combine(Path.GetTempPath(),
+            "naziki-overlap-chart-" + Guid.NewGuid().ToString("N") +
+            ".json");
+        File.WriteAllText(path, """
+        {
+          "time_base":480,
+          "page_list":[
+            {"start_tick":0,"end_tick":960,"scan_line_direction":1},
+            {"start_tick":-960,"end_tick":1920,"scan_line_direction":-1}
+          ],
+          "tempo_list":[{"tick":0,"value":500000}],
+          "event_order_list":[],
+          "note_list":[]
+        }
+        """);
+
+        try
+        {
+            var service = new ProjectResourceService(
+                new FakeStoryboardReader(),
+                new FakeStoryboardWriter(),
+                MessageBroker.Default);
+
+            service.ValidateSource(ProjectResourceKind.Chart, path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task CreateProject_CopiesManagedResourcesAndUsesPortablePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "naziki-project-resources-" + Guid.NewGuid().ToString("N"));
@@ -27,6 +61,8 @@ public sealed class ProjectResourceServiceTests
         var chart = Path.Combine(source, "chart.json");
         var music = Path.Combine(source, "music.wav");
         var background = Path.Combine(source, "cover.png");
+        var initialImage = Path.Combine(source, "initial.png");
+        var initialVideo = Path.Combine(source, "intro.mp4");
         var storyboard = Path.Combine(source, "storyboard.json");
         await File.WriteAllTextAsync(level, ValidLevel);
         await File.WriteAllTextAsync(chart, ValidChart);
@@ -44,12 +80,18 @@ public sealed class ProjectResourceServiceTests
                 "text": "hello",
                 "time": [0, 2],
                 "template": "fade"
+              }],
+              "sprites": [{
+                "id": "untimed",
+                "path": "initial.png"
               }]
             }
             """);
         WriteSilentWav(music);
         await File.WriteAllBytesAsync(background, Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXsAAAAASUVORK5CYII="));
+        await File.WriteAllBytesAsync(initialImage, [1, 2, 3]);
+        await File.WriteAllBytesAsync(initialVideo, [4, 5, 6]);
 
         try
         {
@@ -57,13 +99,18 @@ public sealed class ProjectResourceServiceTests
             var projectFile = Path.Combine(projectDirectory, "portable.nep");
             var result = await service.CreateProjectAsync(new ProjectCreationRequest(
                 projectFile, "Portable", level, chart, music,
-                background, storyboard));
+                background, storyboard,
+                [initialImage, initialImage.ToUpperInvariant(), initialVideo]));
 
             Assert.Equal("assets", result.Project.MaterialFolderPath);
             Assert.Equal("level/level.json", result.Project.LevelFilePath);
             Assert.Equal("level/chart.json", result.Project.ChartFilePath);
             Assert.Equal("music/music.wav", result.Project.AudioFilePath);
             Assert.Equal("assets/background/cover.png", result.Project.BackgroundPath);
+            Assert.True(File.Exists(Path.Combine(projectDirectory, "assets", "initial.png")));
+            Assert.True(File.Exists(Path.Combine(projectDirectory, "assets", "intro.mp4")));
+            Assert.Single(Directory.GetFiles(
+                Path.Combine(projectDirectory, "assets"), "initial*"));
             Assert.Equal("level/storyboard.json", result.Project.StoryboardExportPath);
             Assert.Equal(3, result.Project.FormatVersion);
             Assert.Equal(".naziki/storyboard.editor.json",
@@ -85,6 +132,17 @@ public sealed class ProjectResourceServiceTests
                     .Where(property => property.Name == "time"),
                 property => Assert.NotEqual(JTokenType.Array,
                     property.Value.Type));
+            Assert.Equal(0,
+                runtime["sprites"]?[0]?.Value<double>("time"));
+            var editorSource = JObject.Parse(
+                await File.ReadAllTextAsync(editorSourcePath));
+            var untimedSourceEntity = Assert.Single(
+                editorSource["entities"]!.Children<JObject>(),
+                entity => entity.Value<string>("kind") == "Sprite");
+            Assert.Equal("Explicit",
+                untimedSourceEntity.Value<string>("activation_mode"));
+            Assert.Equal(0, untimedSourceEntity["activation_time"]
+                ?.Value<double>("seconds"));
             Assert.All(new[]
             {
                 result.Project.ChartFilePath,
@@ -115,6 +173,45 @@ public sealed class ProjectResourceServiceTests
             Assert.Equal("music/music_1.wav", second.Project.AudioFilePath);
             Assert.Equal("assets/background/cover_1.png", second.Project.BackgroundPath);
             Assert.Equal("level/storyboard_1.json", second.Project.StoryboardExportPath);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateProject_InvalidInitialAssetLeavesNoProjectFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(),
+            "naziki-project-assets-rollback-" + Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "source");
+        Directory.CreateDirectory(source);
+        var level = Path.Combine(source, "level.json");
+        var chart = Path.Combine(source, "chart.json");
+        var music = Path.Combine(source, "music.wav");
+        var background = Path.Combine(source, "cover.png");
+        var invalidAsset = Path.Combine(source, "unsupported.txt");
+        await File.WriteAllTextAsync(level, ValidLevel);
+        await File.WriteAllTextAsync(chart, ValidChart);
+        WriteSilentWav(music);
+        await File.WriteAllBytesAsync(background, Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXsAAAAASUVORK5CYII="));
+        await File.WriteAllTextAsync(invalidAsset, "not an asset");
+        var projectFile = Path.Combine(root, "project", "invalid.nep");
+
+        try
+        {
+            var service = new ProjectResourceService(
+                new FakeStoryboardReader(), new FakeStoryboardWriter(),
+                MessageBroker.Default);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                service.CreateProjectAsync(new ProjectCreationRequest(
+                    projectFile, "Invalid", level, chart, music, background,
+                    AssetSourcePaths: [invalidAsset])));
+
+            Assert.False(File.Exists(projectFile));
+            Assert.False(Directory.Exists(Path.Combine(root, "project")));
         }
         finally
         {

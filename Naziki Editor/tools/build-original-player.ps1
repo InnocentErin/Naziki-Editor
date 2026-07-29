@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$requiredVersion = "6000.0.75f1"
+$requiredVersion = "6000.0.80f1"
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $workspaceRoot "External\original_player\engines\unity"
 
@@ -27,14 +27,21 @@ $logPath = Join-Path $logDirectory "unity-build.log"
 
 # Do not add -quit. CytoidCoreBuild survives target-switch domain reloads through
 # EditorPrefs and calls EditorApplication.Exit itself after the build completes.
-& $UnityPath `
-    -batchmode `
-    -projectPath $projectPath `
-    -executeMethod $method `
-    -logFile $logPath
+# Unity.exe is a GUI-subsystem executable, so invoking it directly does not
+# reliably populate $LASTEXITCODE. Wait on the process and inspect ExitCode.
+$unityProcess = Start-Process `
+    -FilePath $UnityPath `
+    -ArgumentList @(
+        "-batchmode",
+        "-projectPath", "`"$projectPath`"",
+        "-executeMethod", $method,
+        "-logFile", "`"$logPath`"") `
+    -WindowStyle Hidden `
+    -Wait `
+    -PassThru
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Unity Preview build failed with exit code $LASTEXITCODE. See $logPath."
+if ($unityProcess.ExitCode -ne 0) {
+    throw "Unity Preview build failed with exit code $($unityProcess.ExitCode). See $logPath."
 }
 
 $player = Join-Path $logDirectory "NazikiOriginalPlayer.exe"

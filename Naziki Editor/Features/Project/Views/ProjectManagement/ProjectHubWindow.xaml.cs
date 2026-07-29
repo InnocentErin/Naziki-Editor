@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using Naziki_Editor.Core.Abstractions;
-using Naziki_Editor.Core.Commands;
 using Naziki_Editor.Models;
 using Naziki_Editor.Views;
 using Newtonsoft.Json;
@@ -13,6 +12,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Diagnostics;
+using Naziki_Editor.Features.EditorShell;
+using Naziki_Editor.Features.Project.Loading;
 using Naziki_Editor.Views.Loading;
 
 namespace Naziki_Editor.ProjectManagement
@@ -20,8 +23,7 @@ namespace Naziki_Editor.ProjectManagement
     public partial class ProjectHubWindow : Window
     {
         private readonly IDialogService _dialogService;
-        private readonly AppCommands _appCommands;
-        private readonly IProjectService _projectService;
+        private readonly IProjectOpenPreparationService _projectLoader;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILoadingService _loading;
         private bool _projectOpening;
@@ -35,14 +37,13 @@ namespace Naziki_Editor.ProjectManagement
         }
 
         public ProjectHubWindow(IDialogService dialogService,
-            AppCommands appCommands, IServiceProvider serviceProvider,
-            IProjectService projectService)
+            IServiceProvider serviceProvider,
+            IProjectOpenPreparationService projectLoader)
         {
             InitializeComponent();
 
             _dialogService = dialogService;
-            _appCommands = appCommands;
-            _projectService = projectService;
+            _projectLoader = projectLoader;
             _serviceProvider = serviceProvider;
             _loading = AppServices.GetService<ILoadingService>();
             _loading.Register(this, LoadingOverlay);
@@ -165,27 +166,7 @@ namespace Naziki_Editor.ProjectManagement
                 // 🔍 【安检 A 面】：项目依然乖乖待在原有位置
                 if (File.Exists(historyItem.FilePath))
                 {
-                    try
-                    {
-                        _projectOpening = true;
-                        SetProjectActionsEnabled(false);
-                        using var loading = _loading.Begin(this, "请稍等，正在打开项目");
-                        var loaded = await _projectService.LoadProjectAsync(
-                            historyItem.FilePath);
-                        NazikiProjectModel project = loaded?.ProjectData;
-
-                        if (project == null) throw new Exception("工程文件配置已损坏！");
-
-                        // 刷新最后宠幸时间，并带进主大本营
-                        AddToHistory(historyItem.FilePath, historyItem.ProjectName);
-                        await LaunchMainWindowAsync(historyItem.FilePath, project);
-                    }
-                    catch (Exception ex)
-                    {
-                        _projectOpening = false;
-                        SetProjectActionsEnabled(true);
-                        _dialogService.ShowErrorDialog($"读取历史项目发生爆炸 QAQ：\n{ex.Message}", "读取失败", ex.ToString());
-                    }
+                    await OpenProjectAsync(historyItem.FilePath);
                 }
                 // 🛑 【安检 B 面】：纳尼？！项目玩失踪移形换位了！
                 else
@@ -224,11 +205,9 @@ namespace Naziki_Editor.ProjectManagement
             };
             if (wizard.ShowDialog() == true && wizard.CreatedProject is { } created)
             {
-                AddToHistory(created.ProjectFilePath, created.Project.ProjectName);
-                _projectOpening = true;
-                SetProjectActionsEnabled(false);
-                using var loading = _loading.Begin(this, "请稍等，正在打开项目");
-                await LaunchMainWindowAsync(created.ProjectFilePath, created.Project);
+                await OpenProjectAsync(
+                    created.ProjectFilePath,
+                    "项目初始化失败");
             }
         }
 
@@ -246,44 +225,149 @@ namespace Naziki_Editor.ProjectManagement
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string nepPath = openFileDialog.FileName;
-                try
-                {
-                    _projectOpening = true;
-                    SetProjectActionsEnabled(false);
-                    using var loading = _loading.Begin(this, "请稍等，正在打开项目");
-                    var loaded = await _projectService.LoadProjectAsync(
-                        nepPath);
-                    NazikiProjectModel project = loaded?.ProjectData;
-
-                    if (project == null) throw new Exception("工程文件内容损坏或为空！");
-
-                    // 🌟 登记入册！把手动打开的健康项目也加入最近列表
-                    AddToHistory(nepPath, project.ProjectName);
-
-                    await LaunchMainWindowAsync(nepPath, project);
-                }
-                catch (Exception ex)
-                {
-                    _projectOpening = false;
-                    SetProjectActionsEnabled(true);
-                    _dialogService.ShowErrorDialog($"读取工程文件失败 QAQ：\n{ex.Message}", "打开失败", ex.ToString());
-                }
+                await OpenProjectAsync(openFileDialog.FileName);
             }
         }
 
-        private async Task LaunchMainWindowAsync(string projectFilePath, NazikiProjectModel projectData)
+        public async Task OpenProjectAsync(
+            string projectFilePath,
+            string failureTitle = "打开失败")
         {
-            MainWindow editorWindow = _serviceProvider.GetRequiredService<MainWindow>();
-            editorWindow.Show();
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            if (_projectOpening) return;
 
-            // 🛡️ 关键修复：将 Application.Current.MainWindow 显式指向编辑器主窗口，
-            // 防止后续 ErrorDialog 等弹窗将 Owner 设置为已关闭的 ProjectHubWindow 而触发穿模崩溃。
-            Application.Current.MainWindow = editorWindow;
+            if (!File.Exists(projectFilePath))
+            {
+                _dialogService.ShowErrorDialog(
+                    $"无法找到项目文件：{projectFilePath}",
+                    failureTitle);
+                return;
+            }
 
-            _appCommands.DoLoadProject(projectFilePath, projectData, editorWindow.Context);
-            this.Close(); // 顺利进城，摧毁传送门
+            try
+            {
+                _projectOpening = true;
+                SetProjectActionsEnabled(false);
+                using var loading = _loading.Begin(
+                    this,
+                    "请稍等，正在打开项目");
+                await LaunchMainWindowAsync(projectFilePath);
+            }
+            catch (Exception ex)
+            {
+                _projectOpening = false;
+                SetProjectActionsEnabled(true);
+                _dialogService.ShowErrorDialog(
+                    FormatLoadError(ex),
+                    failureTitle,
+                    ex.ToString());
+            }
+        }
+
+        private async Task LaunchMainWindowAsync(string projectFilePath)
+        {
+            MainWindow? editorWindow = null;
+            using var manualCancellation = new CancellationTokenSource();
+            using var timeoutCancellation =
+                new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            using var linkedCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    manualCancellation.Token, timeoutCancellation.Token);
+            var stopwatch = Stopwatch.StartNew();
+            _loading.SetCancellation(this, manualCancellation.Cancel);
+            var progressEntries = new List<(ProjectLoadStage Stage, string Message)>();
+            IProgress<ProjectLoadProgress> progress = new Progress<ProjectLoadProgress>(value =>
+            {
+                var index = progressEntries.FindIndex(item =>
+                    item.Stage == value.Stage);
+                var entry = (value.Stage, value.Message);
+                if (index >= 0) progressEntries[index] = entry;
+                else progressEntries.Add(entry);
+                var steps = string.Join(
+                    Environment.NewLine,
+                    progressEntries.Select(item =>
+                        $"  {GetStageName(item.Stage)}  {item.Message}"));
+                _loading.Update(this,
+                    $"正在准备编辑器，请稍候…  {stopwatch.Elapsed:mm\\:ss}" +
+                    $"{Environment.NewLine}{Environment.NewLine}{steps}",
+                    value.Percentage);
+            });
+
+            try
+            {
+                var prepared = await _projectLoader.PrepareAsync(
+                    projectFilePath, progress, linkedCancellation.Token);
+                linkedCancellation.Token.ThrowIfCancellationRequested();
+
+                progress.Report(new(ProjectLoadStage.EditorSurface,
+                    "正在创建编辑器控件…",
+                    ProjectLoadPipeline.DataPreparationComplete,
+                    ProjectLoadPipeline.TotalSteps));
+                await Dispatcher.InvokeAsync(
+                    () => { },
+                    System.Windows.Threading.DispatcherPriority.Render);
+                editorWindow = _serviceProvider.GetRequiredService<MainWindow>();
+
+                await editorWindow.PrepareProjectAsync(
+                    prepared, progress,
+                    linkedCancellation.Token);
+                linkedCancellation.Token.ThrowIfCancellationRequested();
+
+                progress.Report(new(ProjectLoadStage.Commit,
+                    "全部内容已加载，正在打开编辑器…",
+                    ProjectLoadPipeline.Complete,
+                    ProjectLoadPipeline.TotalSteps));
+                AddToHistory(projectFilePath,
+                    prepared.Context.ProjectData.ProjectName);
+                Application.Current.MainWindow = editorWindow;
+                editorWindow.CommitPreparedProject();
+                editorWindow.Show();
+                editorWindow.Activate();
+                this.Close();
+            }
+            catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+            {
+                editorWindow?.Close();
+                throw new TimeoutException(
+                    "项目加载超过 60 秒，操作已终止。请检查最后显示的加载阶段后重试。");
+            }
+            catch
+            {
+                editorWindow?.Close();
+                throw;
+            }
+            finally
+            {
+                _loading.SetCancellation(this, null);
+            }
+        }
+
+        private static string GetStageName(ProjectLoadStage stage) => stage switch
+        {
+            ProjectLoadStage.ProjectConfiguration => "工程配置",
+            ProjectLoadStage.ResourcePaths => "资源路径",
+            ProjectLoadStage.Chart => "谱面数据",
+            ProjectLoadStage.Storyboard => "故事板",
+            ProjectLoadStage.Events => "事件列表",
+            ProjectLoadStage.Notes => "音符列表",
+            ProjectLoadStage.Assets => "素材资源",
+            ProjectLoadStage.EditorSurface => "编辑器控件",
+            ProjectLoadStage.Audio => "音频资源",
+            ProjectLoadStage.Commit => "完成",
+            _ => stage.ToString()
+        };
+
+        private static string FormatLoadError(Exception ex)
+        {
+            if (ex is ProjectLoadException load)
+            {
+                var path = string.IsNullOrWhiteSpace(load.ResourcePath)
+                    ? string.Empty
+                    : $"\n相关路径：{load.ResourcePath}";
+                return $"项目加载在“{load.Stage}”阶段失败：{load.Message}{path}\n\n{load.InnerException?.Message}";
+            }
+            if (ex is OperationCanceledException)
+                return "项目加载已取消，编辑器没有切换到未完成的工程。";
+            return ex.Message;
         }
 
         private void SetProjectActionsEnabled(bool enabled)

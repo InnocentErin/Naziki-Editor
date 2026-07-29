@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Cytoid.Storyboard;
 using Newtonsoft.Json;
@@ -15,6 +16,8 @@ public static class EditorPreviewController
     static VfsSignature currentSignature;
     static bool externalClock;
     static JObject lastSettingsPayload;
+    static int loadInProgress;
+    public static long CurrentPreviewVersion => previewVersion;
 
     public static void Handle(JObject message)
     {
@@ -25,14 +28,25 @@ public static class EditorPreviewController
             case "host.ping":
                 Ack(message, requestId, "host.pong");
                 break;
+            case "preview.health.check":
+                EditorPreviewBridge.SendProtocol(
+                    "preview.health.ok",
+                    requestId,
+                    new JObject
+                    {
+                        ["state"] = CurrentGame()?.IsLoaded == true ? "ready" : "loading",
+                        ["previewVersion"] = previewVersion
+                    });
+                break;
             case "host.shutdown":
-                Ack(message, requestId);
-                Application.Quit();
+                Shutdown(message, requestId).Forget();
                 break;
             case "preview.open":
+                if (!TryBeginLoad(message, requestId)) break;
                 OpenSnapshot(message, requestId).Forget();
                 break;
             case "preview.replaceSnapshot":
+                if (!TryBeginLoad(message, requestId)) break;
                 ReplaceSnapshot(message, requestId).Forget();
                 break;
             case "preview.applyChanges":
@@ -42,6 +56,7 @@ public static class EditorPreviewController
                         $"Expected base preview version {previewVersion}.");
                     break;
                 }
+                if (!TryBeginLoad(message, requestId)) break;
                 ApplyChanges(message, requestId).Forget();
                 break;
             case "preview.play":
@@ -96,18 +111,32 @@ public static class EditorPreviewController
         }
     }
 
+    static async UniTask Shutdown(JObject message, string requestId)
+    {
+        Ack(message, requestId);
+        // Give the dedicated writer thread time to flush the acknowledgement.
+        // Application.Quit destroys the bridge and cancels that thread.
+        await UniTask.DelayFrame(2);
+        Application.Quit();
+    }
+
     static async UniTask OpenSnapshot(JObject message, string requestId)
     {
+        LoadEvent(message, requestId, "preview.load.started", "accepted");
         try
         {
+            LoadEvent(message, requestId, "preview.load.progress", "readingVfs");
             var root = RequireVfsRoot(message);
             var levelText = File.ReadAllText(Path.Combine(root, "level.json"));
+            LoadEvent(message, requestId, "preview.load.progress", "parsingLevel");
             var level = JsonConvert.DeserializeObject<LevelMeta>(levelText);
             if (level == null || !level.Validate()) throw new InvalidDataException("Invalid level.json.");
             var chart = level.GetChartSection("hard") ??
                         level.GetChartSection("extreme") ??
                         level.GetChartSection("easy") ??
                         throw new InvalidDataException("No supported chart is present in level.json.");
+            var chartIdentity = ValidateOfficialChart(root, chart);
+            LoadEvent(message, requestId, "preview.load.progress", "startingGame");
             var launch = new JObject
             {
                 ["mode"] = "ranked",
@@ -129,20 +158,25 @@ public static class EditorPreviewController
             };
             GameLaunchBridge.StartGame(launch.ToString(Formatting.None));
             externalClock = false;
-            await UniTask.WaitUntil(() => CurrentGame()?.IsLoaded == true)
-                .Timeout(TimeSpan.FromSeconds(30));
+            LoadEvent(message, requestId, "preview.load.progress", "loadingSceneAndAssets");
+            await UniTask.WaitUntil(() => CurrentGame()?.IsLoaded == true);
             var game = CurrentGame();
+            LoadEvent(message, requestId, "preview.load.progress", "evaluatingFirstFrame");
             var time = (float)(Payload(message).Value<double?>("time") ?? 0);
             game.PreviewEvaluateAt(time);
             if (lastSettingsPayload != null)
                 ApplySettings((JObject)lastSettingsPayload.DeepClone());
             currentSignature = VfsSignature.Create(root);
-            AcceptVersion(message, requestId);
+            AcceptLoadedVersion(message, requestId, chartIdentity, game);
             SendState("Paused", requestId);
         }
         catch (Exception exception)
         {
-            Reject(message, requestId, "preview_open_failed", exception.Message);
+            LoadFailed(message, requestId, "preview_open_failed", exception);
+        }
+        finally
+        {
+            Volatile.Write(ref loadInProgress, 0);
         }
     }
 
@@ -156,6 +190,8 @@ public static class EditorPreviewController
         }
         try
         {
+            LoadEvent(message, requestId, "preview.load.started", "hotSwapAccepted");
+            LoadEvent(message, requestId, "preview.load.progress", "readingStoryboard");
             var root = RequireVfsRoot(message);
             var nextSignature = VfsSignature.Create(root);
             if (currentSignature == null || !currentSignature.CanHotSwap(nextSignature))
@@ -164,13 +200,18 @@ public static class EditorPreviewController
                 return;
             }
             await game.PreviewReplaceStoryboard(File.ReadAllText(Path.Combine(root, "storyboard.json")));
+            LoadEvent(message, requestId, "preview.load.progress", "evaluatingFirstFrame");
             game.PreviewEvaluateAt(game.Time);
             currentSignature = nextSignature;
-            AcceptVersion(message, requestId);
+            AcceptLoadedVersion(message, requestId, null, game);
         }
         catch (Exception exception)
         {
-            Reject(message, requestId, "snapshot_replace_failed", exception.Message);
+            LoadFailed(message, requestId, "snapshot_replace_failed", exception);
+        }
+        finally
+        {
+            Volatile.Write(ref loadInProgress, 0);
         }
     }
 
@@ -184,6 +225,7 @@ public static class EditorPreviewController
         }
         try
         {
+            LoadEvent(message, requestId, "preview.load.started", "changesAccepted");
             var root = RequireVfsRoot(message);
             var nextSignature = VfsSignature.Create(root);
             if (currentSignature == null || !currentSignature.CanHotSwap(nextSignature))
@@ -195,12 +237,25 @@ public static class EditorPreviewController
             await StoryboardHotReloadCoordinator.Apply(game, json, Payload(message)["changes"] as JArray);
             game.PreviewEvaluateAt(game.Time);
             currentSignature = nextSignature;
-            AcceptVersion(message, requestId);
+            AcceptLoadedVersion(message, requestId, null, game);
         }
         catch (Exception exception)
         {
-            Reject(message, requestId, "hot_reload_failed", exception.Message);
+            LoadFailed(message, requestId, "hot_reload_failed", exception);
         }
+        finally
+        {
+            Volatile.Write(ref loadInProgress, 0);
+        }
+    }
+
+    static bool TryBeginLoad(JObject message, string requestId)
+    {
+        if (Interlocked.CompareExchange(ref loadInProgress, 1, 0) == 0)
+            return true;
+        Reject(message, requestId, "load_in_progress",
+            "Unity Preview is already materializing another snapshot.");
+        return false;
     }
 
     static async UniTask BeginScrub(JObject message, string requestId)
@@ -378,10 +433,124 @@ public static class EditorPreviewController
             LongValue(source, "BasePreviewVersion"),
             LongValue(source, "TargetPreviewVersion"));
 
-    static void AcceptVersion(JObject source, string requestId)
+    static void AcceptVersion(JObject source, string requestId, JObject chartIdentity = null)
     {
         previewVersion = LongValue(source, "TargetPreviewVersion");
-        Ack(source, requestId);
+        EditorPreviewBridge.SendProtocol(
+            "preview.ack",
+            requestId,
+            chartIdentity == null
+                ? new JObject()
+                : new JObject { ["chartIdentity"] = chartIdentity },
+            LongValue(source, "EditorVersion"),
+            LongValue(source, "BasePreviewVersion"),
+            LongValue(source, "TargetPreviewVersion"));
+    }
+
+    static void AcceptLoadedVersion(
+        JObject source,
+        string requestId,
+        JObject chartIdentity,
+        Game game)
+    {
+        previewVersion = LongValue(source, "TargetPreviewVersion");
+        var payload = chartIdentity == null
+            ? new JObject()
+            : new JObject { ["chartIdentity"] = chartIdentity };
+        payload["time"] = game?.Time ?? 0;
+        payload["duration"] = game?.PreviewDuration ?? 0;
+        EditorPreviewBridge.SendProtocol(
+            "preview.load.ready",
+            requestId,
+            payload,
+            LongValue(source, "EditorVersion"),
+            LongValue(source, "BasePreviewVersion"),
+            LongValue(source, "TargetPreviewVersion"));
+    }
+
+    static void LoadEvent(
+        JObject source,
+        string requestId,
+        string type,
+        string stage) =>
+        EditorPreviewBridge.SendProtocol(
+            type,
+            requestId,
+            new JObject { ["stage"] = stage },
+            LongValue(source, "EditorVersion"),
+            LongValue(source, "BasePreviewVersion"),
+            LongValue(source, "TargetPreviewVersion"));
+
+    static void LoadFailed(
+        JObject source,
+        string requestId,
+        string code,
+        Exception exception) =>
+        EditorPreviewBridge.SendProtocol(
+            "preview.load.failed",
+            requestId,
+            new JObject
+            {
+                ["code"] = code,
+                ["message"] = SafeDiagnosticText(exception.Message, 2048),
+                ["stage"] = "contentLoad",
+                ["resourcePath"] = string.Empty,
+                ["stackTrace"] = SafeDiagnosticText(exception.StackTrace, 8192)
+            },
+            LongValue(source, "EditorVersion"),
+            LongValue(source, "BasePreviewVersion"),
+            LongValue(source, "TargetPreviewVersion"));
+
+    static string SafeDiagnosticText(string value, int maximumLength)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        var sanitized = value
+            .Replace(Application.dataPath, "<unity-project>/Assets")
+            .Replace(Environment.CurrentDirectory, "<working-directory>");
+        return sanitized.Length <= maximumLength
+            ? sanitized
+            : sanitized.Substring(0, maximumLength);
+    }
+
+    static JObject ValidateOfficialChart(string root, LevelMeta.ChartSection chart)
+    {
+        if (chart == null || string.IsNullOrWhiteSpace(chart.path))
+            throw new InvalidDataException("PREVIEW_CHART_PATH_MISSING: level.json 中选中难度缺少 chart.path。");
+        var chartPath = Path.GetFullPath(Path.Combine(root,
+            chart.path.Replace('/', Path.DirectorySeparatorChar)));
+        var rootPath = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
+        if (!chartPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase) ||
+            !File.Exists(chartPath))
+            throw new InvalidDataException(
+                $"PREVIEW_CHART_NOT_FOUND: 找不到正式谱面文件“{chart.path}”。");
+
+        var json = JObject.Parse(File.ReadAllText(chartPath));
+        var notes = json["note_list"] as JArray;
+        var pages = json["page_list"] as JArray;
+        var tempos = json["tempo_list"] as JArray;
+        if (notes == null || notes.Count == 0)
+            throw new InvalidDataException("PREVIEW_CHART_EMPTY: $.note_list 必须至少包含一个音符。");
+        if (pages == null || pages.Count == 0)
+            throw new InvalidDataException("PREVIEW_CHART_PAGES_EMPTY: $.page_list 必须至少包含一个扫描页。");
+        if (tempos == null || tempos.Count == 0)
+            throw new InvalidDataException("PREVIEW_CHART_TEMPO_EMPTY: $.tempo_list 必须至少包含一个 BPM 段。");
+
+        return new JObject
+        {
+            ["difficulty"] = chart.type,
+            ["path"] = chart.path.Replace('\\', '/'),
+            ["sha256"] = HashFile(chartPath),
+            ["noteCount"] = notes.Count,
+            ["pageCount"] = pages.Count,
+            ["tempoCount"] = tempos.Count
+        };
+    }
+
+    static string HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var sha = SHA256.Create();
+        return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
     }
 
     static void Reject(JObject source, string requestId, string code, string text) =>

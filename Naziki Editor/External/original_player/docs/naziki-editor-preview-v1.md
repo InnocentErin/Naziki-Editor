@@ -27,19 +27,40 @@ Every envelope contains:
 }
 ```
 
-Unity ignores other protocols and stale sessions. The editor ignores late ACKs and
-does not promote a snapshot to last-known-good until `preview.ack`.
+Unity ignores other protocols and stale sessions. `host.ready` revision 3 is the
+compatibility baseline and revision 4 adds queued Unity-side writes, concurrent-load
+rejection, and an explicit persistent-bridge capability. The handshake
+authenticates the session, nonce, protocol, and the `loadProgressV1` and
+`healthCheckV1` capabilities. When present, `persistentBridgeV1` confirms the pipe
+bridge's scene-lifetime policy, but it is not required from revision 3 players
+because their bridge is already attached to the persistent `GameBridge` object.
+The editor ignores messages from stale requests and
+does not promote a snapshot to last-known-good until `preview.load.ready`.
 
 ## Lifecycle and data
 
 - `host.ready`, `host.ping`, `host.pong`, `host.shutdown`
 - `preview.open`, `preview.replaceSnapshot`, `preview.applyChanges`
+- `preview.load.started`, `preview.load.progress`, `preview.load.ready`,
+  `preview.load.failed`
+- `preview.health.check`, `preview.health.ok`
 - `preview.ack`, `preview.rejected`, `preview.validationFailed`, `preview.error`
 
 Data commands point to an immutable VFS version directory containing valid
 `level.json`, `chart.json`, `storyboard.json`, music, background, and storyboard
 assets. Unity validates and preloads before switching. An entity update that cannot
 be safely applied uses an in-scene atomic storyboard replacement.
+
+The envelope `SessionId` is a transport-generation identifier and remains unchanged
+for the lifetime of one Unity process and pipe. Project snapshot session IDs remain
+inside the VFS/version model; opening a project must not change the transport
+session established by `host.ready`.
+
+The 30-second startup deadline ends permanently when a valid `host.ready` is
+accepted. Content loading has no fixed total timeout: progress messages keep the
+request alive, while a ten-second health probe distinguishes slow loading from an
+unresponsive Unity main loop. Ordinary `preview.ack` messages acknowledge control
+commands only and never mean that snapshot content is playable.
 
 ## Playback
 

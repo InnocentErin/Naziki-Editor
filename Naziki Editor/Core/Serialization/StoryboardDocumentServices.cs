@@ -52,10 +52,15 @@ internal static class StoryboardJsonSettings
 
 public sealed class StoryboardDocumentReader : IStoryboardDocumentReader
 {
-    private readonly IStoryboardPropertyCatalog _catalog;
+    private readonly IStoryboardJsonNormalizer _normalizer;
     private readonly JsonSerializerSettings _settings = StoryboardJsonSettings.Create();
 
-    public StoryboardDocumentReader(IStoryboardPropertyCatalog catalog) => _catalog = catalog;
+    public StoryboardDocumentReader(
+        IStoryboardPropertyCatalog catalog,
+        IStoryboardJsonNormalizer? normalizer = null)
+    {
+        _normalizer = normalizer ?? new StoryboardJsonNormalizer(catalog);
+    }
 
     public StoryboardRoot Read(string json)
     {
@@ -83,29 +88,15 @@ public sealed class StoryboardDocumentReader : IStoryboardDocumentReader
             DateParseHandling = DateParseHandling.None,
             FloatParseHandling = FloatParseHandling.Double
         };
-        var token = JToken.ReadFrom(reader);
-        NormalizeAliases(token);
-        return token;
-    }
-
-    private void NormalizeAliases(JToken token)
-    {
-        if (token is JObject obj)
-        {
-            foreach (var property in obj.Properties().ToArray())
-            {
-                if (_catalog.Catalog.Aliases.TryGetValue(property.Name, out var canonical) &&
-                    obj[canonical] is null)
-                {
-                    property.Replace(new JProperty(canonical, property.Value));
-                }
-                NormalizeAliases(property.Value);
-            }
-        }
-        else if (token is JArray array)
-        {
-            foreach (var item in array) NormalizeAliases(item);
-        }
+        var normalized = _normalizer.Normalize(JToken.ReadFrom(reader));
+        if (normalized.Conflicts.Count > 0)
+            throw new JsonSerializationException(string.Join(
+                Environment.NewLine,
+                normalized.Conflicts.Select(conflict =>
+                    $"{conflict.Path}.{conflict.CanonicalName}: conflicting property names " +
+                    string.Join(", ", conflict.Candidates.Select(item =>
+                        $"'{item.OriginalName}'")))));
+        return normalized.Token;
     }
 }
 

@@ -8,9 +8,22 @@
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <ui:ProgressRing Width="42" Height="42" IsIndeterminate="{Binding IsIndeterminate, RelativeSource={RelativeSource AncestorType=UserControl}}"
                              Foreground="White" HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding Message, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                       Foreground="White" FontSize="15" Margin="0,14,0,0"
-                       HorizontalAlignment="Center" TextAlignment="Center"/>
+            <ScrollViewer MaxHeight="230" Margin="0,14,0,0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <TextBlock Text="{Binding Message, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                           MaxWidth="520"
+                           Foreground="White" FontSize="14"
+                           HorizontalAlignment="Center" TextAlignment="Left"
+                           TextWrapping="Wrap" LineHeight="21"/>
+            </ScrollViewer>
+            <ProgressBar Width="280" Height="7" Margin="0,12,0,0"
+                         Minimum="0" Maximum="100"
+                         Value="{Binding Progress, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                         Visibility="{Binding IsProgressVisible, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            <Button x:Name="CancelButton" Content="取消" Width="88" Margin="0,14,0,0"
+                    Click="CancelButton_Click"
+                    Visibility="{Binding CanCancel, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
         </StackPanel>
     </Border>
 </UserControl>

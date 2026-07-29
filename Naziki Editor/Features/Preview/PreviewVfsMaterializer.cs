@@ -54,8 +54,18 @@ public sealed class PreviewVfsMaterializer : IPreviewVfsMaterializer
         var storyboardPath = Path.Combine(versionDirectory, "storyboard.json");
         var chartPath = Path.Combine(versionDirectory, "chart.json");
         var levelPath = Path.Combine(versionDirectory, "level.json");
+        var chartJson = snapshot.ChartJson
+            ?? throw new InvalidDataException(
+                "The Cytoid preview chart payload is missing.");
+        var chartRoot = JObject.Parse(chartJson);
+        var noteCount = (chartRoot["note_list"] as JArray)?.Count
+            ?? throw new InvalidDataException(
+                "The Cytoid preview chart payload does not contain note_list.");
+        if (noteCount == 0)
+            throw new InvalidDataException(
+                "The Cytoid preview chart contains no notes.");
         await AtomicWriteAsync(storyboardPath, snapshot.StoryboardJson, cancellationToken).ConfigureAwait(false);
-        await AtomicWriteAsync(chartPath, snapshot.ChartJson ?? "{}", cancellationToken).ConfigureAwait(false);
+        await AtomicWriteAsync(chartPath, chartJson, cancellationToken).ConfigureAwait(false);
 
         var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var musicName = await LinkOrCopyAssetAsync(snapshot.MusicPath, versionDirectory, blobRoot, "music", hashes, cancellationToken)

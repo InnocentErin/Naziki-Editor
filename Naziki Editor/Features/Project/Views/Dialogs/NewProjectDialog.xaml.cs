@@ -3,7 +3,9 @@ using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.State;
 using System.IO;
+using System.Collections.ObjectModel;
 using System.Windows;
+using Naziki_Editor.Views.StoryboardCorrections;
 
 namespace Naziki_Editor.Views.Dialogs;
 
@@ -12,6 +14,7 @@ public partial class NewProjectDialog : Window
     private readonly IProjectResourceService _resources;
     private readonly IProjectService _projects;
     private readonly ProjectDataContext? _repairContext;
+    private readonly ObservableCollection<string> _assetSources = [];
 
     public ProjectCreationResult? CreatedProject { get; private set; }
     public bool IsRepairMode => _repairContext is not null;
@@ -33,6 +36,7 @@ public partial class NewProjectDialog : Window
         _projects = projects;
         _repairContext = repairContext;
         InitializeComponent();
+        AssetSourceList.ItemsSource = _assetSources;
         if (repairContext is not null)
             ConfigureRepairMode(repairContext);
     }
@@ -53,6 +57,7 @@ public partial class NewProjectDialog : Window
         FillExisting(ProjectResourceKind.Music, TxtMusicPath);
         FillExisting(ProjectResourceKind.Background, TxtBackgroundPath);
         FillExisting(ProjectResourceKind.Storyboard, TxtStoryboardPath);
+        AssetImportPanel.Visibility = Visibility.Collapsed;
 
         void FillExisting(ProjectResourceKind kind, System.Windows.Controls.TextBox target)
         {
@@ -102,6 +107,40 @@ public partial class NewProjectDialog : Window
     private void BrowseStoryboard_Click(object sender, RoutedEventArgs e) =>
         Browse(TxtStoryboardPath, "选择已有故事板", "JSON 文件 (*.json)|*.json");
 
+    private void BrowseAssets_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择初始素材",
+            Multiselect = true,
+            Filter = "所有支持的素材|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.mp4;*.webm;*.avi;*.mov|图片文件|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|视频文件|*.mp4;*.webm;*.avi;*.mov"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var existing = new HashSet<string>(_assetSources, StringComparer.OrdinalIgnoreCase);
+        foreach (var file in dialog.FileNames.Select(Path.GetFullPath))
+            if (existing.Add(file))
+                _assetSources.Add(file);
+        UpdateAssetSummary();
+    }
+
+    private void RemoveSelectedAssets_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var item in AssetSourceList.SelectedItems.Cast<string>().ToArray())
+            _assetSources.Remove(item);
+        UpdateAssetSummary();
+    }
+
+    private void ClearAssets_Click(object sender, RoutedEventArgs e)
+    {
+        _assetSources.Clear();
+        UpdateAssetSummary();
+    }
+
+    private void UpdateAssetSummary() =>
+        TxtAssetSummary.Text = _assetSources.Count == 0
+            ? "尚未选择素材"
+            : $"已选择 {_assetSources.Count} 个素材，将复制到 assets 文件夹";
+
     private void Browse(System.Windows.Controls.TextBox target, string title, string filter)
     {
         var dialog = new OpenFileDialog { Title = title, Filter = filter };
@@ -136,6 +175,20 @@ public partial class NewProjectDialog : Window
     {
         if (string.IsNullOrWhiteSpace(TxtProjectPath.Text))
             throw new InvalidDataException("请选择工程文件保存位置。");
+        var progress = new Progress<ProjectCreationProgress>(value =>
+        {
+            TxtAssetSummary.Text = value.Message;
+        });
+        using var resolvedStoryboard =
+            string.IsNullOrWhiteSpace(TxtStoryboardPath.Text)
+                ? null
+                : await StoryboardSourceConflictResolver.ResolveAsync(
+                    this, TxtStoryboardPath.Text);
+        if (!string.IsNullOrWhiteSpace(TxtStoryboardPath.Text) &&
+            resolvedStoryboard is null)
+            throw new OperationCanceledException(
+                "已取消故事板属性冲突修正，工程未创建。");
+
         CreatedProject = await _resources.CreateProjectAsync(new ProjectCreationRequest(
             TxtProjectPath.Text,
             TxtProjectName.Text,
@@ -143,7 +196,9 @@ public partial class NewProjectDialog : Window
             TxtChartPath.Text,
             TxtMusicPath.Text,
             TxtBackgroundPath.Text,
-            string.IsNullOrWhiteSpace(TxtStoryboardPath.Text) ? null : TxtStoryboardPath.Text));
+            resolvedStoryboard?.Path,
+            _assetSources.ToArray(),
+            progress));
     }
 
     private async Task RepairAsync()
@@ -176,7 +231,18 @@ public partial class NewProjectDialog : Window
                 _resources.ValidateSource(kind, selected);
                 return;
             }
-            await _resources.ImportAsync(context, kind, selected);
+            if (kind == ProjectResourceKind.Storyboard)
+            {
+                using var resolved =
+                    await StoryboardSourceConflictResolver.ResolveAsync(
+                        this, selected);
+                if (resolved is null)
+                    throw new OperationCanceledException(
+                        "已取消故事板属性冲突修正。");
+                await _resources.ImportAsync(context, kind, resolved.Path);
+            }
+            else
+                await _resources.ImportAsync(context, kind, selected);
         }
     }
 

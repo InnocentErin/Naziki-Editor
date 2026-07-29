@@ -1,8 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace Naziki_Editor.Views.Dialogs
@@ -72,6 +74,8 @@ namespace Naziki_Editor.Views.Dialogs
             InitializeComponent();
 
             _mode = mode;
+            ConfigureInitialSize();
+            SourceInitialized += (_, _) => ApplyDisplayConstraints();
 
             // 设置标题和消息
             TitleBlock.Text = string.IsNullOrEmpty(title) ? "Naziki Editor" : title;
@@ -86,9 +90,91 @@ namespace Naziki_Editor.Views.Dialogs
                 DetailsTextBox.Text = errorDetails;
                 DetailsSection.Visibility = Visibility.Visible;
             }
+            else
+            {
+                DetailsRow.Height = new GridLength(0);
+                DetailsRow.MinHeight = 0;
+            }
 
             // 构建按钮
             BuildButtons();
+        }
+
+        private void ConfigureInitialSize()
+        {
+            if (_mode == ErrorDialogMode.Error)
+            {
+                Width = 820;
+                Height = 600;
+                MinWidth = 680;
+                MinHeight = 360;
+                return;
+            }
+
+            Width = 560;
+            Height = 360;
+            MinWidth = 480;
+            MinHeight = 280;
+        }
+
+        private void ApplyDisplayConstraints()
+        {
+            var workArea = GetCurrentWorkArea();
+            var maxWidth = Math.Max(320, workArea.Width * 0.85);
+            var maxHeight = Math.Max(240, workArea.Height * 0.85);
+
+            MinWidth = Math.Min(MinWidth, maxWidth);
+            MinHeight = Math.Min(MinHeight, maxHeight);
+            MaxWidth = maxWidth;
+            MaxHeight = maxHeight;
+            Width = Math.Min(Width, maxWidth);
+            Height = Math.Min(Height, maxHeight);
+        }
+
+        private Rect GetCurrentWorkArea()
+        {
+            var target = Owner is null
+                ? new WindowInteropHelper(this).Handle
+                : new WindowInteropHelper(Owner).Handle;
+            var monitor = MonitorFromWindow(target, MonitorDefaultToNearest);
+            var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+                return SystemParameters.WorkArea;
+
+            var dpi = VisualTreeHelper.GetDpi(this);
+            return new Rect(
+                info.WorkArea.Left / dpi.DpiScaleX,
+                info.WorkArea.Top / dpi.DpiScaleY,
+                (info.WorkArea.Right - info.WorkArea.Left) / dpi.DpiScaleX,
+                (info.WorkArea.Bottom - info.WorkArea.Top) / dpi.DpiScaleY);
+        }
+
+        private const uint MonitorDefaultToNearest = 2;
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr windowHandle, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetMonitorInfo(IntPtr monitorHandle, ref MonitorInfo monitorInfo);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct MonitorInfo
+        {
+            public int Size;
+            public NativeRect Monitor;
+            public NativeRect WorkArea;
+            public uint Flags;
         }
 
         /// <summary>

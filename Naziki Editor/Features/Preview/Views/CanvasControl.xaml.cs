@@ -10,6 +10,8 @@ using Naziki_Editor.Core.Abstractions;
 using Naziki_Editor.Core.Shortcuts;
 using System.Linq;
 using System.Collections;
+using System.Threading;
+using System.Windows.Threading;
 using Naziki_Editor.Features.Preview;
 using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.Features.Audio.Playback;
@@ -41,8 +43,12 @@ namespace Naziki_Editor.Views
         private readonly IPlaybackCoordinator _playback;
         private readonly ISettingsStore _settings;
         private readonly ILoadingService _loading;
+        private readonly IDialogService _dialogService;
         private string _aspectRatio = "16:9";
         private bool _reloadInProgress;
+        private CancellationTokenSource _resizeCancellation = new();
+        private bool _nativePreviewOpened;
+        private readonly SemaphoreSlim _openPreviewGate = new(1, 1);
 
         public void LoadContext(ProjectDataContext context)
         {
@@ -68,6 +74,7 @@ namespace Naziki_Editor.Views
             _playback = AppServices.GetService<IPlaybackCoordinator>();
             _settings = AppServices.GetService<ISettingsStore>();
             _loading = AppServices.GetService<ILoadingService>();
+            _dialogService = AppServices.GetService<IDialogService>();
             _loading.Register(this, LoadingOverlay);
             _aspectRatio = PreviewSettingsProvider.ParseAspectRatio(
                 _settings.Get("Editor.PreviewAspectRatio", "16:9"));
@@ -87,16 +94,35 @@ namespace Naziki_Editor.Views
             };
         }
 
-        private async void UnityHost_HandleCreated(object? sender, IntPtr handle) =>
+        private async void UnityHost_HandleCreated(object? sender, IntPtr handle)
+        {
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            if (!IsLoaded || CanvasTabControl.SelectedIndex != 0 ||
+                UnityHostContainer.ActualWidth < 32 || UnityHostContainer.ActualHeight < 32)
+                return;
             await OpenNativePreviewAsync(handle);
+        }
 
         private async Task OpenNativePreviewAsync(IntPtr handle)
         {
+            if (_nativePreviewOpened || handle == IntPtr.Zero)
+                return;
+            await _openPreviewGate.WaitAsync();
+            if (_nativePreviewOpened)
+            {
+                _openPreviewGate.Release();
+                return;
+            }
             using var loading = _loading.Begin(this, "请稍等，正在加载预览");
             try
             {
+                ApplyAspectRatioLayout();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                 var (width, height) = GetPreviewPixelSize();
+                if (width < 32 || height < 32)
+                    return;
                 await _previewSession.AttachWindowAsync(handle, width, height);
+                _nativePreviewOpened = true;
                 if (Context is not null)
                 {
                     var initialTime = Math.Max(0, Context.ProjectData?.LastTimelinePosition ?? 0);
@@ -104,6 +130,7 @@ namespace Naziki_Editor.Views
                     _playback.Seek(initialTime);
                     await _previewSession.OpenProjectAsync(Context, initialTime);
                 }
+                PreviewDiagnostics_Changed(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
@@ -111,15 +138,36 @@ namespace Naziki_Editor.Views
                 TxtPreviewState.Foreground = new SolidColorBrush(Colors.OrangeRed);
                 BtnRetryPreview.Visibility = Visibility.Visible;
             }
+            finally
+            {
+                _openPreviewGate.Release();
+            }
         }
 
         private async void UnityHostContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ApplyAspectRatioLayout();
-            if (_unityHost.HostHandle == IntPtr.Zero)
+            _resizeCancellation.Cancel();
+            _resizeCancellation.Dispose();
+            _resizeCancellation = new CancellationTokenSource();
+            var cancellation = _resizeCancellation.Token;
+            try
+            {
+                await Task.Delay(100, cancellation);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render, cancellation);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            if (_unityHost.HostHandle == IntPtr.Zero || !IsVisible ||
+                UnityHostContainer.ActualWidth < 32 || UnityHostContainer.ActualHeight < 32)
                 return;
             var (width, height) = GetPreviewPixelSize();
-            await _previewSession.ResizeAsync(width, height, CanvasTabControl.SelectedIndex == 0);
+            if (!_nativePreviewOpened)
+                await OpenNativePreviewAsync(_unityHost.HostHandle);
+            else
+                await _previewSession.ResizeAsync(width, height, CanvasTabControl.SelectedIndex == 0);
         }
 
         private (int Width, int Height) GetPreviewPixelSize()
@@ -274,16 +322,26 @@ namespace Naziki_Editor.Views
                 Environment.NewLine + Environment.NewLine,
                 _previewDiagnostics.Diagnostics.Select(item =>
                     $"[{item.Code}] {item.Message}" +
+                    $"{Environment.NewLine}时间：{item.Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}" +
                     (string.IsNullOrWhiteSpace(item.Path) ? string.Empty : $"{Environment.NewLine}位置：{item.Path}") +
                     (string.IsNullOrWhiteSpace(item.EntityId) ? string.Empty : $"{Environment.NewLine}实体：{item.EntityId}") +
-                    (string.IsNullOrWhiteSpace(item.Suggestion) ? string.Empty : $"{Environment.NewLine}建议：{item.Suggestion}")));
-            MessageBox.Show(
-                string.IsNullOrWhiteSpace(details) ? "当前没有预览诊断。" : details,
-                "Unity Preview 诊断",
-                MessageBoxButton.OK,
-                _previewDiagnostics.Diagnostics.Any(item => item.Severity == PreviewDiagnosticSeverity.Error)
-                    ? MessageBoxImage.Error
-                    : MessageBoxImage.Information);
+                    (item.SnapshotVersion is null ? string.Empty : $"{Environment.NewLine}快照版本：{item.SnapshotVersion}") +
+                    (item.RepeatCount <= 1 ? string.Empty : $"{Environment.NewLine}重复次数：{item.RepeatCount}") +
+                    (string.IsNullOrWhiteSpace(item.Suggestion) ? string.Empty : $"{Environment.NewLine}建议：{item.Suggestion}") +
+                    (string.IsNullOrWhiteSpace(item.StackTrace) ? string.Empty : $"{Environment.NewLine}调用堆栈：{Environment.NewLine}{item.StackTrace}")));
+            var summary = _previewDiagnostics.Summary;
+            if (summary.ErrorCount > 0)
+                _dialogService.ShowErrorDialog(
+                    summary.Primary?.Message ?? "Unity 预览发生错误。",
+                    $"Unity 预览诊断（{summary.ErrorCount} 个错误，{summary.WarningCount} 个警告）",
+                    details);
+            else if (summary.WarningCount > 0)
+                _dialogService.ShowMessage(
+                    $"{summary.Primary?.Message}{Environment.NewLine}{Environment.NewLine}{details}",
+                    $"Unity 预览诊断（{summary.WarningCount} 个警告）",
+                    DialogMessageType.Warning);
+            else
+                _dialogService.ShowMessage("当前没有 Unity 预览错误或警告。", "Unity 预览诊断");
         }
 
         private void BtnRepairResources_Click(object sender, RoutedEventArgs e)
@@ -306,6 +364,20 @@ namespace Naziki_Editor.Views
                         $"当前数据无效，预览停留在版本 {_previewDiagnostics.LastKnownGood.Snapshot.Version}：{diagnostic?.Message}",
                     _ => diagnostic?.Message ?? $"预览状态：{_previewDiagnostics.Availability}"
                 };
+                TxtPreviewState.Text = _previewDiagnostics.SessionStatus.Phase switch
+                {
+                    PreviewSessionPhase.LaunchingProcess => "正在启动 Unity Original Player…",
+                    PreviewSessionPhase.InitializingGraphics => "正在初始化 Unity 图形窗口…",
+                    PreviewSessionPhase.ConnectingTransport => "正在连接 Unity 通信通道…",
+                    PreviewSessionPhase.AuthenticatingHost => "Unity 已启动，正在完成协议握手…",
+                    PreviewSessionPhase.HostReady => "Unity 已连接，正在准备预览数据…",
+                    PreviewSessionPhase.ValidatingSnapshot => "正在校验谱面与故事板…",
+                    PreviewSessionPhase.MaterializingVfs => "正在准备预览资源…",
+                    PreviewSessionPhase.LoadingContent =>
+                        $"Unity 已连接，正在加载谱面… {_previewDiagnostics.SessionStatus.Detail}",
+                    PreviewSessionPhase.PreviewReady => "Unity Original Player 已就绪",
+                    _ => TxtPreviewState.Text
+                };
                 if (_previewDiagnostics.Availability == PreviewAvailabilityState.Ready &&
                     _previewDiagnostics.Diagnostics.Count == 0 &&
                     _previewPlayback is UnityStoryboardPreviewHost { Performance: { } performance })
@@ -327,9 +399,29 @@ namespace Naziki_Editor.Views
                     PreviewAvailabilityState.Faulted
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                BtnPreviewDiagnostics.Visibility = _previewDiagnostics.Diagnostics.Count > 0
+                var summary = _previewDiagnostics.Summary;
+                BtnPreviewDiagnostics.IsEnabled = summary.ErrorCount + summary.WarningCount > 0;
+                DiagnosticBadge.Visibility = BtnPreviewDiagnostics.IsEnabled
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+                TxtDiagnosticBadge.Text = (summary.ErrorCount > 0
+                    ? summary.ErrorCount
+                    : summary.WarningCount).ToString();
+                TxtDiagnosticIcon.Foreground = new SolidColorBrush(
+                    summary.ErrorCount > 0 ? Colors.OrangeRed :
+                    summary.WarningCount > 0 ? Colors.Gold : Colors.Gray);
+                BtnPreviewDiagnostics.ToolTip =
+                    $"Unity 预览诊断：{summary.ErrorCount} 个错误，{summary.WarningCount} 个警告";
+                // Keep the host in the visual tree during startup. A collapsed
+                // HwndHost never creates the HWND that Unity needs to launch.
+                _unityHost.Visibility = CanvasTabControl.SelectedIndex == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                PreviewFallbackText.Visibility =
+                    _nativePreviewOpened &&
+                    _previewDiagnostics.Availability == PreviewAvailabilityState.Ready
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
                 BtnRepairResources.Visibility = Context is not null &&
                     AppServices.GetService<IProjectReadinessService>()
                         .Evaluate(Context).NeedsRepair
@@ -370,6 +462,9 @@ namespace Naziki_Editor.Views
                         height,
                         tabControl.SelectedIndex == 0);
                 }
+                _unityHost.Visibility = tabControl.SelectedIndex == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             }
         }
 

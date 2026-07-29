@@ -86,6 +86,34 @@ public sealed class StoryboardPreviewServiceTests
     }
 
     [Fact]
+    public void ChartWireSerialization_ReportsNullNoteListWithoutNullReference()
+    {
+        var chart = new C2Chart
+        {
+            time_base = 480,
+            page_list =
+            [
+                new C2Page
+                {
+                    start_tick = 0,
+                    end_tick = 480,
+                    scan_line_direction = 1
+                }
+            ],
+            tempo_list =
+            [
+                new TempoEvent { tick = 0, value = 500_000 }
+            ],
+            note_list = null!
+        };
+
+        var error = Assert.Throws<Newtonsoft.Json.JsonSerializationException>(
+            () => new ChartPreviewWireAdapter().Serialize(chart));
+
+        Assert.Contains("note_list 为 null", error.Message);
+    }
+
+    [Fact]
     public void ChartWireValidation_ReportsExactUnityContractPath()
     {
         var issues = new ChartPreviewWireAdapter().Validate("""
@@ -109,7 +137,7 @@ public sealed class StoryboardPreviewServiceTests
     }
 
     [Fact]
-    public void StartingNewSessionClearsPreviousLastKnownGoodStoryboard()
+    public void ExportFailureNeverReusesPreviousStoryboardAsCurrentSnapshot()
     {
         var bridge = new ToggleBridge();
         var service = new StoryboardPreviewService(bridge,
@@ -118,8 +146,8 @@ public sealed class StoryboardPreviewServiceTests
 
         service.GetSnapshot(context);
         bridge.Fail = true;
-        // Same session retains its last-known-good projection.
-        service.GetSnapshot(context);
+        Assert.Throws<Newtonsoft.Json.JsonSerializationException>(
+            () => service.GetSnapshot(context));
         service.StartSession();
 
         Assert.Throws<Newtonsoft.Json.JsonSerializationException>(

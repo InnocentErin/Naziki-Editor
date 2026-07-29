@@ -1,4 +1,3 @@
-using System.Globalization;
 using Naziki_Editor.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -10,45 +9,33 @@ public sealed class StoryboardUnitValueJsonConverter : JsonConverter<UnitFloat>
     public override void WriteJson(JsonWriter writer, UnitFloat? value, JsonSerializer serializer)
     {
         if (value is null) { writer.WriteNull(); return; }
-        if (value.Unit == ReferenceUnit.World) { writer.WriteValue(value.Value); return; }
-        var prefix = value.Unit switch
+        if (value.Unit == ReferenceUnit.World && !value.HasExplicitUnit)
         {
-            ReferenceUnit.NoteX => "noteX",
-            ReferenceUnit.NoteY => "noteY",
-            ReferenceUnit.StageX => "stageX",
-            ReferenceUnit.StageY => "stageY",
-            ReferenceUnit.CameraX => "cameraX",
-            ReferenceUnit.CameraY => "cameraY",
-            _ => throw new JsonSerializationException($"Unsupported reference unit: {value.Unit}")
-        };
-        writer.WriteValue($"{prefix}:{value.Value.ToString("R", CultureInfo.InvariantCulture)}");
+            writer.WriteValue(value.Value);
+            return;
+        }
+        var prefix = StoryboardUnitCodec.FromModelUnit(value.Unit);
+        writer.WriteValue($"{prefix}:{value.Value.ToString("R",
+            System.Globalization.CultureInfo.InvariantCulture)}");
     }
 
     public override UnitFloat? ReadJson(JsonReader reader, Type objectType, UnitFloat? existingValue,
         bool hasExistingValue, JsonSerializer serializer)
     {
         if (reader.TokenType == JsonToken.Null) return null;
-        if (reader.TokenType is JsonToken.Integer or JsonToken.Float)
-            return new UnitFloat { Value = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture) };
-        if (reader.TokenType != JsonToken.String)
-            throw new JsonSerializationException($"Expected number or unit string, got {reader.TokenType}.");
-
-        var raw = ((string?)reader.Value)?.Trim() ?? "";
-        var separator = raw.IndexOf(':');
-        if (separator <= 0 ||
-            !float.TryParse(raw[(separator + 1)..], NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
-            throw new JsonSerializationException($"Invalid unit value '{raw}'.");
-        var unit = raw[..separator].ToLowerInvariant() switch
+        var token = JToken.Load(reader);
+        if (!StoryboardUnitCodec.TryDecodeWireValue(token, out var decoded,
+                out var code, out var message))
+            throw new JsonSerializationException(
+                $"{code ?? "UNIT_OBJECT_INVALID"}: {message ?? $"Unsupported unit token {token.Type}."}");
+        return new UnitFloat
         {
-            "notex" => ReferenceUnit.NoteX,
-            "notey" => ReferenceUnit.NoteY,
-            "stagex" => ReferenceUnit.StageX,
-            "stagey" => ReferenceUnit.StageY,
-            "camerax" => ReferenceUnit.CameraX,
-            "cameray" => ReferenceUnit.CameraY,
-            _ => throw new JsonSerializationException($"Unknown reference unit in '{raw}'.")
+            Value = checked((float)decoded.Value),
+            Unit = decoded.Explicit
+                ? StoryboardUnitCodec.ToModelUnit(decoded.Unit)
+                : ReferenceUnit.World,
+            HasExplicitUnit = decoded.Explicit
         };
-        return new UnitFloat { Value = number, Unit = unit };
     }
 }
 

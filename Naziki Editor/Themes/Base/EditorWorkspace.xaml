@@ -1,0 +1,125 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:avalonControls="clr-namespace:AvalonDock.Controls;assembly=AvalonDock">
+
+    <!--
+        Editor workspace tabs use the same top-aligned visual language as the
+        timeline document tabs. Keeping this style outside MainWindow makes the
+        docking presentation reusable without coupling it to shell behavior.
+    -->
+    <Style x:Key="EditorAnchorablePaneStyle"
+           TargetType="{x:Type avalonControls:LayoutAnchorablePaneControl}">
+        <Setter Property="Foreground"
+                Value="{Binding Model.Root.Manager.Foreground, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="Background"
+                Value="{Binding Model.Root.Manager.Background, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="TabStripPlacement" Value="Top"/>
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="{x:Type TabItem}">
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                    <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
+                    <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource SecTextColor}"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Padding" Value="14,6"/>
+                    <Setter Property="Margin" Value="2,2,2,0"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type TabItem}">
+                                <Border x:Name="TabSurface"
+                                        Padding="{TemplateBinding Padding}"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="1,1,1,0"
+                                        CornerRadius="5,5,0,0">
+                                    <ContentPresenter ContentSource="Header"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      RecognizesAccessKey="True"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="TabSurface" Property="Background"
+                                                Value="{DynamicResource MenuBgColor}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource MainTextColor}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="TabSurface" Property="Background"
+                                                Value="{DynamicResource BoardBgColor}"/>
+                                        <Setter TargetName="TabSurface" Property="BorderBrush"
+                                                Value="{DynamicResource BorderColor}"/>
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource HighlightBorderColor}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.55"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ItemTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <avalonControls:LayoutAnchorableTabItem Model="{Binding}"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <avalonControls:LayoutAnchorableControl Model="{Binding}"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type avalonControls:LayoutAnchorablePaneControl}">
+                    <Grid ClipToBounds="True"
+                          KeyboardNavigation.TabNavigation="Local"
+                          SnapsToDevicePixels="True">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- AvalonDock requires this surface for pane drag handling. -->
+                        <Border Grid.RowSpan="2" Background="Transparent"/>
+
+                        <avalonControls:AnchorablePaneTabPanel
+                            x:Name="HeaderPanel"
+                            Grid.Row="0"
+                            Margin="3,2,3,0"
+                            Panel.ZIndex="1"
+                            IsItemsHost="True"
+                            KeyboardNavigation.TabIndex="1"/>
+
+                        <Border x:Name="ContentPanel"
+                                Grid.Row="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource BorderColor}"
+                                BorderThickness="0,1,0,0"
+                                KeyboardNavigation.DirectionalNavigation="Contained"
+                                KeyboardNavigation.TabIndex="2"
+                                KeyboardNavigation.TabNavigation="Cycle">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Margin="{TemplateBinding Padding}"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

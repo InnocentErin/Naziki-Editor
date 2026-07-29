@@ -8,9 +8,28 @@ namespace Naziki_Editor.Views;
 
 public partial class MainWindow
 {
+    private const int WorkspaceLayoutSchemaVersion = 3;
+    private bool _workspaceLayoutPrepared;
+
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        => PrepareWorkspaceLayout();
+
+    private void PrepareWorkspaceLayout()
     {
+        if (_workspaceLayoutPrepared) return;
+        _workspaceLayoutPrepared = true;
         _defaultWorkspaceLayout ??= SerializeWorkspaceLayout();
+
+        // Older persisted layouts grouped Assets with Events/Notes. Reset only
+        // the presentation schema so the new persistent lower-left pane is used.
+        var savedSchemaVersion = _settingsStore.Get("Workspace.LayoutSchemaVersion", 0);
+        if (savedSchemaVersion != WorkspaceLayoutSchemaVersion)
+        {
+            _workspaceLayoutService.ResetToDefault();
+            _settingsStore.Set("Workspace.LayoutSchemaVersion", WorkspaceLayoutSchemaVersion);
+            return;
+        }
+
         var saved = _workspaceLayoutService.RestoreLastActive();
         if (!string.IsNullOrWhiteSpace(saved))
             DeserializeWorkspaceLayout(saved);

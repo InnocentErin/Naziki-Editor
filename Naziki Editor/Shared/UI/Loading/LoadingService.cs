@@ -25,8 +25,30 @@ public sealed class LoadingService : ILoadingService
 
         registration.Overlay.Message = message;
         registration.Overlay.IsLoading = true;
+        registration.Overlay.IsIndeterminate = true;
+        registration.Overlay.IsProgressVisible = Visibility.Collapsed;
         _registrations[owner] = (registration.Overlay, registration.Count + 1);
         return new LoadingScope(() => End(owner));
+    }
+
+    public void Update(FrameworkElement owner, string message, double? progress = null)
+    {
+        if (!_registrations.TryGetValue(owner, out var registration))
+            throw new InvalidOperationException("The owner has not registered a LoadingOverlay.");
+        registration.Overlay.Message = message;
+        if (progress is { } value)
+        {
+            registration.Overlay.Progress = Math.Clamp(value, 0, 100);
+            registration.Overlay.IsIndeterminate = false;
+            registration.Overlay.IsProgressVisible = Visibility.Visible;
+        }
+    }
+
+    public void SetCancellation(FrameworkElement owner, Action? cancel)
+    {
+        if (!_registrations.TryGetValue(owner, out var registration))
+            throw new InvalidOperationException("The owner has not registered a LoadingOverlay.");
+        registration.Overlay.SetCancelAction(cancel);
     }
 
     private void End(FrameworkElement owner)
@@ -34,6 +56,10 @@ public sealed class LoadingService : ILoadingService
         if (!_registrations.TryGetValue(owner, out var registration)) return;
         var count = Math.Max(0, registration.Count - 1);
         registration.Overlay.IsLoading = count > 0;
+        if (count == 0)
+        {
+            registration.Overlay.SetCancelAction(null);
+        }
         _registrations[owner] = (registration.Overlay, count);
     }
 }

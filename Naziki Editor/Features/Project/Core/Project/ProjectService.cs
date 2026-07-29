@@ -12,6 +12,7 @@ using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Naziki_Editor.Core.Charting;
 
 namespace Naziki_Editor.Core.Project
 {
@@ -31,6 +32,7 @@ namespace Naziki_Editor.Core.Project
         private readonly IStoryboardCanonicalBridge _storyboardBridge;
         private readonly IStoryboardImportService _storyboardImporter;
         private readonly IStoryboardImportCoordinator _storyboardImportCoordinator;
+        private readonly IChartJsonCodec _chartCodec;
 
         public ProjectService(
             IMessageBroker messageBroker,
@@ -42,7 +44,8 @@ namespace Naziki_Editor.Core.Project
             IStoryboardSourceStore storyboardSourceStore,
             IStoryboardCanonicalBridge storyboardBridge,
             IStoryboardImportService storyboardImporter,
-            IStoryboardImportCoordinator storyboardImportCoordinator)
+            IStoryboardImportCoordinator storyboardImportCoordinator,
+            IChartJsonCodec chartCodec)
         {
             _messageBroker = messageBroker;
             _errorHandler = errorHandler;
@@ -54,12 +57,12 @@ namespace Naziki_Editor.Core.Project
             _storyboardBridge = storyboardBridge;
             _storyboardImporter = storyboardImporter;
             _storyboardImportCoordinator = storyboardImportCoordinator;
+            _chartCodec = chartCodec;
         }
 
         public Task<ProjectDataContext?> LoadProjectAsync(string filePath)
         {
-            var context = LoadProjectData(filePath);
-            return Task.FromResult<ProjectDataContext?>(context);
+            return Task.Run(() => LoadProjectData(filePath));
         }
 
         public Task SaveProjectAsync(ProjectDataContext context, string filePath)
@@ -181,15 +184,40 @@ namespace Naziki_Editor.Core.Project
                         filePath, projectData.ChartFilePath);
                     if (File.Exists(chartPath))
                     {
-                        context.Chart = SilentImportChart(chartPath);
+                        context.ChartDocument =
+                            LoadChartDocument(chartPath);
+                        context.Chart =
+                            context.ChartDocument.Projection;
                         if (context.Chart is { time_base: not 0 })
                             context.TimeEngine = new ChartTimeEngine(
                                 context.Chart.tempo_list,
                                 context.Chart.time_base);
                     }
                 }
+
+                if (!string.IsNullOrWhiteSpace(
+                        projectData.StoryboardExportPath))
+                {
+                    var storyboardPath = ResolveProjectPath(
+                        filePath, projectData.StoryboardExportPath);
+                    var storyboard = LoadProjectStoryboard(
+                        storyboardPath, projectData);
+                    if (storyboard.Storyboard is not null)
+                    {
+                        context.StoryboardPath = storyboardPath;
+#pragma warning disable CS0618
+                        context.Storyboard = storyboard.Storyboard;
+#pragma warning restore CS0618
+                        context.StoryboardMeta = storyboard.Meta;
+                    }
+                }
                 _storyboardImportCoordinator.EnsureCanonicalSource(
                     context);
+#pragma warning disable CS0618
+                context.LegacyStoryboardProjectionHash =
+                    _storyboardBridge.ComputeLegacyProjectionHash(
+                        context.Storyboard);
+#pragma warning restore CS0618
                 return context;
             }
             catch (JsonException ex)
@@ -430,36 +458,49 @@ namespace Naziki_Editor.Core.Project
         /// </summary>
         public C2Chart? SilentImportChart(string chartPath)
         {
+            try
+            {
+                return LoadChartDocument(chartPath).Projection;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public ChartDocument LoadChartDocument(string chartPath)
+        {
             if (string.IsNullOrEmpty(chartPath)) throw new ArgumentException("谱面路径不能为空", nameof(chartPath));
             if (!File.Exists(chartPath)) throw new FileNotFoundException("谱面文件不存在", chartPath);
 
             try
             {
-                string jsonText = File.ReadAllText(chartPath);
-                var chart = JsonConvert.DeserializeObject<C2Chart>(jsonText);
-                if (chart == null)
-                {
-                    _errorHandler.HandleException(
-                        new InvalidOperationException("谱面文件解析结果为空"),
-                        ErrorSeverity.Error, "DataValidation",
-                        "谱面 JSON 反序列化后为 null", "ProjectService.SilentImportChart",
-                        $"FilePath: {chartPath}");
-                }
-                return chart;
+                var result = _chartCodec.Decode(
+                    File.ReadAllText(chartPath),
+                    ChartRuntimeProfile.Cytus2);
+                if (!result.Success || result.Document is null)
+                    throw new JsonSerializationException(string.Join(
+                        Environment.NewLine,
+                        result.Diagnostics
+                            .Where(item => item.Severity ==
+                                           ChartDiagnosticSeverity.Error)
+                            .Select(item =>
+                                $"{item.Code} {item.Path}: {item.Message}")));
+                return result.Document;
             }
             catch (JsonException ex)
             {
                 _errorHandler.HandleException(ex, ErrorSeverity.Error, "DataValidation",
                     "谱面文件 JSON 格式错误", "ProjectService.SilentImportChart",
                     $"FilePath: {chartPath}");
-                return null;
+                throw;
             }
             catch (IOException ex)
             {
                 _errorHandler.HandleException(ex, ErrorSeverity.Error, "FileIO",
                     "读取谱面文件时发生 I/O 错误", "ProjectService.SilentImportChart",
                     $"FilePath: {chartPath}");
-                return null;
+                throw;
             }
         }
 

@@ -1,5 +1,6 @@
 using System.IO;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Charting;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
 using Newtonsoft.Json.Linq;
@@ -102,7 +103,26 @@ public sealed class PreviewValidationService : IPreviewValidationService
         if (!string.IsNullOrWhiteSpace(snapshot.ChartJson))
         {
             ValidateJson(snapshot.ChartJson, PreviewDiagnosticSource.Chart, diagnostics);
-            ValidateChart(snapshot.ChartJson, diagnostics);
+            ValidateChartCollections(snapshot.ChartJson, diagnostics);
+            var chartDiagnostics = context.ChartDocument is null
+                ? _chartWire.Diagnose(snapshot.ChartJson)
+                : _chartWire.Diagnose(context.ChartDocument);
+            foreach (var item in chartDiagnostics)
+            {
+                diagnostics.Add(new PreviewDiagnostic(
+                    item.Code,
+                    item.Message,
+                    item.Severity switch
+                    {
+                        ChartDiagnosticSeverity.Error =>
+                            PreviewDiagnosticSeverity.Error,
+                        ChartDiagnosticSeverity.Warning =>
+                            PreviewDiagnosticSeverity.Warning,
+                        _ => PreviewDiagnosticSeverity.Information
+                    },
+                    PreviewDiagnosticSource.Chart,
+                    item.Path));
+            }
             foreach (var issue in _chartWire.Validate(snapshot.ChartJson))
             {
                 diagnostics.Add(Error(
@@ -117,6 +137,7 @@ public sealed class PreviewValidationService : IPreviewValidationService
             diagnostics.Add(Error("PREVIEW_CHART_MISSING", "当前项目没有可供原生播放器读取的谱面。", PreviewDiagnosticSource.Chart, "$.chart"));
 
         ValidateFiniteNumbers(snapshot.StoryboardJson, PreviewDiagnosticSource.Storyboard, diagnostics);
+        ValidateRuntimeStoryboardBoundary(snapshot.StoryboardJson, diagnostics);
         if (!string.IsNullOrWhiteSpace(snapshot.ChartJson))
             ValidateFiniteNumbers(snapshot.ChartJson, PreviewDiagnosticSource.Chart, diagnostics);
 
@@ -180,6 +201,59 @@ public sealed class PreviewValidationService : IPreviewValidationService
         }
     }
 
+    private static void ValidateChartCollections(
+        string json,
+        ICollection<PreviewDiagnostic> diagnostics)
+    {
+        JObject root;
+        try { root = JObject.Parse(json); }
+        catch { return; }
+
+        RequireNonEmptyArray(root, "note_list", "PREVIEW_CHART_EMPTY",
+            "谱面没有任何音符，Unity 正式播放器无法计算关卡时长。", diagnostics);
+        RequireNonEmptyArray(root, "page_list", "PREVIEW_CHART_PAGES_EMPTY",
+            "谱面没有扫描页 page_list。", diagnostics);
+        RequireNonEmptyArray(root, "tempo_list", "PREVIEW_CHART_TEMPO_EMPTY",
+            "谱面没有 BPM 段 tempo_list。", diagnostics);
+    }
+
+    private static void RequireNonEmptyArray(
+        JObject root,
+        string property,
+        string code,
+        string message,
+        ICollection<PreviewDiagnostic> diagnostics)
+    {
+        if (root[property] is JArray { Count: > 0 })
+            return;
+        diagnostics.Add(Error(code, message, PreviewDiagnosticSource.Chart,
+            $"$.{property}", "请重新导入或修复正式谱面文件。"));
+    }
+
+    private static void ValidateRuntimeStoryboardBoundary(
+        string json,
+        ICollection<PreviewDiagnostic> diagnostics)
+    {
+        JToken root;
+        try { root = JToken.Parse(json); }
+        catch { return; }
+
+        var forbidden = Traverse(root).OfType<JProperty>().FirstOrDefault(property =>
+            property.Name is "editor_id" or "document_id" or "source_group_id" or
+                "activation_mode" or "base_patch" or "instance_overrides" or
+                "import_diagnostics" ||
+            property.Name.StartsWith("$naziki_editor_", StringComparison.Ordinal));
+        if (forbidden is null)
+            return;
+
+        diagnostics.Add(Error(
+            "PREVIEW_STORYBOARD_EDITOR_FORMAT",
+            $"故事板仍包含编辑器专用字段“{forbidden.Name}”，不能发送给正式 Unity 播放器。",
+            PreviewDiagnosticSource.Storyboard,
+            forbidden.Path,
+            "请先通过故事板正式运行时导出器生成 wire JSON。"));
+    }
+
     private static void ValidateRequiredFile(
         string? path,
         string code,
@@ -195,89 +269,6 @@ public sealed class PreviewValidationService : IPreviewValidationService
                 $"原生预览不支持文件类型“{Path.GetExtension(path)}”。",
                 PreviewDiagnosticSource.Asset,
                 path));
-    }
-
-    private static void ValidateChart(string json, ICollection<PreviewDiagnostic> diagnostics)
-    {
-        JObject chart;
-        try { chart = JObject.Parse(json); }
-        catch { return; }
-
-        if ((chart.Value<int?>("time_base") ?? 0) <= 0)
-            diagnostics.Add(Error("PREVIEW_CHART_TIME_BASE", "谱面的 time_base 必须大于 0。",
-                PreviewDiagnosticSource.Chart, "$.time_base"));
-
-        var pages = chart["page_list"] as JArray;
-        if (pages is null || pages.Count == 0)
-        {
-            diagnostics.Add(Error("PREVIEW_CHART_PAGES", "谱面至少需要一个 page。",
-                PreviewDiagnosticSource.Chart, "$.page_list"));
-        }
-        else
-        {
-            var previousEnd = int.MinValue;
-            for (var index = 0; index < pages.Count; index++)
-            {
-                var page = pages[index] as JObject;
-                var start = page?.Value<int?>("start_tick") ?? int.MinValue;
-                var end = page?.Value<int?>("end_tick") ?? int.MinValue;
-                if (start >= end || start < previousEnd)
-                    diagnostics.Add(Error("PREVIEW_CHART_PAGE_RANGE",
-                        "Page 时间范围无效或与前一页重叠。",
-                        PreviewDiagnosticSource.Chart,
-                        $"$.page_list[{index}]"));
-                previousEnd = end;
-            }
-        }
-
-        var tempos = chart["tempo_list"] as JArray;
-        if (tempos is null || tempos.Count == 0)
-            diagnostics.Add(Error("PREVIEW_CHART_TEMPO", "谱面至少需要一个 tempo。",
-                PreviewDiagnosticSource.Chart, "$.tempo_list"));
-        else
-        {
-            var previousTick = int.MinValue;
-            for (var index = 0; index < tempos.Count; index++)
-            {
-                var tempo = tempos[index] as JObject;
-                var tick = tempo?.Value<int?>("tick") ?? int.MinValue;
-                var value = tempo?.Value<long?>("value") ?? 0;
-                if (tick < previousTick || value <= 0)
-                    diagnostics.Add(Error("PREVIEW_CHART_TEMPO_RANGE",
-                        "Tempo 必须按 tick 排序且 value 大于 0。",
-                        PreviewDiagnosticSource.Chart,
-                        $"$.tempo_list[{index}]"));
-                previousTick = tick;
-            }
-        }
-
-        var notes = chart["note_list"] as JArray ?? new JArray();
-        var noteIds = notes.OfType<JObject>()
-            .Select(note => note.Value<int?>("id"))
-            .Where(id => id.HasValue)
-            .Select(id => id!.Value)
-            .ToHashSet();
-        if (noteIds.Count != notes.Count)
-            diagnostics.Add(Error("PREVIEW_CHART_NOTE_ID",
-                "音符 ID 缺失或重复。",
-                PreviewDiagnosticSource.Chart,
-                "$.note_list"));
-        for (var index = 0; index < notes.Count; index++)
-        {
-            var note = notes[index] as JObject;
-            var pageIndex = note?.Value<int?>("page_index") ?? -1;
-            var nextId = note?.Value<int?>("next_id") ?? -1;
-            if (pages is null || pageIndex < 0 || pageIndex >= pages.Count)
-                diagnostics.Add(Error("PREVIEW_CHART_NOTE_PAGE",
-                    "音符引用了不存在的 page_index。",
-                    PreviewDiagnosticSource.Chart,
-                    $"$.note_list[{index}].page_index"));
-            if (nextId > 0 && !noteIds.Contains(nextId))
-                diagnostics.Add(Error("PREVIEW_CHART_NOTE_LINK",
-                    "音符 next_id 指向不存在的音符。",
-                    PreviewDiagnosticSource.Chart,
-                    $"$.note_list[{index}].next_id"));
-        }
     }
 
     private static void ValidateAssetReferences(

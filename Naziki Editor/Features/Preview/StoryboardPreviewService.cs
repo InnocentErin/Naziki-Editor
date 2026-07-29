@@ -19,7 +19,6 @@ public sealed class StoryboardPreviewService :
     private readonly List<Action<StoryboardPreviewChangeSet>> _subscribers = [];
     private long _version;
     private string _sessionId = Guid.NewGuid().ToString("N");
-    private string? _lastKnownGoodStoryboardJson;
 
     public StoryboardPreviewService(
         IStoryboardCanonicalBridge bridge,
@@ -49,21 +48,20 @@ public sealed class StoryboardPreviewService :
 
         var levelPath = _resources.ResolvePath(context, ProjectResourceKind.Level);
         var exported = _bridge.Export(context);
-        if (exported.Success)
-            _lastKnownGoodStoryboardJson = exported.Json.ToString(Formatting.None);
-        else if (_lastKnownGoodStoryboardJson is null)
+        if (!exported.Success)
             throw new JsonSerializationException(string.Join(
                 Environment.NewLine,
                 exported.Issues.Where(issue =>
                         issue.Severity == StoryboardDiagnosticSeverity.Error)
                     .Select(issue => $"{issue.Path}: {issue.Message}")));
+        var runtimeStoryboardJson = exported.Json.ToString(Formatting.None);
 
         return new StoryboardPreviewSnapshot(
             _sessionId,
             CurrentVersion,
             context.ProjectFilePath,
-            _lastKnownGoodStoryboardJson!,
-            _chartWire.Serialize(context.Chart),
+            runtimeStoryboardJson,
+            _chartWire.Serialize(context.Chart, context.ChartDocument),
             assetRoot,
             playbackTime)
         {
@@ -132,7 +130,6 @@ public sealed class StoryboardPreviewService :
     {
         _sessionId = Guid.NewGuid().ToString("N");
         Interlocked.Exchange(ref _version, 0);
-        _lastKnownGoodStoryboardJson = null;
     }
 
     private void Publish(StoryboardPreviewChangeSet changes)

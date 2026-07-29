@@ -4,6 +4,7 @@ using NAudio.Vorbis;
 using NAudio.Wave;
 using Naziki_Editor.Core;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Charting;
 using Naziki_Editor.Models;
 using Naziki_Editor.Core.Storyboard.Canonical;
 using Naziki_Editor.State;
@@ -34,7 +35,14 @@ public sealed record ProjectCreationRequest(
     string ChartSourcePath,
     string MusicSourcePath,
     string BackgroundSourcePath,
-    string? StoryboardSourcePath = null);
+    string? StoryboardSourcePath = null,
+    IReadOnlyList<string>? AssetSourcePaths = null,
+    IProgress<ProjectCreationProgress>? Progress = null);
+
+public sealed record ProjectCreationProgress(
+    string Message,
+    int CompletedAssets,
+    int TotalAssets);
 
 public sealed record ProjectCreationResult(
     NazikiProjectModel Project,
@@ -164,6 +172,7 @@ public sealed class ProjectResourceService : IProjectResourceService
     private readonly IStoryboardImportService _storyboardImporter;
     private readonly IStoryboardSourceStore _storyboardSourceStore;
     private readonly IStoryboardImportCoordinator _storyboardImportCoordinator;
+    private readonly IChartJsonCodec _chartCodec;
 
     public ProjectResourceService(
         IStoryboardDocumentReader storyboardReader,
@@ -181,7 +190,8 @@ public sealed class ProjectResourceService : IProjectResourceService
         IMessageBroker messages,
         IStoryboardImportService storyboardImporter,
         IStoryboardSourceStore storyboardSourceStore,
-        IStoryboardImportCoordinator? storyboardImportCoordinator = null)
+        IStoryboardImportCoordinator? storyboardImportCoordinator = null,
+        IChartJsonCodec? chartCodec = null)
     {
         _storyboardReader = storyboardReader;
         _storyboardWriter = storyboardWriter;
@@ -192,6 +202,7 @@ public sealed class ProjectResourceService : IProjectResourceService
             CreateDefaultCoordinator(storyboardReader,
                 storyboardWriter, messages, storyboardImporter,
                 storyboardSourceStore);
+        _chartCodec = chartCodec ?? new ChartJsonCodec();
     }
 
     public string ResolvePath(string projectFilePath, string configuredPath)
@@ -316,6 +327,13 @@ public sealed class ProjectResourceService : IProjectResourceService
         ValidateSource(ProjectResourceKind.Background, request.BackgroundSourcePath);
         if (!string.IsNullOrWhiteSpace(request.StoryboardSourcePath))
             ValidateSource(ProjectResourceKind.Storyboard, request.StoryboardSourcePath);
+        var assetSources = (request.AssetSourcePaths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        foreach (var assetSource in assetSources)
+            ValidateSource(ProjectResourceKind.Asset, assetSource);
 
         var projectDirectory = Path.GetDirectoryName(projectFile)
             ?? throw new InvalidOperationException("无法解析工程目录。");
@@ -342,6 +360,23 @@ public sealed class ProjectResourceService : IProjectResourceService
                 request.MusicSourcePath, musicDirectory, createdFiles, cancellationToken).ConfigureAwait(false);
             var background = await CopyUniqueAsync(
                 request.BackgroundSourcePath, backgroundDirectory, createdFiles, cancellationToken).ConfigureAwait(false);
+            for (var index = 0; index < assetSources.Length; index++)
+            {
+                var assetSource = assetSources[index];
+                request.Progress?.Report(new ProjectCreationProgress(
+                    $"正在复制素材 {index + 1}/{assetSources.Length}：{Path.GetFileName(assetSource)}",
+                    index,
+                    assetSources.Length));
+                await CopyUniqueAsync(
+                    assetSource, assetsDirectory, createdFiles, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            request.Progress?.Report(new ProjectCreationProgress(
+                assetSources.Length == 0
+                    ? "正在创建工程文件…"
+                    : $"已复制 {assetSources.Length} 个素材，正在创建工程文件…",
+                assetSources.Length,
+                assetSources.Length));
             var storyboard = GetUniqueDestinationPath(
                 levelDirectory, "storyboard", ".json");
 
@@ -359,9 +394,10 @@ public sealed class ProjectResourceService : IProjectResourceService
                 StoryboardSourcePath = ".naziki/storyboard.editor.json",
                 MaterialFolderPath = "assets"
             };
-            var chartModel = JsonConvert.DeserializeObject<C2Chart>(
+            var chartModel = DecodeChartProjection(
                 await File.ReadAllTextAsync(chart,
-                    cancellationToken).ConfigureAwait(false))
+                    cancellationToken).ConfigureAwait(false),
+                ChartRuntimeProfile.Cytus2)
                 ?? throw new InvalidDataException(
                     "谱面无法建立故事板时间环境。");
             var timeEngine = new ChartTimeEngine(
@@ -374,8 +410,18 @@ public sealed class ProjectResourceService : IProjectResourceService
                             request.StoryboardSourcePath!,
                             cancellationToken)
                         .ConfigureAwait(false);
-            var candidate = _storyboardImportCoordinator.Prepare(
-                storyboardInput, chartModel, timeEngine);
+            StoryboardImportCandidate candidate;
+            try
+            {
+                candidate = _storyboardImportCoordinator.Prepare(
+                    storyboardInput, chartModel, timeEngine);
+            }
+            catch (InvalidDataException ex) when (
+                !string.IsNullOrWhiteSpace(request.StoryboardSourcePath))
+            {
+                throw new InvalidDataException(
+                    $"已有故事板文件无法导入：{ex.Message}", ex);
+            }
             project.StoryboardSourceHash = candidate.SourceHash;
             project.StoryboardExportHash = candidate.RuntimeHash;
             await WriteAtomicAsync(storyboard,
@@ -608,15 +654,29 @@ public sealed class ProjectResourceService : IProjectResourceService
         }
     }
 
-    private static void ValidateChart(string path)
+    private C2Chart? DecodeChartProjection(
+        string json,
+        ChartRuntimeProfile profile)
     {
-        var root = JObject.Parse(File.ReadAllText(path));
-        if ((root.Value<int?>("time_base") ?? 0) <= 0)
-            throw new InvalidDataException("谱面的 time_base 必须大于 0。");
-        if (root["page_list"] is not JArray pages || pages.Count == 0)
-            throw new InvalidDataException("谱面必须至少包含一个 page。");
-        if (root["tempo_list"] is not JArray tempos || tempos.Count == 0)
-            throw new InvalidDataException("谱面必须至少包含一个 tempo。");
+        var result = _chartCodec.Decode(json, profile);
+        if (result.Success)
+            return result.Document!.Projection;
+
+        throw new InvalidDataException(string.Join(
+            Environment.NewLine,
+            result.Diagnostics
+                .Where(item =>
+                    item.Severity ==
+                    ChartDiagnosticSeverity.Error)
+                .Select(item =>
+                    $"{item.Path}: {item.Message}")));
+    }
+
+    private void ValidateChart(string path)
+    {
+        _ = DecodeChartProjection(
+            File.ReadAllText(path),
+            ChartRuntimeProfile.Cytus2);
     }
 
     private static void ValidateLevel(string path)

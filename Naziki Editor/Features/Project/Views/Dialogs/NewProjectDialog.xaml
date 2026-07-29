@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="新建故事板工程"
-        Width="720" Height="710"
+        Width="720" Height="820"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#1E1E2E">
@@ -106,6 +106,25 @@
                     <TextBox x:Name="TxtStoryboardPath" IsReadOnly="True"/>
                     <Button Grid.Column="1" Content="选择故事板…" Click="BrowseStoryboard_Click"/>
                 </Grid>
+
+                <Border x:Name="AssetImportPanel" Margin="0,12,0,0" Padding="12"
+                        Background="#252536" BorderBrush="#585B70" BorderThickness="1"
+                        CornerRadius="5">
+                    <StackPanel>
+                        <TextBlock Text="初始素材（可选）" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="TxtAssetSummary" Text="尚未选择素材"
+                                   Foreground="#A6ADC8" Margin="0,0,0,8"/>
+                        <ListBox x:Name="AssetSourceList" Height="92"
+                                 Background="#313244" Foreground="#CDD6F4"
+                                 BorderBrush="#585B70" SelectionMode="Extended"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                    Margin="0,8,0,0">
+                            <Button Content="选择素材…" Click="BrowseAssets_Click"/>
+                            <Button Content="移除选中" Click="RemoveSelectedAssets_Click"/>
+                            <Button Content="清空" Click="ClearAssets_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <Border x:Name="ErrorPanel" Background="#3B2028" BorderBrush="#F38BA8"
                         BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,14,0,0"

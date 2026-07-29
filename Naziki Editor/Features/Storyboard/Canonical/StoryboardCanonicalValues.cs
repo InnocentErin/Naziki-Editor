@@ -1,136 +1,56 @@
-using System.Globalization;
+using Naziki_Editor.Core.Serialization;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Core.Storyboard.Canonical;
 
 /// <summary>
-/// Canonical scalar encoding. Unit expressions are not stored as ambiguous
-/// strings in the editor source; the wire spelling is restored only during
-/// runtime export.
+/// Canonical scalar encoding facade. The codec in Core.Serialization is the
+/// single authority for unit names, Unity enum mapping and wire conversion.
 /// </summary>
 internal static class StoryboardCanonicalValues
 {
-    private const string TypeProperty = "$naziki_type";
-    private const string UnitProperty = "unit";
-    private const string ValueProperty = "value";
-    private static readonly HashSet<string> UnitFields =
-        new(StringComparer.Ordinal)
-        {
-            "x", "y", "z", "width", "height", "w", "h",
-            "scanline_pos"
-        };
-
     public static void NormalizeUnits(JToken token)
     {
-        if (token is JObject obj)
-        {
-            foreach (var property in obj.Properties().ToArray())
-            {
-                if (UnitFields.Contains(property.Name) &&
-                    TryParseWireUnit(property.Value, out var typed))
-                    property.Value = typed;
-                else
-                    NormalizeUnits(property.Value);
-            }
-        }
-        else if (token is JArray array)
-        {
-            foreach (var item in array) NormalizeUnits(item);
-        }
+        var diagnostics = StoryboardUnitCodec.NormalizeWireValues(token);
+        var error = diagnostics.FirstOrDefault(item => !item.Migrated);
+        if (error is not null)
+            throw new JsonSerializationException(
+                $"{error.Code} at {error.Path}: {error.Message}");
     }
+
+    public static IReadOnlyList<StoryboardUnitDiagnostic>
+        NormalizeWireUnits(JToken token, string path = "$") =>
+        StoryboardUnitCodec.NormalizeWireValues(token, path);
+
+    public static IReadOnlyList<StoryboardUnitDiagnostic>
+        NormalizeCanonicalUnits(JToken token, string path = "$") =>
+        StoryboardUnitCodec.NormalizeCanonicalValues(token, path);
 
     public static JObject ToWireObject(JObject canonical)
     {
         var clone = (JObject)canonical.DeepClone();
-        DenormalizeUnits(clone);
+        StoryboardUnitCodec.DenormalizeCanonicalValues(clone);
         return clone;
     }
 
     public static bool TryReadUnit(JToken? token, out double value,
         out string? unit)
     {
-        if (token is JObject typed &&
-            typed.Value<string>(TypeProperty) == "unit_float")
+        if (StoryboardUnitCodec.TryRead(token, out var decoded))
         {
-            value = typed.Value<double>(ValueProperty);
-            unit = typed.Value<string>(UnitProperty);
+            value = decoded.Value;
+            unit = decoded.Explicit ? decoded.Unit : null;
             return true;
-        }
-        if (token?.Type is JTokenType.Integer or JTokenType.Float)
-        {
-            value = token.Value<double>();
-            unit = null;
-            return true;
-        }
-        if (token?.Type == JTokenType.String)
-        {
-            var raw = token.Value<string>() ?? "";
-            var separator = raw.IndexOf(':');
-            var numberText = separator >= 0 ? raw[(separator + 1)..] : raw;
-            if (double.TryParse(numberText, NumberStyles.Float,
-                    CultureInfo.InvariantCulture, out value))
-            {
-                unit = separator >= 0 ? raw[..separator] : null;
-                return true;
-            }
         }
         value = 0;
         unit = null;
         return false;
     }
 
-    public static JObject Unit(double value, string unit) => new()
-    {
-        [TypeProperty] = "unit_float",
-        [UnitProperty] = unit,
-        [ValueProperty] = value
-    };
+    public static JObject Unit(double value, string unit) =>
+        StoryboardUnitCodec.Canonical(value, unit);
 
     public static bool IsUnitToken(JToken token) =>
-        token is JObject obj &&
-        obj.Value<string>(TypeProperty) == "unit_float";
-
-    private static bool TryParseWireUnit(JToken token, out JObject typed)
-    {
-        typed = new JObject();
-        if (token.Type != JTokenType.String) return false;
-        var raw = token.Value<string>() ?? "";
-        var separator = raw.IndexOf(':');
-        if (separator <= 0) return false;
-        var unit = raw[..separator];
-        if (unit.ToLowerInvariant() is not
-            ("notex" or "notey" or "stagex" or "stagey" or
-             "camerax" or "cameray"))
-            return false;
-        if (!double.TryParse(raw[(separator + 1)..], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var value))
-            return false;
-        typed = Unit(value, unit);
-        return true;
-    }
-
-    private static void DenormalizeUnits(JToken token)
-    {
-        if (token is JObject obj)
-        {
-            foreach (var property in obj.Properties().ToArray())
-            {
-                if (property.Value is JObject typed &&
-                    typed.Value<string>(TypeProperty) == "unit_float")
-                {
-                    var unit = typed.Value<string>(UnitProperty) ?? "";
-                    var value = typed.Value<double>(ValueProperty);
-                    property.Value =
-                        $"{unit}:{value.ToString("R", CultureInfo.InvariantCulture)}";
-                }
-                else
-                    DenormalizeUnits(property.Value);
-            }
-        }
-        else if (token is JArray array)
-        {
-            foreach (var item in array) DenormalizeUnits(item);
-        }
-    }
+        StoryboardUnitCodec.IsCanonicalUnit(token);
 }
-

@@ -34,6 +34,7 @@ using System.Windows.Media;
 using Naziki_Editor.Features.EditorShell;
 using Naziki_Editor.Features.Preview;
 using Naziki_Editor.Features.EditorShell.Workspace;
+using Naziki_Editor.Features.Project.Loading;
 using Naziki_Editor.Features.Project.Resources;
 using Naziki_Editor.Features.Audio.Playback;
 
@@ -137,6 +138,7 @@ namespace Naziki_Editor.Views
             if (string.IsNullOrWhiteSpace(selectedPath)) return;
 
             var previousChartPath = Context.ProjectData.ChartFilePath;
+            var previousChartDocument = Context.ChartDocument;
             var previousChart = Context.Chart;
             var previousTimeEngine = Context.TimeEngine;
             var chartCommitted = false;
@@ -161,8 +163,10 @@ namespace Naziki_Editor.Views
                 {
                     case ProjectResourceKind.Chart:
                     {
-                        var chart = _projectService.SilentImportChart(resolved)
-                            ?? throw new InvalidDataException("复制后的谱面无法加载。");
+                        var chartDocument =
+                            _projectService.LoadChartDocument(resolved);
+                        var chart = chartDocument.Projection;
+                        Context.ChartDocument = chartDocument;
                         Context.Chart = chart;
                         Context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
                         await AppServices
@@ -202,6 +206,8 @@ namespace Naziki_Editor.Views
                         case ProjectResourceKind.Chart:
                             Context.ProjectData.ChartFilePath =
                                 previousChartPath;
+                            Context.ChartDocument =
+                                previousChartDocument;
                             Context.Chart = previousChart;
                             Context.TimeEngine =
                                 previousTimeEngine;
@@ -249,13 +255,17 @@ namespace Naziki_Editor.Views
                 $"FilePath: {Context.ProjectFilePath}");
         }
 
-        public void RefreshAllAssets()
+        public void RefreshAllAssets(bool strict = false)
         {
             if (string.IsNullOrEmpty(Context.ProjectFilePath) || Context.ProjectData == null) return;
             string projectDir = System.IO.Path.GetDirectoryName(Context.ProjectFilePath);
             string? materialRoot;
             try { materialRoot = _projectResources.ResolvePath(Context, ProjectResourceKind.Asset); }
-            catch { materialRoot = null; }
+            catch
+            {
+                if (strict) throw;
+                materialRoot = null;
+            }
             if (string.IsNullOrWhiteSpace(materialRoot)) return;
             var bundle = AssetScanner.ScanResolvedProjectAssets(projectDir, materialRoot);
             AssetList.RefreshAssetListUI(bundle);
@@ -272,11 +282,27 @@ namespace Naziki_Editor.Views
 
 
         private void RefreshAllUIAfterProjectLoad()
+            => _ = RefreshAllUIAfterProjectLoadAsync(null, CancellationToken.None);
+
+        private async Task RefreshAllUIAfterProjectLoadAsync(
+            IProgress<ProjectLoadProgress>? progress,
+            CancellationToken cancellationToken,
+            PreparedProjectSession? preparedSession = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // 隐藏欢迎页
             WelcomePage.Visibility = Visibility.Collapsed;
 
+            progress?.Report(new(ProjectLoadStage.Events, "正在加载事件列表…",
+                ProjectLoadPipeline.EventsReady, ProjectLoadPipeline.TotalSteps));
+            await System.Windows.Threading.Dispatcher.Yield(
+                System.Windows.Threading.DispatcherPriority.Render);
             EventList.LoadStoryboardUI();
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new(ProjectLoadStage.EditorSurface, "正在初始化编辑器界面…",
+                ProjectLoadPipeline.EditorContextReady, ProjectLoadPipeline.TotalSteps));
+            await System.Windows.Threading.Dispatcher.Yield(
+                System.Windows.Threading.DispatcherPriority.Render);
             CanvasArea.LoadContext(Context);
             CanvasArea.TrackSelectedObject(null);
             CanvasArea.RefreshJsonView();
@@ -288,28 +314,73 @@ namespace Naziki_Editor.Views
 
             if (Context.HasChart && readiness.HasChart)
             {
+                progress?.Report(new(ProjectLoadStage.Notes, "正在构建音符列表…",
+                    ProjectLoadPipeline.NotesReady, ProjectLoadPipeline.TotalSteps));
+                await System.Windows.Threading.Dispatcher.Yield(
+                    System.Windows.Threading.DispatcherPriority.Render);
                 NoteList.BuildFullNoteTree();
                 if (Context.Chart.note_list.Count > 0)
                     NoteList._maxChartTime = Context.TimeEngine.TickToSeconds(Context.Chart.note_list.Max(n => n.tick));
                 NoteList.RefreshNoteList();
             }
 
-            RefreshAllAssets();
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new(ProjectLoadStage.Assets, "正在装载素材列表…",
+                ProjectLoadPipeline.AssetsReady, ProjectLoadPipeline.TotalSteps));
+            await System.Windows.Threading.Dispatcher.Yield(
+                System.Windows.Threading.DispatcherPriority.Render);
+            if (preparedSession is not null)
+            {
+                AssetList.RefreshAssetListUI(preparedSession.Assets);
+            }
+            else if (progress is null)
+            {
+                RefreshAllAssets();
+            }
+            else
+            {
+                var projectDirectory = Path.GetDirectoryName(Context.ProjectFilePath)
+                    ?? throw new InvalidOperationException("无法解析工程目录。");
+                var materialRoot = _projectResources.ResolvePath(
+                    Context, ProjectResourceKind.Asset);
+                if (!string.IsNullOrWhiteSpace(materialRoot))
+                {
+                    var bundle = await Task.Run(
+                        () => AssetScanner.ScanResolvedProjectAssets(
+                            projectDirectory, materialRoot),
+                        cancellationToken);
+                    AssetList.RefreshAssetListUI(bundle);
+                }
+            }
             if (Context.HasStoryboard)
             {
+                progress?.Report(new(ProjectLoadStage.EditorSurface, "正在构建时间轴…",
+                    ProjectLoadPipeline.TimelineAndAudioReady,
+                    ProjectLoadPipeline.TotalSteps));
+                await System.Windows.Threading.Dispatcher.Yield(
+                    System.Windows.Threading.DispatcherPriority.Render);
                 TimelineConsole.LoadStoryboardTimeline(Context);
             }
 
             // ✨ 【新增】：项目加载完毕后，自动检查并加载音频
-            string? musicPath = null;
-            try { musicPath = _projectResources.ResolvePath(Context, ProjectResourceKind.Music); }
+            string? musicPath = preparedSession?.MusicPath;
+            try
+            {
+                musicPath ??= _projectResources.ResolvePath(
+                    Context, ProjectResourceKind.Music);
+            }
             catch (Exception ex)
             {
                 _notificationService.ShowWarning($"工程音乐路径无效：{ex.Message}");
             }
             if (!string.IsNullOrWhiteSpace(musicPath) && System.IO.File.Exists(musicPath))
             {
-                _ = LoadProjectAudioAsync(musicPath);
+                progress?.Report(new(ProjectLoadStage.Audio, "正在加载音频…",
+                    ProjectLoadPipeline.TimelineAndAudioReady,
+                    ProjectLoadPipeline.TotalSteps));
+                await System.Windows.Threading.Dispatcher.Yield(
+                    System.Windows.Threading.DispatcherPriority.Render);
+                await _playback.LoadAudioAsync(musicPath);
             }
             else
             {
@@ -318,6 +389,63 @@ namespace Naziki_Editor.Views
 
             // 更新状态栏
             UpdateStatusBar();
+            progress?.Report(new(ProjectLoadStage.Commit, "正在完成项目初始化…",
+                ProjectLoadPipeline.Complete, ProjectLoadPipeline.TotalSteps));
+        }
+
+        public async Task PrepareProjectAsync(
+            PreparedProjectSession preparedSession,
+            IProgress<ProjectLoadProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(preparedSession);
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                progress?.Report(new(ProjectLoadStage.ProjectConfiguration,
+                    "正在绑定工程上下文…",
+                    ProjectLoadPipeline.DataPreparationComplete,
+                    ProjectLoadPipeline.TotalSteps));
+                Context = preparedSession.Context;
+                BindChildContexts();
+                _historyService.Reset();
+                _historyService.RecordSnapshot(Context.Storyboard);
+                PrepareWorkspaceLayout();
+            }
+            catch (Exception ex)
+            {
+                throw new ProjectLoadException(
+                    ProjectLoadStage.ProjectConfiguration,
+                    "工程上下文绑定失败。", ex,
+                    preparedSession.Context.ProjectFilePath);
+            }
+
+            try
+            {
+                await RefreshAllUIAfterProjectLoadAsync(
+                    progress, cancellationToken, preparedSession);
+                cancellationToken.ThrowIfCancellationRequested();
+                Measure(new Size(
+                    Math.Max(MinWidth, Width),
+                    Math.Max(MinHeight, Height)));
+                Arrange(new Rect(0, 0,
+                    Math.Max(MinWidth, Width),
+                    Math.Max(MinHeight, Height)));
+                UpdateLayout();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var stage = ex is ProjectLoadException loadException
+                    ? loadException.Stage
+                    : ProjectLoadStage.EditorSurface;
+                throw new ProjectLoadException(
+                    stage, "编辑器数据初始化失败。", ex,
+                    preparedSession.Context.ProjectFilePath);
+            }
         }
 
         private async Task LoadProjectAudioAsync(string musicPath)
@@ -398,6 +526,7 @@ namespace Naziki_Editor.Views
             Context = new ProjectDataContext(_messageBroker);
 
             InitializeComponent();
+            InitializeMaximizedWorkArea();
             Loaded += MainWindow_Loaded;
 
             // =========================================================
@@ -505,10 +634,7 @@ namespace Naziki_Editor.Views
             });
 
             // 🔌 ✨ 终极通电！主窗口一启动，就把数据包分发给所有小弟！
-            EventList.LoadContext(Context);
-            NoteList.LoadContext(Context);
-            CanvasArea.LoadContext(Context);
-            PropertyPanel.LoadContext(Context);
+            BindChildContexts();
 
             // ==========================================
             // 让主窗口订阅 Context 的数据修改广播！
@@ -590,10 +716,16 @@ namespace Naziki_Editor.Views
                 {
                     if (Context.ProjectData != null && !string.IsNullOrWhiteSpace(Context.ProjectFilePath))
                     {
+                        using var resolved =
+                            await StoryboardCorrections
+                                .StoryboardSourceConflictResolver
+                                .ResolveAsync(this, path);
+                        if (resolved is null)
+                            return;
                         await _projectResources.ImportAsync(
                             Context,
                             ProjectResourceKind.Storyboard,
-                            path);
+                            resolved.Path);
                         importCommitted = true;
                         Context.StoryboardPath =
                             _projectResources.ResolvePath(Context, ProjectResourceKind.Storyboard) ?? path;
@@ -1000,6 +1132,15 @@ namespace Naziki_Editor.Views
             EventList.InitDependencies(_messageBroker, _dialogService, _projectService, _storyboardRepository, _notificationService);
         }
 
+        private void BindChildContexts()
+        {
+            EventList.LoadContext(Context);
+            NoteList.LoadContext(Context);
+            AssetList.LoadContext(Context);
+            CanvasArea.LoadContext(Context);
+            PropertyPanel.LoadContext(Context);
+        }
+
         // =========================================================
         // 🔔 通知气泡叠加层初始化
         // =========================================================
@@ -1377,9 +1518,19 @@ namespace Naziki_Editor.Views
 
         void IEditorShellView.ApplyLoadedProject()
         {
-            Title = $"Naziki Editor - {Context.ProjectData?.ProjectName} [{Context.ProjectFilePath}]";
             RefreshAllUIAfterProjectLoad();
+            CommitPreparedProject(startPreviewSession: false);
+        }
 
+        public void CommitPreparedProject(bool startPreviewSession = true)
+        {
+            Title = $"Naziki Editor - {Context.ProjectData?.ProjectName} [{Context.ProjectFilePath}]";
+            if (startPreviewSession)
+            {
+                _previewPublisher.EndSession();
+                _previewPublisher.StartSession();
+                _previewPublisher.PublishReset("Project.Loaded");
+            }
             if (!string.IsNullOrWhiteSpace(Context.ProjectFilePath))
             {
                 SaveRecentProject(Context.ProjectFilePath);
@@ -1418,6 +1569,7 @@ namespace Naziki_Editor.Views
 
         protected override void OnClosed(EventArgs e)
         {
+            ReleaseMaximizedWorkArea();
             _shellCoordinator.Dispose();
             _previewPublisher.EndSession();
             base.OnClosed(e);

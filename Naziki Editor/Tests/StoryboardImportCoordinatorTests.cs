@@ -129,6 +129,129 @@ public sealed class StoryboardImportCoordinatorTests
                     "storyboard.json")))["texts"]?[0]?["id"]);
     }
 
+    [Fact]
+    public async Task UntimedEntitiesPersistAndExportAtAbsoluteZero()
+    {
+        using var directory = new TemporaryDirectory();
+        var external = Path.Combine(directory.Path, "untimed.json");
+        await File.WriteAllTextAsync(external, """
+            {
+              "sprites": [{"id":"image","path":"image.png"}],
+              "videos": [{"id":"video","path":"video.mp4"}],
+              "texts": [{"id":"text","text":"hello"}]
+            }
+            """);
+        var context = CreateContext(directory.Path);
+
+        var result = await CreateCoordinator().ImportAndCommitAsync(
+            context, external);
+
+        Assert.All(context.EditorStoryboard.Entities, entity =>
+        {
+            Assert.Equal(StoryboardActivationMode.Explicit,
+                entity.ActivationMode);
+            Assert.Equal(0, entity.ActivationTime!.Seconds);
+        });
+        var source = JObject.Parse(await File.ReadAllTextAsync(
+            result.StoryboardSourcePath));
+        Assert.All(source["entities"]!.Children<JObject>(), entity =>
+        {
+            Assert.Equal("Explicit",
+                entity.Value<string>("activation_mode"));
+            Assert.Equal(0,
+                entity["activation_time"]?.Value<double>("seconds"));
+        });
+        var runtime = JObject.Parse(await File.ReadAllTextAsync(
+            result.StoryboardRuntimePath));
+        Assert.All(new[] { "sprites", "videos", "texts" }, collection =>
+        {
+            var entity = Assert.Single(
+                runtime[collection]!.Children<JObject>());
+            Assert.Equal(0, entity.Value<double>("time"));
+        });
+    }
+
+    [Fact]
+    public void Prepare_PreservesExplicitWorldUnitForLineWidth()
+    {
+        const string input = """
+        {
+          "lines": [{
+            "id": "line",
+            "time": 0,
+            "pos": [{
+              "x": { "Value": 0, "Unit": 1 },
+              "y": { "Value": 0, "Unit": 2 },
+              "z": { "Value": 0, "Unit": 0 }
+            }],
+            "width": {
+              "Value": 0.03,
+              "Unit": 0,
+              "ScaleToCanvas": false,
+              "Span": true
+            },
+            "states": [{
+              "relative_time": 1,
+              "width": {
+                "Value": 0.05,
+                "Unit": 0,
+                "ScaleToCanvas": false,
+                "Span": true
+              }
+            }]
+          }]
+        }
+        """;
+
+        var candidate = CreateCoordinator().Prepare(input);
+
+        var runtimeLine = Assert.Single(
+            candidate.RuntimeJson["lines"]!.Children<JObject>());
+        Assert.Equal("world:0.03",
+            runtimeLine.Value<string>("width"));
+        Assert.Equal("world:0.05",
+            runtimeLine["states"]![0]!.Value<string>("width"));
+        var legacyLine = Assert.Single(
+            candidate.LegacyProjection.lines);
+        Assert.Equal(0.03f, legacyLine.BaseState.Width!.Value);
+        Assert.True(legacyLine.BaseState.Width.HasExplicitUnit);
+        Assert.Equal(ReferenceUnit.World,
+            legacyLine.BaseState.Width.Unit);
+        Assert.Equal(0.05f,
+            legacyLine.Keyframes[0].Width!.Value);
+    }
+
+    [Fact]
+    public void Prepare_NormalizesExternalPlayerColorObjects()
+    {
+        const string input = """
+        {
+          "note_controllers": [{
+            "id": "note-color",
+            "note": 1,
+            "time": 0,
+            "override_fill_color": true,
+            "fill_color": {
+              "R": 0.917647064,
+              "G": 0,
+              "B": 0.215686277,
+              "A": 1
+            }
+          }]
+        }
+        """;
+
+        var candidate = CreateCoordinator().Prepare(input);
+
+        var runtime = Assert.Single(candidate.RuntimeJson[
+            "note_controllers"]!.Children<JObject>());
+        Assert.Equal("#EA0037",
+            runtime.Value<string>("fill_color"));
+        var legacy = Assert.Single(
+            candidate.LegacyProjection.note_controllers);
+        Assert.Equal("#EA0037", legacy.BaseState.FillColor);
+    }
+
     private static ProjectDataContext CreateContext(string directory)
     {
         var projectPath = Path.Combine(directory, "project.nep");

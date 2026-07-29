@@ -36,10 +36,12 @@ using Naziki_Editor.Features.EditorShell.Workspace;
 using Naziki_Editor.Features.Editing;
 using Naziki_Editor.Features.Preview;
 using Naziki_Editor.Features.Project.Resources;
+using Naziki_Editor.Features.Project.Loading;
 using Naziki_Editor.Features.Audio.Playback;
 using Naziki_Editor.Shared.Input;
 using Naziki_Editor.Views.Loading;
 using Naziki_Editor.Core.Storyboard.Canonical;
+using Naziki_Editor.Core.Charting;
 
 namespace Naziki_Editor
 {
@@ -58,6 +60,7 @@ namespace Naziki_Editor
             services.AddSingleton<IProjectService, ProjectService>();
             services.AddSingleton<IProjectResourceService, ProjectResourceService>();
             services.AddSingleton<IProjectReadinessService, ProjectReadinessService>();
+            services.AddSingleton<IProjectOpenPreparationService, ProjectOpenPreparationService>();
             services.AddSingleton<IStoryboardRepository, StoryboardRepository>();
             services.AddSingleton<IWorkspaceService, WorkspaceService>();
             services.AddSingleton<ICommandDispatcher, CommandDispatcher>();
@@ -71,6 +74,7 @@ namespace Naziki_Editor
             services.AddSingleton<ITemplateManager, TemplateManager>();
             services.AddSingleton<IStoryboardParser, StoryboardParser>();
             services.AddSingleton<IStoryboardPropertyCatalog, StoryboardPropertyCatalogService>();
+            services.AddSingleton<IStoryboardJsonNormalizer, StoryboardJsonNormalizer>();
             services.AddSingleton<IStoryboardDocumentReader, StoryboardDocumentReader>();
             services.AddSingleton<IStoryboardDocumentWriter, StoryboardDocumentWriter>();
             services.AddSingleton<IEditorStoryboardSerializer, EditorStoryboardSerializer>();
@@ -85,6 +89,7 @@ namespace Naziki_Editor
             services.AddSingleton<IStoryboardTemplateViewAdapter, StoryboardTemplateViewAdapter>();
             services.AddSingleton<IStoryboardCanonicalBridge, StoryboardCanonicalBridge>();
             services.AddSingleton<IStoryboardImportCoordinator, StoryboardImportCoordinator>();
+            services.AddSingleton<IChartJsonCodec, ChartJsonCodec>();
             services.AddSingleton<IChartPreviewWireAdapter, ChartPreviewWireAdapter>();
             services.AddSingleton<StoryboardPreviewService>();
             services.AddSingleton<IStoryboardPreviewDataSource>(sp => sp.GetRequiredService<StoryboardPreviewService>());

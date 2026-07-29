@@ -56,12 +56,18 @@ namespace Naziki_Editor.Core.Commands
         // ==========================================
         // ⚓ 公开港口入城式：先谱面→再故事板→通知UI
         // ==========================================
-        public void DoLoadProject(string projectPath, NazikiProjectModel projectData, ProjectDataContext context)
+        public void DoLoadProject(
+            string projectPath,
+            NazikiProjectModel projectData,
+            ProjectDataContext context,
+            bool publishLoaded = true,
+            bool strict = false)
         {
             if (projectData == null) return;
 
             context.ProjectFilePath = projectPath;
             context.ProjectData = projectData;
+            context.ChartDocument = null;
             context.Chart = null;
             context.TimeEngine = null;
             context.StoryboardPath = null;
@@ -74,7 +80,7 @@ namespace Naziki_Editor.Core.Commands
             var chartPath = ResolveConfigured(ProjectResourceKind.Chart);
             if (!string.IsNullOrEmpty(chartPath) && File.Exists(chartPath))
             {
-                SilentImportChart(context, chartPath);
+                SilentImportChart(context, chartPath, strict);
             }
 
             // ==========================================
@@ -106,6 +112,9 @@ namespace Naziki_Editor.Core.Commands
                 }
                 catch (Exception ex)
                 {
+                    if (strict)
+                        throw new InvalidDataException(
+                            $"读取工程故事板失败：{storyboardPath}", ex);
                     _dialogService.ShowErrorDialog($"读取工程内关联的故事板文件失败 QAQ：\n{ex.Message}", "同步失败", ex.ToString());
                     context.Storyboard = new StoryboardRoot();
                 }
@@ -145,27 +154,39 @@ namespace Naziki_Editor.Core.Commands
             // ==========================================
             // 🔴 【第三优先级】：加载完成后，通知 UI 刷新
             // ==========================================
-            _messageBroker.Publish("ProjectLoaded");
+            if (publishLoaded)
+                _messageBroker.Publish("ProjectLoaded");
 
             string? ResolveConfigured(ProjectResourceKind kind)
             {
                 try { return _projectResources.ResolvePath(context, kind); }
-                catch { return null; }
+                catch
+                {
+                    if (strict) throw;
+                    return null;
+                }
             }
         }
 
-        private void SilentImportChart(ProjectDataContext context, string chartPath)
+        private void SilentImportChart(
+            ProjectDataContext context,
+            string chartPath,
+            bool strict)
         {
             try
             {
-                C2Chart? chart = _projectService.SilentImportChart(chartPath);
-                if (chart != null)
-                {
-                    context.Chart = chart;
-                    context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
-                }
+                var document =
+                    _projectService.LoadChartDocument(chartPath);
+                context.ChartDocument = document;
+                context.Chart = document.Projection;
+                context.TimeEngine = new ChartTimeEngine(
+                    context.Chart.tempo_list,
+                    context.Chart.time_base);
             }
-            catch { }
+            catch
+            {
+                if (strict) throw;
+            }
         }
 
         // ==========================================
@@ -394,11 +415,13 @@ namespace Naziki_Editor.Core.Commands
                         chartFile);
                     var managedChart = _projectResources.ResolvePath(context, ProjectResourceKind.Chart)
                         ?? throw new InvalidDataException("无法解析导入后的谱面路径。");
-                    C2Chart? chart = _projectService.SilentImportChart(managedChart);
-                    if (chart == null || chart.time_base == 0) return;
-
+                    var document =
+                        _projectService.LoadChartDocument(managedChart);
+                    var chart = document.Projection;
+                    context.ChartDocument = document;
                     context.Chart = chart;
-                    context.TimeEngine = new ChartTimeEngine(chart.tempo_list, chart.time_base);
+                    context.TimeEngine = new ChartTimeEngine(
+                        chart.tempo_list, chart.time_base);
 
                     if (context.ProjectData != null)
                     {

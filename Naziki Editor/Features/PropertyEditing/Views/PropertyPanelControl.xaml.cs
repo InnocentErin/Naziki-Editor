@@ -501,7 +501,7 @@ namespace Naziki_Editor.Views
             var state = line.BaseState;
             if (state != null)
             {
-                AddPropertyRow("线段宽度", state.Width?.ToString() ?? "默认", state, "Width");
+                AddPropertyRow("线段宽度", FormatUnitFloat(state.Width), state, "Width");
                 AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0", state, "Opacity");
                 AddPropertyRow("线条颜色", state.Color ?? "默认", state, "Color");
 

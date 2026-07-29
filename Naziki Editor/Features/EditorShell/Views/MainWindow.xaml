@@ -8,6 +8,7 @@
         Title="Naziki Editor" 
         Height="720" Width="1280"
         MinWidth="800" MinHeight="600"
+        WindowState="Maximized"
         WindowStyle="None" x:Name="MainWindowInstance"
         Background="{DynamicResource MainBgColor}" 
         BorderBrush="{DynamicResource BorderColor}"
@@ -204,39 +205,55 @@
         </Border>
 
         <avalonDock:DockingManager x:Name="WorkspaceDockingManager" Grid.Row="3" Grid.RowSpan="3"
-                                  Background="{DynamicResource MainBgColor}">
+                                  Background="{DynamicResource MainBgColor}"
+                                  AnchorablePaneControlStyle="{StaticResource EditorAnchorablePaneStyle}">
             <avalonLayout:LayoutRoot>
-                <avalonLayout:LayoutPanel Orientation="Horizontal">
-                    <avalonLayout:LayoutAnchorablePane DockWidth="260">
-                        <avalonLayout:LayoutAnchorable Title="事件" ContentId="Events" CanClose="False">
-                            <local:EventListControl x:Name="EventList"/>
-                        </avalonLayout:LayoutAnchorable>
-                        <avalonLayout:LayoutAnchorable Title="音符" ContentId="Notes" CanClose="False">
-                            <local:NoteListControl x:Name="NoteList"/>
-                        </avalonLayout:LayoutAnchorable>
-                        <avalonLayout:LayoutAnchorable Title="素材" ContentId="Assets" CanClose="False">
-                            <local:AssetListControl x:Name="AssetList"/>
-                        </avalonLayout:LayoutAnchorable>
-                    </avalonLayout:LayoutAnchorablePane>
+                <avalonLayout:LayoutPanel Orientation="Vertical">
+                    <!-- Upper editing area: event/note tabs remain grouped at the top. -->
+                    <avalonLayout:LayoutPanel Orientation="Horizontal"
+                                              DockHeight="64*" DockMinHeight="300">
+                        <avalonLayout:LayoutAnchorablePane DockWidth="22*" DockMinWidth="220">
+                            <avalonLayout:LayoutAnchorable Title="事件" ContentId="Events" CanClose="False">
+                                <local:EventListControl x:Name="EventList"/>
+                            </avalonLayout:LayoutAnchorable>
+                            <avalonLayout:LayoutAnchorable Title="音符" ContentId="Notes" CanClose="False">
+                                <local:NoteListControl x:Name="NoteList"/>
+                            </avalonLayout:LayoutAnchorable>
+                        </avalonLayout:LayoutAnchorablePane>
 
-                    <avalonLayout:LayoutPanel Orientation="Vertical">
-                        <avalonLayout:LayoutDocumentPane>
+                        <avalonLayout:LayoutDocumentPane DockWidth="56*" DockMinWidth="420">
                             <avalonLayout:LayoutDocument Title="预览与源代码" ContentId="Canvas" CanClose="False">
                                 <local:CanvasControl x:Name="CanvasArea"/>
                             </avalonLayout:LayoutDocument>
                         </avalonLayout:LayoutDocumentPane>
-                        <avalonLayout:LayoutAnchorablePane DockHeight="280">
+
+                        <avalonLayout:LayoutAnchorablePane DockWidth="22*" DockMinWidth="240">
+                            <avalonLayout:LayoutAnchorable Title="属性" ContentId="Properties" CanClose="False">
+                                <local:PropertyPanelControl x:Name="PropertyPanel"/>
+                            </avalonLayout:LayoutAnchorable>
+                        </avalonLayout:LayoutAnchorablePane>
+                    </avalonLayout:LayoutPanel>
+
+                    <!--
+                        Persistent import area: Assets is a separate pane to the left
+                        of MainTimeline and can no longer collapse into Events/Notes.
+                    -->
+                    <avalonLayout:LayoutPanel Orientation="Horizontal"
+                                              DockHeight="36*" DockMinHeight="240">
+                        <avalonLayout:LayoutAnchorablePane DockWidth="22*" DockMinWidth="220">
+                            <avalonLayout:LayoutAnchorable Title="素材" ContentId="Assets"
+                                                           CanClose="False" CanHide="False"
+                                                           CanAutoHide="False" CanFloat="False">
+                                <local:AssetListControl x:Name="AssetList"/>
+                            </avalonLayout:LayoutAnchorable>
+                        </avalonLayout:LayoutAnchorablePane>
+
+                        <avalonLayout:LayoutAnchorablePane DockWidth="78*" DockMinWidth="500">
                             <avalonLayout:LayoutAnchorable Title="主时间轴" ContentId="MainTimeline" CanClose="False">
                                 <local:TimelineControl x:Name="TimelineConsole"/>
                             </avalonLayout:LayoutAnchorable>
                         </avalonLayout:LayoutAnchorablePane>
                     </avalonLayout:LayoutPanel>
-
-                    <avalonLayout:LayoutAnchorablePane DockWidth="280">
-                        <avalonLayout:LayoutAnchorable Title="属性" ContentId="Properties" CanClose="False">
-                            <local:PropertyPanelControl x:Name="PropertyPanel"/>
-                        </avalonLayout:LayoutAnchorable>
-                    </avalonLayout:LayoutAnchorablePane>
                 </avalonLayout:LayoutPanel>
             </avalonLayout:LayoutRoot>
         </avalonDock:DockingManager>

@@ -14,6 +14,8 @@ namespace Naziki_Editor.Models
     {
         public float Value { get; set; }
         public ReferenceUnit Unit { get; set; } = ReferenceUnit.World;
+        [JsonIgnore]
+        public bool HasExplicitUnit { get; set; }
         // 配合你的 UnitFloatConverter 使用
     }
 
@@ -192,7 +194,6 @@ namespace Naziki_Editor.Models
     public class LineState : StageObjectState
     {
         [JsonProperty("pos")] public List<LinePosition> Pos { get; set; } = new List<LinePosition>();
-        [JsonProperty("width")] public float? Width { get; set; }
         [JsonProperty("color")] public string Color { get; set; }
     }
 

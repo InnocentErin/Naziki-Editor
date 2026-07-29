@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Naziki_Editor.Models;
 using Naziki_Editor.State;
+using Naziki_Editor.Core.Charting;
 
 namespace Naziki_Editor.Core.Abstractions
 {
@@ -35,5 +36,6 @@ namespace Naziki_Editor.Core.Abstractions
         (StoryboardRoot? Storyboard, StoryboardMeta Meta) LoadProjectStoryboard(string storyboardPath, NazikiProjectModel projectData);
 
         C2Chart? SilentImportChart(string chartPath);
+        ChartDocument LoadChartDocument(string chartPath);
     }
 }

@@ -36,6 +36,34 @@ public enum PreviewAvailabilityState
     Faulted
 }
 
+public enum PreviewSessionPhase
+{
+    Idle,
+    LaunchingProcess,
+    InitializingGraphics,
+    ConnectingTransport,
+    AuthenticatingHost,
+    HostReady,
+    ValidatingSnapshot,
+    MaterializingVfs,
+    LoadingContent,
+    PreviewReady,
+    Failed,
+    Disconnected
+}
+
+public sealed record PreviewSessionStatus(
+    long Generation,
+    PreviewSessionPhase Phase,
+    DateTimeOffset PhaseStartedAt,
+    DateTimeOffset LastMessageAt,
+    int? UnityProcessId,
+    bool TransportConnected,
+    int HostRevision,
+    string? RequestId,
+    long? SnapshotVersion,
+    string? Detail);
+
 public enum PreviewDiagnosticSeverity
 {
     Information,
@@ -104,7 +132,24 @@ public sealed record PreviewDiagnostic(
     string? Path = null,
     string? EntityId = null,
     string? PropertyName = null,
-    string? Suggestion = null);
+    string? Suggestion = null)
+{
+    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.Now;
+    public string? StackTrace { get; init; }
+    public int RepeatCount { get; init; } = 1;
+    public string? Scene { get; init; }
+    public int? Frame { get; init; }
+    public long? SnapshotVersion { get; init; }
+}
+
+public sealed record PreviewDiagnosticSummary(
+    int ErrorCount,
+    int WarningCount,
+    PreviewDiagnostic? Primary)
+{
+    public bool HasErrors => ErrorCount > 0;
+    public bool HasWarnings => WarningCount > 0;
+}
 
 public sealed record PreviewValidationResult(
     long EditorVersion,
@@ -184,7 +229,9 @@ public interface IPreviewValidationService
 public interface IPreviewDiagnosticsService
 {
     PreviewAvailabilityState Availability { get; }
+    PreviewSessionStatus SessionStatus { get; }
     IReadOnlyList<PreviewDiagnostic> Diagnostics { get; }
+    PreviewDiagnosticSummary Summary { get; }
     LastKnownGoodPreview? LastKnownGood { get; }
     event EventHandler? Changed;
 }

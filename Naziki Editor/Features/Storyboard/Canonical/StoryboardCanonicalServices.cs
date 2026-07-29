@@ -3,6 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using Naziki_Editor.Core.Abstractions;
+using Naziki_Editor.Core.Serialization;
 using Naziki_Editor.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -29,18 +30,47 @@ public sealed class EditorStoryboardSerializer : IEditorStoryboardSerializer
         if (document.SchemaVersion != 1)
             throw new JsonSerializationException(
                 $"Unsupported editor storyboard schema {document.SchemaVersion}.");
-        return JsonConvert.SerializeObject(document, Settings);
+        var token = JObject.FromObject(document,
+            JsonSerializer.Create(Settings));
+        var diagnostics =
+            StoryboardCanonicalValues.NormalizeCanonicalUnits(token);
+        ThrowForInvalidCanonicalUnits(diagnostics);
+        return token.ToString(Formatting.Indented);
     }
 
     public EditorStoryboardDocument Deserialize(string json)
     {
-        var document = JsonConvert.DeserializeObject<EditorStoryboardDocument>(json, Settings)
+        var token = JToken.Parse(json);
+        var diagnostics =
+            StoryboardCanonicalValues.NormalizeCanonicalUnits(token);
+        ThrowForInvalidCanonicalUnits(diagnostics);
+        var document = token.ToObject<EditorStoryboardDocument>(
+                           JsonSerializer.Create(Settings))
                        ?? throw new JsonSerializationException(
                            "Editor storyboard source is empty.");
         if (document.SchemaVersion != 1)
             throw new JsonSerializationException(
                 $"Unsupported editor storyboard schema {document.SchemaVersion}.");
+        foreach (var migration in diagnostics.Where(item => item.Migrated))
+            document.Metadata.ImportDiagnostics.Add(
+                new EditorStoryboardStoredDiagnostic
+                {
+                    Code = migration.Code,
+                    Path = migration.Path,
+                    Message = migration.Message,
+                    Severity = StoryboardDiagnosticSeverity.Warning.ToString()
+                });
         return document;
+    }
+
+    private static void ThrowForInvalidCanonicalUnits(
+        IReadOnlyList<StoryboardUnitDiagnostic> diagnostics)
+    {
+        var errors = diagnostics.Where(item => !item.Migrated).ToArray();
+        if (errors.Length == 0) return;
+        throw new JsonSerializationException(string.Join(
+            Environment.NewLine, errors.Select(item =>
+                $"{item.Code} at {item.Path}: {item.Message}")));
     }
 }
 
@@ -134,16 +164,18 @@ public sealed class StoryboardImportService : IStoryboardImportService
         "sprites", "texts", "lines", "videos", "controllers", "note_controllers"
     ];
 
-    private static readonly Dictionary<string, string> Aliases =
-        new(StringComparer.Ordinal)
-        {
-            ["arcade_inteference_size"] = "arcade_interference_size",
-            ["arcade_inteference_speed"] = "arcade_interference_speed",
-            ["arcade_interferance_size"] = "arcade_interference_size",
-            ["arcade_interferance_speed"] = "arcade_interference_speed",
-            ["x_offset"] = "dx",
-            ["y_offset"] = "dy"
-        };
+    private readonly IStoryboardJsonNormalizer _normalizer;
+
+    public StoryboardImportService()
+        : this(new StoryboardJsonNormalizer(
+            new StoryboardPropertyCatalogService()))
+    {
+    }
+
+    public StoryboardImportService(IStoryboardJsonNormalizer normalizer)
+    {
+        _normalizer = normalizer;
+    }
 
     public StoryboardImportResult Import(string json, C2Chart? chart = null,
         StoryboardMeta? legacyMeta = null,
@@ -172,7 +204,54 @@ public sealed class StoryboardImportService : IStoryboardImportService
             ]);
         }
 
-        NormalizeAliases(root);
+        var normalization = _normalizer.Normalize(root);
+        root = (JObject)normalization.Token;
+        foreach (var change in normalization.Changes)
+            issues.Add(new StoryboardImportIssue(
+                change.DuplicateMerged
+                    ? "PROPERTY_NAME_DUPLICATE_MERGED"
+                    : "PROPERTY_NAME_NORMALIZED",
+                change.Path,
+                change.DuplicateMerged
+                    ? $"Properties '{change.OriginalName}' were merged as '{change.CanonicalName}'."
+                    : $"Property '{change.OriginalName}' was normalized to '{change.CanonicalName}'.",
+                StoryboardDiagnosticSeverity.Warning));
+        foreach (var conflict in normalization.Conflicts)
+            issues.Add(new StoryboardImportIssue(
+                "PROPERTY_NAME_CONFLICT",
+                $"{conflict.Path}.{conflict.CanonicalName}",
+                $"Properties {string.Join(", ", conflict.Candidates.Select(item => $"'{item.OriginalName}'"))} normalize to '{conflict.CanonicalName}' but contain different values.",
+                StoryboardDiagnosticSeverity.Error));
+        if (normalization.Conflicts.Count > 0)
+            return new StoryboardImportResult(null, issues,
+                normalization.Conflicts);
+
+        var unitDiagnostics =
+            StoryboardCanonicalValues.NormalizeWireUnits(root);
+        foreach (var diagnostic in unitDiagnostics)
+            issues.Add(new StoryboardImportIssue(
+                diagnostic.Code,
+                diagnostic.Path,
+                diagnostic.Message,
+                diagnostic.Migrated
+                    ? StoryboardDiagnosticSeverity.Warning
+                    : StoryboardDiagnosticSeverity.Error));
+        if (unitDiagnostics.Any(item => !item.Migrated))
+            return new StoryboardImportResult(null, issues,
+                normalization.Conflicts);
+
+        var colorDiagnostics =
+            StoryboardColorCodec.NormalizeWireValues(root);
+        foreach (var diagnostic in colorDiagnostics)
+            issues.Add(new StoryboardImportIssue(
+                diagnostic.Code,
+                diagnostic.Path,
+                diagnostic.Message,
+                StoryboardDiagnosticSeverity.Error));
+        if (colorDiagnostics.Count > 0)
+            return new StoryboardImportResult(null, issues,
+                normalization.Conflicts);
+
         var normalized = root.ToString(Formatting.None);
         var importHash = StoryboardStableId.HashText(normalized);
         var document = new EditorStoryboardDocument
@@ -246,6 +325,7 @@ public sealed class StoryboardImportService : IStoryboardImportService
         }
 
         ValidateTemplateReferences(document, issues);
+        ValidateParentRelationships(document, issues);
         document.Metadata.ImportDiagnostics = issues.Select(issue =>
             new EditorStoryboardStoredDiagnostic
             {
@@ -254,8 +334,108 @@ public sealed class StoryboardImportService : IStoryboardImportService
                 Message = issue.Message,
                 Severity = issue.Severity.ToString()
             }).ToList();
-        return new StoryboardImportResult(document, issues);
+        return new StoryboardImportResult(document, issues,
+            normalization.Conflicts);
     }
+
+    private static void ValidateParentRelationships(
+        EditorStoryboardDocument document,
+        List<StoryboardImportIssue> issues)
+    {
+        var entities = document.Entities
+            .Where(entity => !string.IsNullOrWhiteSpace(
+                entity.RuntimeId?.Literal))
+            .GroupBy(entity => entity.RuntimeId!.Literal,
+                StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(),
+                StringComparer.Ordinal);
+        var edges = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var entity in document.Entities.Where(entity =>
+                     !string.IsNullOrWhiteSpace(entity.ParentId?.Literal)))
+        {
+            var path = $"{entity.Source.Path}.parent_id";
+            var parentId = entity.ParentId!.Literal;
+            if (entity.Kind is not EditorStoryboardEntityKind.Sprite and
+                not EditorStoryboardEntityKind.Text)
+                issues.Add(new StoryboardImportIssue(
+                    "PARENT_TYPE_INVALID", path,
+                    "Only sprite and text entities can define parent_id.",
+                    StoryboardDiagnosticSeverity.Error));
+
+            if (entity.ParentId.UsesCurrentNote)
+            {
+                if (entity.NoteBinding is null)
+                    issues.Add(new StoryboardImportIssue(
+                        "PARENT_NOTE_CONTEXT_MISSING", path,
+                        "parent_id uses $note but the entity has no note binding.",
+                        StoryboardDiagnosticSeverity.Error));
+                continue;
+            }
+
+            var childId = entity.RuntimeId?.Literal;
+            if (!string.IsNullOrWhiteSpace(childId) &&
+                string.Equals(childId, parentId, StringComparison.Ordinal))
+                issues.Add(new StoryboardImportIssue(
+                    "PARENT_SELF_REFERENCE", path,
+                    $"Entity '{childId}' cannot be its own parent.",
+                    StoryboardDiagnosticSeverity.Error));
+
+            if (!entities.TryGetValue(parentId, out var parent))
+                continue; // The runtime reference validator reports this.
+
+            if (!CanExistBefore(parent, entity))
+                issues.Add(new StoryboardImportIssue(
+                    "PARENT_CREATION_ORDER_INVALID", path,
+                    $"Parent '{parentId}' is created after child " +
+                    $"'{childId ?? entity.EditorId}' by the runtime.",
+                    StoryboardDiagnosticSeverity.Error));
+
+            if (!string.IsNullOrWhiteSpace(childId))
+                edges[childId] = parentId;
+        }
+
+        foreach (var start in edges.Keys)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var current = start;
+            while (edges.TryGetValue(current, out var parent))
+            {
+                if (!seen.Add(current))
+                {
+                    issues.Add(new StoryboardImportIssue(
+                        "PARENT_CYCLE", $"id:{start}.parent_id",
+                        $"Parent relationship for '{start}' contains a cycle.",
+                        StoryboardDiagnosticSeverity.Error));
+                    break;
+                }
+                current = parent;
+            }
+        }
+    }
+
+    private static bool CanExistBefore(
+        EditorStoryboardEntity parent,
+        EditorStoryboardEntity child)
+    {
+        var parentRank = RuntimeCreationRank(parent.Kind);
+        var childRank = RuntimeCreationRank(child.Kind);
+        return parentRank < childRank ||
+               parentRank == childRank &&
+               parent.SourceOrder < child.SourceOrder;
+    }
+
+    private static int RuntimeCreationRank(EditorStoryboardEntityKind kind) =>
+        kind switch
+        {
+            EditorStoryboardEntityKind.NoteController => 0,
+            EditorStoryboardEntityKind.Text => 1,
+            EditorStoryboardEntityKind.Sprite => 2,
+            EditorStoryboardEntityKind.Line => 3,
+            EditorStoryboardEntityKind.Video => 4,
+            EditorStoryboardEntityKind.SceneController => 5,
+            _ => int.MaxValue
+        };
 
     private static void ParseTemplates(JToken? token,
         EditorStoryboardDocument document, string importHash,
@@ -468,10 +648,11 @@ public sealed class StoryboardImportService : IStoryboardImportService
         }
         else
         {
-            entity.ActivationMode = StoryboardActivationMode.Inactive;
+            entity.ActivationMode = StoryboardActivationMode.Explicit;
+            entity.ActivationTime = StoryboardTimePosition.Absolute(0);
             issues.Add(new StoryboardImportIssue(
-                "ENTITY_NOT_ACTIVATABLE", path,
-                "Scene entity has no object time, timed state, or trigger spawn reference.",
+                "ENTITY_ACTIVATION_DEFAULTED", path,
+                "Scene entity has no activation time or trigger reference; absolute time 0 was applied.",
                 StoryboardDiagnosticSeverity.Warning));
         }
         return entity;
@@ -806,23 +987,6 @@ public sealed class StoryboardImportService : IStoryboardImportService
         return false;
     }
 
-    private static void NormalizeAliases(JToken token)
-    {
-        if (token is JObject obj)
-        {
-            foreach (var property in obj.Properties().ToArray())
-            {
-                if (Aliases.TryGetValue(property.Name, out var canonical) &&
-                    obj[canonical] is null)
-                    property.Replace(new JProperty(canonical, property.Value));
-                NormalizeAliases(property.Value);
-            }
-        }
-        else if (token is JArray array)
-        {
-            foreach (var item in array) NormalizeAliases(item);
-        }
-    }
 
     private static void ValidateTemplateReferences(EditorStoryboardDocument document,
         List<StoryboardImportIssue> issues)

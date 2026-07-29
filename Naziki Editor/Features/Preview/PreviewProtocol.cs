@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
+using System.Threading.Channels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -10,13 +11,20 @@ namespace Naziki_Editor.Features.Preview;
 public interface IUnityPreviewTransport : IAsyncDisposable
 {
     bool IsConnected { get; }
+    long Generation { get; }
     string PipeName { get; }
     event EventHandler<PreviewProtocolMessage>? MessageReceived;
-    event EventHandler<bool>? ConnectionChanged;
+    event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
     Task StartAsync(CancellationToken cancellationToken = default);
     Task SendAsync(PreviewProtocolMessage message, CancellationToken cancellationToken = default);
     Task StopAsync();
 }
+
+public sealed record PreviewTransportStateChanged(
+    long Generation,
+    bool Connected,
+    string? Reason = null,
+    Exception? Exception = null);
 
 public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 {
@@ -26,6 +34,10 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
     private CancellationTokenSource _lifetime = new();
     private NamedPipeServerStream? _pipe;
     private Task? _readLoop;
+    private Task? _dispatchLoop;
+    private Channel<PreviewProtocolMessage>? _messages;
+    private long _generation;
+    private int _disconnectPublished;
 
     public NamedPipeUnityPreviewTransport()
     {
@@ -33,14 +45,24 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
     }
 
     public bool IsConnected => _pipe?.IsConnected == true;
+    public long Generation => Volatile.Read(ref _generation);
     public string PipeName { get; }
     public event EventHandler<PreviewProtocolMessage>? MessageReceived;
-    public event EventHandler<bool>? ConnectionChanged;
+    public event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_pipe is not null)
             return;
+        Interlocked.Exchange(ref _disconnectPublished, 0);
+        var generation = Interlocked.Increment(ref _generation);
+        _messages = Channel.CreateUnbounded<PreviewProtocolMessage>(
+            new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true,
+                AllowSynchronousContinuations = false
+            });
         if (_lifetime.IsCancellationRequested)
         {
             _lifetime.Dispose();
@@ -58,8 +80,9 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
         await _pipe.WaitForConnectionAsync(linked.Token).ConfigureAwait(false);
-        ConnectionChanged?.Invoke(this, true);
-        _readLoop = ReadLoopAsync(_pipe, _lifetime.Token);
+        ConnectionChanged?.Invoke(this, new PreviewTransportStateChanged(generation, true));
+        _dispatchLoop = DispatchLoopAsync(_messages.Reader, generation, _lifetime.Token);
+        _readLoop = ReadLoopAsync(_pipe, _messages.Writer, generation, _lifetime.Token);
     }
 
     public async Task SendAsync(PreviewProtocolMessage message, CancellationToken cancellationToken = default)
@@ -99,15 +122,29 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
             try { await _readLoop.ConfigureAwait(false); }
             catch (OperationCanceledException) { }
             catch (IOException) { }
+            catch (ObjectDisposedException) { }
+        }
+        _messages?.Writer.TryComplete();
+        if (_dispatchLoop is not null)
+        {
+            try { await _dispatchLoop.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
         }
         _pipe = null;
         _readLoop = null;
-        ConnectionChanged?.Invoke(this, false);
+        _dispatchLoop = null;
+        _messages = null;
+        PublishDisconnected(Generation, "Transport stopped.");
     }
 
-    private async Task ReadLoopAsync(Stream stream, CancellationToken cancellationToken)
+    private async Task ReadLoopAsync(
+        Stream stream,
+        ChannelWriter<PreviewProtocolMessage> messages,
+        long generation,
+        CancellationToken cancellationToken)
     {
         var header = new byte[sizeof(int)];
+        Exception? failure = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -123,15 +160,49 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
                     continue;
                 var message = json.ToObject<PreviewProtocolMessage>();
                 if (message is not null)
-                    MessageReceived?.Invoke(this, message);
+                    await messages.WriteAsync(message, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (IOException) { }
+        catch (Exception ex) when (ex is IOException or EndOfStreamException or
+                                   InvalidDataException or JsonException or ObjectDisposedException)
+        {
+            failure = ex;
+        }
         finally
         {
-            ConnectionChanged?.Invoke(this, false);
+            messages.TryComplete(failure);
+            PublishDisconnected(
+                generation,
+                failure?.Message ?? "Unity Preview transport closed.",
+                failure);
         }
+    }
+
+    private async Task DispatchLoopAsync(
+        ChannelReader<PreviewProtocolMessage> messages,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var message in messages.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                MessageReceived?.Invoke(this, message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            PublishDisconnected(generation, "Preview message dispatch failed.", ex);
+        }
+    }
+
+    private void PublishDisconnected(long generation, string reason, Exception? exception = null)
+    {
+        if (generation != Generation ||
+            Interlocked.Exchange(ref _disconnectPublished, 1) != 0)
+            return;
+        ConnectionChanged?.Invoke(this,
+            new PreviewTransportStateChanged(generation, false, reason, exception));
     }
 
     private static async Task ReadExactlyAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
