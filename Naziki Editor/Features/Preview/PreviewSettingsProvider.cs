@@ -37,7 +37,8 @@ public sealed class PreviewSettingsProvider : IPreviewSettingsProvider, IDisposa
     private void OnSettingChanged(object? sender, Core.Settings.SettingsChangedEventArgs e)
     {
         if (e.Key.StartsWith("Performance.", StringComparison.Ordinal) ||
-            string.Equals(e.Key, "Editor.PreviewQuality", StringComparison.Ordinal))
+            string.Equals(e.Key, "Editor.PreviewQuality", StringComparison.Ordinal) ||
+            string.Equals(e.Key, "Editor.PreviewAspectRatio", StringComparison.Ordinal))
             Changed?.Invoke(this, Current);
     }
 

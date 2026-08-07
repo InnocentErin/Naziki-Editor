@@ -210,18 +210,18 @@ public sealed record PreviewPerformanceSample(
     long DroppedTelemetryMessages);
 
 public sealed record PreviewSettings(
-    string Quality,
-    int RenderScalePercent,
-    string FrameRate,
-    bool AdaptiveQuality,
-    int InactiveFrameRate,
-    double FrameSkipThresholdMilliseconds,
-    int RenderThreads,
-    long MaxCacheBytes,
-    bool HardwareAcceleration,
-    int ExternalClockRate,
-    int AdaptiveMinimumScalePercent,
-    string AspectRatio);
+    [property: JsonProperty("quality")] string Quality,
+    [property: JsonProperty("renderScalePercent")] int RenderScalePercent,
+    [property: JsonProperty("frameRate")] string FrameRate,
+    [property: JsonProperty("adaptiveQuality")] bool AdaptiveQuality,
+    [property: JsonProperty("inactiveFrameRate")] int InactiveFrameRate,
+    [property: JsonProperty("frameSkipThresholdMilliseconds")] double FrameSkipThresholdMilliseconds,
+    [property: JsonProperty("renderThreads")] int RenderThreads,
+    [property: JsonProperty("maxCacheBytes")] long MaxCacheBytes,
+    [property: JsonProperty("hardwareAcceleration")] bool HardwareAcceleration,
+    [property: JsonProperty("externalClockRate")] int ExternalClockRate,
+    [property: JsonProperty("adaptiveMinimumScalePercent")] int AdaptiveMinimumScalePercent,
+    [property: JsonProperty("aspectRatio")] string AspectRatio);
 
 public sealed record PreviewProtocolMessage(
     [property: JsonProperty("type")] string Type,

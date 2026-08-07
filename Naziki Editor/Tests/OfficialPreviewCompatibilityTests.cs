@@ -179,6 +179,23 @@ public sealed class OfficialPreviewCompatibilityTests
         Assert.Equal("naziki.editor-preview.v2", NamedPipeUnityPreviewTransport.ProtocolName);
     }
 
+    [Fact]
+    public void UnityPreviewPlayback_IsHostOwnedWithoutChangingOfficialDataReaders()
+    {
+        var root = FindRepositoryRoot();
+        var game = File.ReadAllText(Path.Combine(
+            root, "External", "original_player", "engines", "unity", "Assets", "Scripts", "Game", "Game.cs"));
+        var context = File.ReadAllText(Path.Combine(
+            root, "External", "original_player", "engines", "unity", "Assets", "Scripts", "Context.cs"));
+        var process = File.ReadAllText(Path.Combine(root, "Features", "Preview", "UnityPreviewProcessService.cs"));
+
+        Assert.Contains("PlayFrom(Time) performs", game, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Music.SourceTimeSeconds = Mathf.Clamp(targetTime", game, StringComparison.Ordinal);
+        Assert.Contains("if (GameEmbedMode.IsEditorPreview) return;", context, StringComparison.Ordinal);
+        Assert.Contains("Add(startInfo, \"-screen-fullscreen\")", process, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);

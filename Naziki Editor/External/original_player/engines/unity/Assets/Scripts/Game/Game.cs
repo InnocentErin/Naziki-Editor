@@ -520,7 +520,10 @@ public class Game : MonoBehaviour
         MusicProgress = MusicLength <= 0 ? 0 : Time / MusicLength;
         ChartProgress = ChartLength <= 0 ? 0 : Time / ChartLength;
         Music.Pause();
-        Music.SourceTimeSeconds = Mathf.Clamp(targetTime, 0, Music.Length);
+        // The original audio track binds its clip in PlayFrom/SchedulePlay. During the
+        // initial paused evaluation no clip has been assigned to the AudioSource yet,
+        // so setting source.time here is invalid in Unity 6. PlayFrom(Time) performs
+        // the actual seek when playback resumes.
         AudioListener.pause = true;
         State.IsPlaying = false;
 
@@ -684,6 +687,9 @@ public class Game : MonoBehaviour
 
     protected virtual void OnApplicationPause(bool willPause)
     {
+#if CYTOID_EDITOR_HOST && UNITY_STANDALONE_WIN
+        if (GameEmbedMode.IsEditorPreview) return;
+#endif
         if (IsLoaded && State.IsStarted && willPause)
         {
             Pause();
@@ -691,6 +697,9 @@ public class Game : MonoBehaviour
     }
     protected virtual void OnApplicationFocus(bool hasFocus)
     {
+#if CYTOID_EDITOR_HOST && UNITY_STANDALONE_WIN
+        if (GameEmbedMode.IsEditorPreview) return;
+#endif
         if (IsLoaded && State.IsStarted && !hasFocus)
         {
             Pause();

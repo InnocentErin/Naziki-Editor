@@ -347,8 +347,8 @@ public static class EditorPreviewController
         var settings = payload["settings"] as JObject ?? payload;
         var active = payload.Value<bool?>("active") ?? true;
         var frameRate = active
-            ? settings.Value<string>("FrameRate") ?? settings.Value<string>("frameRate") ?? "60"
-            : (settings.Value<int?>("InactiveFrameRate") ?? 15).ToString();
+            ? SettingValue(settings, "FrameRate", "60")
+            : SettingValue(settings, "InactiveFrameRate", 15).ToString();
         if (string.Equals(frameRate, "Display", StringComparison.OrdinalIgnoreCase))
         {
             QualitySettings.vSyncCount = 1;
@@ -360,19 +360,19 @@ public static class EditorPreviewController
             Application.targetFrameRate = int.TryParse(frameRate, out var target) ? Mathf.Clamp(target, 30, 120) : 60;
         }
 
-        var quality = settings.Value<string>("Quality") ?? "Medium";
+        var quality = SettingValue(settings, "Quality", "Medium");
         for (var i = 0; i < QualitySettings.names.Length; i++)
             if (string.Equals(QualitySettings.names[i], quality, StringComparison.OrdinalIgnoreCase))
                 QualitySettings.SetQualityLevel(i, true);
 
-        var scale = (settings.Value<int?>("RenderScalePercent") ?? 100) / 100f;
-        var configuredThreshold = (float)(settings.Value<double?>("FrameSkipThresholdMilliseconds") ?? 16.67);
+        var scale = SettingValue(settings, "RenderScalePercent", 100) / 100f;
+        var configuredThreshold = (float)SettingValue(settings, "FrameSkipThresholdMilliseconds", 16.67);
         var targetFrameRate = Application.targetFrameRate > 0 ? Application.targetFrameRate : 60;
         var targetFrameBudget = 1000f / Mathf.Max(1, targetFrameRate);
         EditorPreviewBridge.ConfigureAdaptiveQuality(
             scale,
-            (settings.Value<int?>("AdaptiveMinimumScalePercent") ?? 50) / 100f,
-            settings.Value<bool?>("AdaptiveQuality") ?? true,
+            SettingValue(settings, "AdaptiveMinimumScalePercent", 50) / 100f,
+            SettingValue(settings, "AdaptiveQuality", true),
             Mathf.Max(configuredThreshold, targetFrameBudget));
         var width = payload.Value<int?>("pixelWidth");
         var height = payload.Value<int?>("pixelHeight");
@@ -434,7 +434,7 @@ public static class EditorPreviewController
                 ["clearEffectsSize"] = 1,
                 ["displayProfiler"] = false,
                 ["adaptOverlayToSafeArea"] = true,
-                ["graphicsQuality"] = settings?.Value<string>("Quality")?.ToLowerInvariant() ?? "medium"
+                ["graphicsQuality"] = SettingValue(settings, "Quality", "Medium").ToLowerInvariant()
             },
             ["audio"] = new JObject
             {
@@ -467,6 +467,14 @@ public static class EditorPreviewController
         message["Payload"] as JObject ?? message["payload"] as JObject ?? new JObject();
     static string StringValue(JObject message, string name) =>
         message.Value<string>(name) ?? message.Value<string>(char.ToLowerInvariant(name[0]) + name.Substring(1));
+
+    static T SettingValue<T>(JObject settings, string name, T defaultValue)
+    {
+        if (settings == null) return defaultValue;
+        var camelName = char.ToLowerInvariant(name[0]) + name.Substring(1);
+        var token = settings[name] ?? settings[camelName];
+        return token == null || token.Type == JTokenType.Null ? defaultValue : token.ToObject<T>();
+    }
 
     static void Ack(JObject source, string requestId, string type = "preview.ack") =>
         EditorPreviewBridge.SendProtocol(

@@ -1650,6 +1650,16 @@ public sealed class UnityStoryboardPreviewHost :
     {
         var previous = _lastAppliedSettings;
         _lastAppliedSettings = settings;
+        if (!string.Equals(previous.FrameRate, settings.FrameRate, StringComparison.Ordinal) &&
+            _scrubTimer is not null)
+        {
+            var frameRate = int.TryParse(settings.FrameRate, out var target) ? target : 60;
+            var period = TimeSpan.FromMilliseconds(1000d / Math.Clamp(frameRate, 30, 120));
+            _scrubTimer.Change(period, period);
+        }
+        if (previous.ExternalClockRate != settings.ExternalClockRate &&
+            _clockMode == PreviewClockMode.External)
+            EnsureExternalClockTimer();
         if (!settings.HardwareAcceleration)
         {
             _ = DisableForSettingsAsync();

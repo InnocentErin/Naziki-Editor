@@ -58,6 +58,36 @@ public sealed class NativePreviewInfrastructureTests
     }
 
     [Fact]
+    public void PreviewSettings_SerializeRuntimeContractAsLowerCamelCase()
+    {
+        using var provider = new PreviewSettingsProvider(new FakeSettingsStore());
+
+        var payload = JObject.FromObject(provider.Current);
+
+        Assert.Equal("Medium", payload.Value<string>("quality"));
+        Assert.Equal(100, payload.Value<int>("renderScalePercent"));
+        Assert.Equal("60", payload.Value<string>("frameRate"));
+        Assert.True(payload.Value<bool>("adaptiveQuality"));
+        Assert.Equal("16:9", payload.Value<string>("aspectRatio"));
+        Assert.Null(payload["Quality"]);
+        Assert.Null(payload["RenderScalePercent"]);
+    }
+
+    [Fact]
+    public void PreviewSettings_NotifyWhenAspectRatioChangesInSettingsControl()
+    {
+        var store = new FakeSettingsStore();
+        using var provider = new PreviewSettingsProvider(store);
+        PreviewSettings? changed = null;
+        provider.Changed += (_, value) => changed = value;
+
+        store.Set("Editor.PreviewAspectRatio", "4:3");
+
+        Assert.NotNull(changed);
+        Assert.Equal("4:3", changed!.AspectRatio);
+    }
+
+    [Fact]
     public void PreviewValidation_BlocksMissingChartAndMusic()
     {
         var validator = new PreviewValidationService(new FakeStoryboardValidator());
@@ -414,6 +444,10 @@ public sealed class NativePreviewInfrastructureTests
             Assert.All(transport.Sent, message =>
                 Assert.Equal(launch.SessionId, message.SessionId));
             var open = Assert.Single(transport.Sent, message => message.Type == "preview.open");
+            var runtimeSettings = Assert.IsType<JObject>(open.Payload["settings"]);
+            Assert.Equal("Medium", runtimeSettings.Value<string>("quality"));
+            Assert.Equal(100, runtimeSettings.Value<int>("renderScalePercent"));
+            Assert.Null(runtimeSettings["Quality"]);
             var vfsRoot = Assert.IsType<string>(open.Payload["vfsRoot"]?.Value<string>());
             Assert.True(File.Exists(Path.Combine(vfsRoot, "level.json")));
             Assert.True(File.Exists(Path.Combine(vfsRoot, "chart.json")));
@@ -422,6 +456,16 @@ public sealed class NativePreviewInfrastructureTests
             Assert.True(File.Exists(Path.Combine(vfsRoot, "background.png")));
             Assert.Equal(PreviewAvailabilityState.Ready, host.Availability);
             Assert.Equal(PreviewSessionPhase.PreviewReady, host.SessionStatus.Phase);
+
+            var settingsApplyCount = transport.Sent.Count(message => message.Type == "preview.settings.apply");
+            store.Set("Performance.PreviewFrameRate", "30");
+            await WaitUntilAsync(
+                () => transport.Sent.Count(message => message.Type == "preview.settings.apply") > settingsApplyCount,
+                "A settings control change was not forwarded to Unity Preview.");
+            var settingsApply = transport.Sent.Last(message => message.Type == "preview.settings.apply");
+            var changedSettings = Assert.IsType<JObject>(settingsApply.Payload["settings"]);
+            Assert.Equal("30", changedSettings.Value<string>("frameRate"));
+            Assert.Null(changedSettings["FrameRate"]);
 
             transport.Raise(open with
             {

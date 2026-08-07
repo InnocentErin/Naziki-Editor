@@ -383,6 +383,12 @@ public class Context : SingletonMonoBehavior<Context>
 
     public static void UpdateGraphicsQuality()
     {
+#if CYTOID_EDITOR_HOST && UNITY_STANDALONE_WIN
+        // The editor host owns the child window size and internal render scale. The
+        // production quality mapping below requests exclusive fullscreen, which is
+        // invalid for an HWND embedded in the WPF Canvas.
+        if (GameEmbedMode.IsEditorPreview) return;
+#endif
         var quality = Player.Settings.GraphicsQuality;
         switch (quality)
         {

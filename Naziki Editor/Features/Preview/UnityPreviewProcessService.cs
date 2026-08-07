@@ -103,6 +103,8 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
             Add(startInfo, Math.Max(1, options.PixelWidth).ToString(CultureInfo.InvariantCulture));
             Add(startInfo, "-screen-height");
             Add(startInfo, Math.Max(1, options.PixelHeight).ToString(CultureInfo.InvariantCulture));
+            Add(startInfo, "-screen-fullscreen");
+            Add(startInfo, "0");
             Add(startInfo, "-job-worker-count");
             Add(startInfo, Math.Clamp(options.JobWorkerCount, 1, 16).ToString(CultureInfo.InvariantCulture));
             Add(startInfo, "--naziki-preview-session");
