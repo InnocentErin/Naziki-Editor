@@ -15,6 +15,7 @@ public interface IUnityPreviewTransport : IAsyncDisposable
     string PipeName { get; }
     event EventHandler<PreviewProtocolMessage>? MessageReceived;
     event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
+    event EventHandler<PreviewTransportFault>? Faulted;
     Task StartAsync(CancellationToken cancellationToken = default);
     Task SendAsync(PreviewProtocolMessage message, CancellationToken cancellationToken = default);
     Task StopAsync();
@@ -25,6 +26,26 @@ public sealed record PreviewTransportStateChanged(
     bool Connected,
     string? Reason = null,
     Exception? Exception = null);
+
+public enum PreviewTransportFaultKind
+{
+    EndOfStream,
+    Io,
+    InvalidFrame,
+    MalformedPayload,
+    MessageDispatch
+}
+
+public sealed record PreviewTransportFault(
+    PreviewTransportFaultKind Kind,
+    long Generation,
+    string Reason,
+    Exception Exception,
+    string? MessageType = null,
+    string? RequestId = null)
+{
+    public bool IsPhysicalConnectionFailure => Kind != PreviewTransportFaultKind.MessageDispatch;
+}
 
 public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 {
@@ -38,6 +59,7 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
     private Channel<PreviewProtocolMessage>? _messages;
     private long _generation;
     private int _disconnectPublished;
+    private int _stopRequested;
 
     public NamedPipeUnityPreviewTransport()
     {
@@ -49,12 +71,14 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
     public string PipeName { get; }
     public event EventHandler<PreviewProtocolMessage>? MessageReceived;
     public event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
+    public event EventHandler<PreviewTransportFault>? Faulted;
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_pipe is not null)
             return;
         Interlocked.Exchange(ref _disconnectPublished, 0);
+        Interlocked.Exchange(ref _stopRequested, 0);
         var generation = Interlocked.Increment(ref _generation);
         _messages = Channel.CreateUnbounded<PreviewProtocolMessage>(
             new UnboundedChannelOptions
@@ -80,7 +104,7 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
         await _pipe.WaitForConnectionAsync(linked.Token).ConfigureAwait(false);
-        ConnectionChanged?.Invoke(this, new PreviewTransportStateChanged(generation, true));
+        PublishConnectionChanged(new PreviewTransportStateChanged(generation, true));
         _dispatchLoop = DispatchLoopAsync(_messages.Reader, generation, _lifetime.Token);
         _readLoop = ReadLoopAsync(_pipe, _messages.Writer, generation, _lifetime.Token);
     }
@@ -114,6 +138,7 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 
     public async Task StopAsync()
     {
+        Interlocked.Exchange(ref _stopRequested, 1);
         if (!_lifetime.IsCancellationRequested)
             _lifetime.Cancel();
         _pipe?.Dispose();
@@ -134,7 +159,6 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
         _readLoop = null;
         _dispatchLoop = null;
         _messages = null;
-        PublishDisconnected(Generation, "Transport stopped.");
     }
 
     private async Task ReadLoopAsync(
@@ -171,11 +195,15 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
         }
         finally
         {
-            messages.TryComplete(failure);
-            PublishDisconnected(
-                generation,
-                failure?.Message ?? "Unity Preview transport closed.",
-                failure);
+            // A consumer exception must never terminate this reader or be
+            // reported as a physical pipe disconnect. Physical failures are
+            // classified here; an expected StopAsync is intentionally silent.
+            messages.TryComplete();
+            if (failure is not null && Volatile.Read(ref _stopRequested) == 0)
+            {
+                PublishFault(ClassifyReadFailure(failure), generation, failure.Message, failure);
+                PublishDisconnected(generation, failure.Message, failure);
+            }
         }
     }
 
@@ -187,12 +215,32 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
         try
         {
             await foreach (var message in messages.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-                MessageReceived?.Invoke(this, message);
+                PublishMessage(message, generation);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception ex)
+    }
+
+    private void PublishMessage(PreviewProtocolMessage message, long generation)
+    {
+        var handlers = MessageReceived?.GetInvocationList();
+        if (handlers is null)
+            return;
+        foreach (var handler in handlers)
         {
-            PublishDisconnected(generation, "Preview message dispatch failed.", ex);
+            try
+            {
+                ((EventHandler<PreviewProtocolMessage>)handler)(this, message);
+            }
+            catch (Exception ex)
+            {
+                PublishFault(
+                    PreviewTransportFaultKind.MessageDispatch,
+                    generation,
+                    $"Preview message handler failed for '{message.Type}'.",
+                    ex,
+                    message.Type,
+                    message.RequestId);
+            }
         }
     }
 
@@ -201,9 +249,59 @@ public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
         if (generation != Generation ||
             Interlocked.Exchange(ref _disconnectPublished, 1) != 0)
             return;
-        ConnectionChanged?.Invoke(this,
+        PublishConnectionChanged(
             new PreviewTransportStateChanged(generation, false, reason, exception));
     }
+
+    private void PublishConnectionChanged(PreviewTransportStateChanged state)
+    {
+        var handlers = ConnectionChanged?.GetInvocationList();
+        if (handlers is null)
+            return;
+        foreach (var handler in handlers)
+        {
+            try
+            {
+                ((EventHandler<PreviewTransportStateChanged>)handler)(this, state);
+            }
+            catch (Exception ex)
+            {
+                PublishFault(
+                    PreviewTransportFaultKind.MessageDispatch,
+                    state.Generation,
+                    "Preview connection-state handler failed.",
+                    ex);
+            }
+        }
+    }
+
+    private void PublishFault(
+        PreviewTransportFaultKind kind,
+        long generation,
+        string reason,
+        Exception exception,
+        string? messageType = null,
+        string? requestId = null)
+    {
+        var fault = new PreviewTransportFault(
+            kind, generation, reason, exception, messageType, requestId);
+        var handlers = Faulted?.GetInvocationList();
+        if (handlers is null)
+            return;
+        foreach (var handler in handlers)
+        {
+            try { ((EventHandler<PreviewTransportFault>)handler)(this, fault); }
+            catch { /* A diagnostics observer cannot affect transport health. */ }
+        }
+    }
+
+    private static PreviewTransportFaultKind ClassifyReadFailure(Exception failure) => failure switch
+    {
+        EndOfStreamException => PreviewTransportFaultKind.EndOfStream,
+        JsonException => PreviewTransportFaultKind.MalformedPayload,
+        InvalidDataException => PreviewTransportFaultKind.InvalidFrame,
+        _ => PreviewTransportFaultKind.Io
+    };
 
     private static async Task ReadExactlyAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {

@@ -173,17 +173,30 @@ public sealed class NativePreviewInfrastructureTests
     }
 
     [Fact]
-    public void UnityHost_SurfacesTelemetryRuntimeExceptionImmediately()
+    public async Task UnityHost_SurfacesTelemetryRuntimeExceptionImmediately()
     {
-        var transport = new FakePreviewTransport();
+        var transport = new ConnectedPreviewTransport();
+        var process = new HandshakePreviewProcess(transport);
         using var settings = new PreviewSettingsProvider(
             new FakeSettingsStore());
         using var host = new UnityStoryboardPreviewHost(
             transport,
-            new FakePreviewProcess(),
+            process,
             new FakePreviewVfs(),
             new FakePreviewValidation(),
             settings);
+        var source = new StaticPreviewSource(new StoryboardPreviewSnapshot(
+            "telemetry-session",
+            1,
+            null,
+            "{}",
+            null,
+            null,
+            0));
+        host.Attach(source, source);
+        await host.AttachWindowAsync(new IntPtr(123), 1280, 720);
+        await host.OpenProjectAsync(new ProjectDataContext(MessageBroker.Default), 0);
+        var launch = Assert.IsType<UnityPreviewLaunchOptions>(process.LaunchOptions);
         var inner = new JObject
         {
             ["schema"] = "cytoid.game-core.v2",
@@ -201,7 +214,7 @@ public sealed class NativePreviewInfrastructureTests
 
         transport.Raise(new PreviewProtocolMessage(
             "preview.telemetry",
-            "unbound",
+            launch.SessionId,
             "telemetry",
             0,
             0,
@@ -212,10 +225,13 @@ public sealed class NativePreviewInfrastructureTests
                     inner.ToString(Newtonsoft.Json.Formatting.None)
             })
         {
-            ConnectionId = "unbound",
-            Generation = 0
+            ConnectionId = launch.ConnectionId,
+            Generation = launch.Generation
         });
 
+        await WaitUntilAsync(
+            () => host.Availability == PreviewAvailabilityState.InvalidData,
+            "The coordinator did not surface the Unity runtime exception.");
         Assert.Equal(PreviewAvailabilityState.InvalidData,
             host.Availability);
         var diagnostic = Assert.Single(host.Diagnostics);
@@ -226,7 +242,7 @@ public sealed class NativePreviewInfrastructureTests
 
         transport.Raise(new PreviewProtocolMessage(
             "preview.rejected",
-            "unbound",
+            launch.SessionId,
             "late-timeout",
             0,
             0,
@@ -237,9 +253,24 @@ public sealed class NativePreviewInfrastructureTests
                 ["message"] = "Exceed Timeout:00:00:30"
             })
         {
-            ConnectionId = "unbound",
-            Generation = 0
+            ConnectionId = launch.ConnectionId,
+            Generation = launch.Generation
         });
+        transport.Raise(new PreviewProtocolMessage(
+            "preview.performance",
+            launch.SessionId,
+            "queue-marker",
+            0,
+            0,
+            0,
+            new JObject { ["fps"] = 123d })
+        {
+            ConnectionId = launch.ConnectionId,
+            Generation = launch.Generation
+        });
+        await WaitUntilAsync(
+            () => host.Performance?.FramesPerSecond == 123d,
+            "The coordinator did not drain the delayed rejection.");
         Assert.Equal("PREVIEW_UNITY_RUNTIME_EXCEPTION",
             Assert.Single(host.Diagnostics).Code);
     }
@@ -367,6 +398,8 @@ public sealed class NativePreviewInfrastructureTests
             new PreviewVfsMaterializer(sessions),
             new FakePreviewValidation(),
             settings);
+        host.Changed += (_, _) =>
+            throw new InvalidOperationException("UI observer failure must be isolated.");
         var source = new StaticPreviewSource(snapshot);
         host.Attach(source, source);
 
@@ -389,6 +422,72 @@ public sealed class NativePreviewInfrastructureTests
             Assert.True(File.Exists(Path.Combine(vfsRoot, "background.png")));
             Assert.Equal(PreviewAvailabilityState.Ready, host.Availability);
             Assert.Equal(PreviewSessionPhase.PreviewReady, host.SessionStatus.Phase);
+
+            transport.Raise(open with
+            {
+                Type = "preview.performance",
+                RequestId = "malformed-editor-telemetry",
+                Payload = new JObject { ["fps"] = "not-a-number" }
+            });
+            transport.Raise(open with
+            {
+                Type = "host.ready",
+                RequestId = "stale-ready",
+                Generation = open.Generation - 1,
+                Payload = new JObject()
+            });
+            transport.Raise(open with
+            {
+                Type = "preview.health.ok",
+                RequestId = "stale-heartbeat",
+                Generation = open.Generation - 1,
+                Payload = new JObject()
+            });
+            transport.RaiseConnection(new PreviewTransportStateChanged(
+                transport.Generation - 1,
+                false,
+                "stale disconnect"));
+            transport.Raise(open with
+            {
+                Type = "preview.unityLog",
+                RequestId = "unity-warning",
+                Payload = new JObject
+                {
+                    ["logType"] = "Warning",
+                    ["summary"] = "simulated non-fatal video warning"
+                }
+            });
+            transport.Raise(open with
+            {
+                Type = "preview.performance",
+                RequestId = "coordinator-marker",
+                Payload = new JObject { ["fps"] = 77d }
+            });
+            await WaitUntilAsync(
+                () => host.Performance?.FramesPerSecond == 77d,
+                "The coordinator did not drain stale generation events.");
+            Assert.Equal(PreviewAvailabilityState.Ready, host.Availability);
+            Assert.Equal(PreviewConnectionState.Healthy, host.SessionStatus.ConnectionState);
+            Assert.Contains(host.Diagnostics,
+                item => item.Code == "PREVIEW_MESSAGE_HANDLER_FAILED");
+            Assert.Contains(host.Diagnostics,
+                item => item.Code == "PREVIEW_UNITY_WARNING");
+            Assert.DoesNotContain(host.Diagnostics,
+                item => item.Code == "PREVIEW_CONNECTION_LOST");
+
+            process.RaiseUnexpectedExit();
+            await WaitUntilAsync(
+                () => process.Generation == 2 &&
+                      host.Availability == PreviewAvailabilityState.Ready,
+                "Unity Preview did not complete its single automatic recovery.");
+            Assert.Equal(2, transport.Sent.Count(message => message.Type == "preview.open"));
+            Assert.DoesNotContain(transport.Sent,
+                message => message.Type == "preview.replaceSnapshot");
+
+            await host.ShutdownAsync();
+            Assert.Equal(PreviewAvailabilityState.Disconnected, host.Availability);
+            Assert.DoesNotContain(host.Diagnostics,
+                item => item.Code == "PREVIEW_CONNECTION_LOST");
         }
         finally
         {
@@ -399,6 +498,51 @@ public sealed class NativePreviewInfrastructureTests
     }
 
     [Fact]
+    public async Task UnityHost_PreservesHostAcceptSendFailureWithoutFalseDisconnect()
+    {
+        var transport = new ConnectedPreviewTransport
+        {
+            FailSendType = "host.accept"
+        };
+        var process = new HandshakePreviewProcess(transport);
+        using var settings = new PreviewSettingsProvider(new FakeSettingsStore());
+        using var host = new UnityStoryboardPreviewHost(
+            transport,
+            process,
+            new FakePreviewVfs(),
+            new FakePreviewValidation(),
+            settings);
+        var source = new StaticPreviewSource(new StoryboardPreviewSnapshot(
+            "accept-failure-session",
+            1,
+            null,
+            "{}",
+            null,
+            null,
+            0));
+        host.Attach(source, source);
+
+        await host.AttachWindowAsync(new IntPtr(123), 1280, 720);
+        await host.OpenProjectAsync(new ProjectDataContext(MessageBroker.Default), 0);
+        await WaitUntilAsync(
+            () => process.Generation == 2 &&
+                  host.Diagnostics.Any(item =>
+                      item.Code == "PREVIEW_HANDSHAKE_SEND_FAILED"),
+            "The host.accept send failure was not retained across automatic recovery.");
+
+        Assert.Equal(PreviewAvailabilityState.Faulted, host.Availability);
+        Assert.Equal("PREVIEW_HANDSHAKE_SEND_FAILED", host.Diagnostics[0].Code);
+        Assert.DoesNotContain(host.Diagnostics,
+            item => item.Code == "PREVIEW_CONNECTION_LOST" ||
+                    item.Code == "PREVIEW_HOST_READY_TIMEOUT");
+        Assert.Equal(2, transport.Sent.Count(message => message.Type == "host.accept"));
+        Assert.DoesNotContain(transport.Sent,
+            message => message.Type == "preview.open");
+        Assert.False(process.IsRunning);
+        Assert.False(transport.IsConnected);
+    }
+
+    [Fact]
     public async Task NamedPipeTransport_PreservesFramesAndReportsMalformedJson()
     {
         await using var transport = new NamedPipeUnityPreviewTransport();
@@ -406,6 +550,8 @@ public sealed class NativePreviewInfrastructureTests
         var receivedTwo = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var disconnected = new TaskCompletionSource<PreviewTransportStateChanged>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var faulted = new TaskCompletionSource<PreviewTransportFault>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         transport.MessageReceived += (_, message) =>
         {
@@ -421,6 +567,7 @@ public sealed class NativePreviewInfrastructureTests
             if (!state.Connected)
                 disconnected.TrySetResult(state);
         };
+        transport.Faulted += (_, fault) => faulted.TrySetResult(fault);
 
         var start = transport.StartAsync();
         await using var client = new NamedPipeClientStream(
@@ -444,11 +591,150 @@ public sealed class NativePreviewInfrastructureTests
         await client.WriteAsync(malformed);
         await client.FlushAsync();
         var failure = await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var fault = await faulted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(["one", "two"], received.Select(item => item.RequestId));
         Assert.Equal("transport-session", received[1].SessionId);
+        Assert.Equal(PreviewTransportFaultKind.MalformedPayload, fault.Kind);
         Assert.NotNull(failure.Exception);
         Assert.Contains("character", failure.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task NamedPipeTransport_ContinuesAfterSubscriberFailureAndStopsSilently()
+    {
+        await using var transport = new NamedPipeUnityPreviewTransport();
+        var received = new List<string>();
+        var receivedTwo = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatchFault = new TaskCompletionSource<PreviewTransportFault>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var disconnectCount = 0;
+        transport.MessageReceived += (_, _) =>
+            throw new InvalidOperationException("simulated editor subscriber failure");
+        transport.MessageReceived += (_, message) =>
+        {
+            lock (received)
+            {
+                received.Add(message.RequestId);
+                if (received.Count == 2)
+                    receivedTwo.TrySetResult(true);
+            }
+        };
+        transport.Faulted += (_, fault) =>
+        {
+            if (fault.Kind == PreviewTransportFaultKind.MessageDispatch)
+                dispatchFault.TrySetResult(fault);
+        };
+        transport.ConnectionChanged += (_, state) =>
+        {
+            if (!state.Connected)
+                Interlocked.Increment(ref disconnectCount);
+        };
+
+        var start = transport.StartAsync();
+        await using var client = new NamedPipeClientStream(
+            ".",
+            transport.PipeName,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
+        await client.ConnectAsync(2000);
+        await start;
+        await WriteProtocolFrameAsync(client, new PreviewProtocolMessage(
+            "host.ready", "transport-session", "one", 0, 0, 0, new JObject()));
+        await WriteProtocolFrameAsync(client, new PreviewProtocolMessage(
+            "preview.load.progress", "transport-session", "two", 1, 0, 1,
+            new JObject { ["stage"] = "loadingSceneAndAssets" }));
+
+        await receivedTwo.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var fault = await dispatchFault.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(["one", "two"], received);
+        Assert.Equal("host.ready", fault.MessageType);
+        Assert.True(transport.IsConnected);
+
+        await transport.StopAsync();
+        await Task.Delay(50);
+        Assert.Equal(0, Volatile.Read(ref disconnectCount));
+    }
+
+    [Fact]
+    public async Task NamedPipeTransport_ReportsEofAsPhysicalDisconnect()
+    {
+        await using var transport = new NamedPipeUnityPreviewTransport();
+        var disconnected = new TaskCompletionSource<PreviewTransportStateChanged>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var faulted = new TaskCompletionSource<PreviewTransportFault>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.ConnectionChanged += (_, state) =>
+        {
+            if (!state.Connected)
+                disconnected.TrySetResult(state);
+        };
+        transport.Faulted += (_, fault) => faulted.TrySetResult(fault);
+
+        var start = transport.StartAsync();
+        await using (var client = new NamedPipeClientStream(
+                         ".",
+                         transport.PipeName,
+                         PipeDirection.InOut,
+                         PipeOptions.Asynchronous))
+        {
+            await client.ConnectAsync(2000);
+            await start;
+        }
+
+        var fault = await faulted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var state = await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(PreviewTransportFaultKind.EndOfStream, fault.Kind);
+        Assert.IsType<EndOfStreamException>(state.Exception);
+    }
+
+    [Fact]
+    public async Task NamedPipeTransport_RejectsOversizedFramePrecisely()
+    {
+        await using var transport = new NamedPipeUnityPreviewTransport();
+        var disconnected = new TaskCompletionSource<PreviewTransportStateChanged>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var faulted = new TaskCompletionSource<PreviewTransportFault>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.ConnectionChanged += (_, state) =>
+        {
+            if (!state.Connected)
+                disconnected.TrySetResult(state);
+        };
+        transport.Faulted += (_, fault) => faulted.TrySetResult(fault);
+
+        var start = transport.StartAsync();
+        await using var client = new NamedPipeClientStream(
+            ".",
+            transport.PipeName,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
+        await client.ConnectAsync(2000);
+        await start;
+        var header = new byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(
+            header,
+            64 * 1024 * 1024 + 1);
+        await client.WriteAsync(header);
+        await client.FlushAsync();
+
+        var fault = await faulted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var state = await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(PreviewTransportFaultKind.InvalidFrame, fault.Kind);
+        Assert.IsType<InvalidDataException>(state.Exception);
+        Assert.Contains("67108865", state.Reason, StringComparison.Ordinal);
+    }
+
+    private static async Task WaitUntilAsync(
+        Func<bool> predicate,
+        string failureMessage,
+        int timeoutMilliseconds = 2000)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (!predicate() && DateTimeOffset.UtcNow < deadline)
+            await Task.Delay(10);
+        Assert.True(predicate(), failureMessage);
     }
 
     private static async Task WriteProtocolFrameAsync(
@@ -514,24 +800,6 @@ public sealed class NativePreviewInfrastructureTests
         public IReadOnlyList<StoryboardDiagnostic> ValidateEntity(IStoryboardEntity entity, string path = "$") => [];
     }
 
-    private sealed class FakePreviewTransport : IUnityPreviewTransport
-    {
-        public bool IsConnected => false;
-        public string PipeName => "fake";
-        public long Generation => 0;
-        public event EventHandler<PreviewProtocolMessage>? MessageReceived;
-        public event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
-        public Task StartAsync(CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-        public Task SendAsync(PreviewProtocolMessage message,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-        public Task StopAsync() => Task.CompletedTask;
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        public void Raise(PreviewProtocolMessage message) =>
-            MessageReceived?.Invoke(this, message);
-    }
-
     private sealed class ConnectedPreviewTransport : IUnityPreviewTransport
     {
         private long _generation;
@@ -539,8 +807,10 @@ public sealed class NativePreviewInfrastructureTests
         public long Generation => _generation;
         public string PipeName => "connected-fake";
         public List<PreviewProtocolMessage> Sent { get; } = [];
+        public string? FailSendType { get; init; }
         public event EventHandler<PreviewProtocolMessage>? MessageReceived;
         public event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
+        public event EventHandler<PreviewTransportFault>? Faulted;
 
         public Task StartAsync(CancellationToken cancellationToken = default)
         {
@@ -556,6 +826,8 @@ public sealed class NativePreviewInfrastructureTests
             CancellationToken cancellationToken = default)
         {
             Sent.Add(message);
+            if (string.Equals(message.Type, FailSendType, StringComparison.Ordinal))
+                throw new IOException($"simulated send failure for {message.Type}");
             if (message.Type == "host.accept")
             {
                 Raise(message with
@@ -616,6 +888,8 @@ public sealed class NativePreviewInfrastructureTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         public void Raise(PreviewProtocolMessage message) =>
             MessageReceived?.Invoke(this, message);
+        public void RaiseConnection(PreviewTransportStateChanged state) =>
+            ConnectionChanged?.Invoke(this, state);
     }
 
     private sealed class HandshakePreviewProcess(ConnectedPreviewTransport transport)
@@ -676,6 +950,16 @@ public sealed class NativePreviewInfrastructureTests
             return Task.CompletedTask;
         }
 
+        public void RaiseUnexpectedExit(int exitCode = -1)
+        {
+            IsRunning = false;
+            Exited?.Invoke(this, new UnityPreviewProcessExited(
+                Generation,
+                42,
+                exitCode,
+                false));
+        }
+
         public void Dispose() { }
     }
 
@@ -692,26 +976,6 @@ public sealed class NativePreviewInfrastructureTests
 
     private sealed class EmptyDisposable : IDisposable
     {
-        public void Dispose() { }
-    }
-
-    private sealed class FakePreviewProcess : IUnityPreviewProcessService
-    {
-        public bool IsRunning => false;
-        public bool IsGraphicsReady => false;
-        public int? ProcessId => null;
-        public long Generation => 0;
-        public string RuntimePath => "";
-        public event EventHandler<UnityPreviewProcessExited>? Exited;
-        public Task StartAsync(UnityPreviewLaunchOptions options,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-        public Task ReparentAsync(IntPtr parentWindow,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-        public Task StopAsync(TimeSpan gracefulTimeout,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
         public void Dispose() { }
     }
 
