@@ -107,6 +107,7 @@
                                FontSize="16"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
+                    <loading:LoadingOverlay x:Name="LoadingOverlay" Panel.ZIndex="100"/>
                 </Grid>
 
                 <Border Grid.Row="2"
@@ -221,6 +222,5 @@
             </Grid>
         </TabItem>
     </TabControl>
-    <loading:LoadingOverlay x:Name="LoadingOverlay" Panel.ZIndex="100"/>
     </Grid>
 </UserControl>

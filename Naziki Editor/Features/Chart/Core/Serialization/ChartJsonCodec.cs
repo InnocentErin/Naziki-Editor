@@ -240,6 +240,18 @@ public sealed class ChartJsonCodec : IChartJsonCodec
                 }
             }
 
+            if (source["event_order_list"] is JArray eventOrders)
+            {
+                for (var index = 0; index < eventOrders.Count; index++)
+                {
+                    if (eventOrders[index]?["tick"] is JValue { Type: JTokenType.Float })
+                        Add("CHART_INTEGER_RUNTIME_CONVERSION",
+                            $"$.event_order_list[{index}].tick",
+                            "Cytoid preserves the JSON number but converts event tick to Int32 at runtime using Newtonsoft rounding.",
+                            ChartDiagnosticSeverity.Warning);
+                }
+            }
+
             void WarnIgnored(string propertyName, string message)
             {
                 if (source[propertyName] is not null)

@@ -28,7 +28,7 @@ public sealed record PreviewTransportStateChanged(
 
 public sealed class NamedPipeUnityPreviewTransport : IUnityPreviewTransport
 {
-    public const string ProtocolName = "naziki.editor-preview.v1";
+    public const string ProtocolName = "naziki.editor-preview.v2";
     private const int MaximumMessageBytes = 64 * 1024 * 1024;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private CancellationTokenSource _lifetime = new();

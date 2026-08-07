@@ -184,28 +184,68 @@ namespace Cytoid.Storyboard
             }
         }
 
-        public void ApplyPreviewTriggers(float targetTime)
+        public void ReplayPreviewTriggers(float targetTime)
         {
             if (!GameEmbedMode.IsEditorPreview) return;
-            foreach (var trigger in Triggers.ToArray())
+            Triggers.Clear();
+            if (RootObject["triggers"] is JArray triggerTokens)
+                foreach (var token in triggerTokens)
+                    Triggers.Add(LoadTrigger(token));
+
+            var clearedNotes = Game.Chart.Model.note_list
+                .Where(note => note.end_time <= targetTime)
+                .OrderBy(note => note.end_time)
+                .ThenBy(note => note.id)
+                .ToList();
+            for (var index = 0; index < clearedNotes.Count; index++)
             {
-                var shouldApply = false;
-                switch (trigger.Type)
+                var note = clearedNotes[index];
+                var combo = index + 1;
+                var score = Game.State.NoteCount == 0
+                    ? 0
+                    : Math.Min(1000000, 1000000.0 * combo / Game.State.NoteCount);
+                foreach (var trigger in Triggers.ToArray())
                 {
-                    case TriggerType.NoteClear:
-                        shouldApply = trigger.Notes.Any(id =>
-                            Game.Chart.Model.note_map.TryGetValue(id, out var note) &&
-                            note.end_time <= targetTime);
-                        break;
-                    case TriggerType.Combo:
-                        shouldApply = trigger.Combo.HasValue && Game.State.Combo >= trigger.Combo.Value;
-                        break;
-                    case TriggerType.Score:
-                        shouldApply = trigger.Score.HasValue && Game.State.Score >= trigger.Score.Value;
-                        break;
+                    var shouldApply = trigger.Type switch
+                    {
+                        TriggerType.NoteClear => trigger.Notes.Contains(note.id),
+                        TriggerType.Combo => trigger.Combo.HasValue && combo == trigger.Combo.Value,
+                        TriggerType.Score => trigger.Score.HasValue && score >= trigger.Score.Value,
+                        _ => false
+                    };
+                    if (shouldApply)
+                        OnTrigger(trigger);
                 }
-                if (shouldApply)
-                    Renderer.OnTrigger(trigger);
+            }
+        }
+
+        public void AdvancePreviewTriggers(float previousTime, float targetTime)
+        {
+            if (!GameEmbedMode.IsEditorPreview || targetTime < previousTime) return;
+            var orderedNotes = Game.Chart.Model.note_list
+                .OrderBy(note => note.end_time)
+                .ThenBy(note => note.id)
+                .ToList();
+            for (var index = 0; index < orderedNotes.Count; index++)
+            {
+                var note = orderedNotes[index];
+                if (note.end_time <= previousTime || note.end_time > targetTime) continue;
+                var combo = index + 1;
+                var score = Game.State.NoteCount == 0
+                    ? 0
+                    : Math.Min(1000000, 1000000.0 * combo / Game.State.NoteCount);
+                foreach (var trigger in Triggers.ToArray())
+                {
+                    var shouldApply = trigger.Type switch
+                    {
+                        TriggerType.NoteClear => trigger.Notes.Contains(note.id),
+                        TriggerType.Combo => trigger.Combo.HasValue && combo == trigger.Combo.Value,
+                        TriggerType.Score => trigger.Score.HasValue && score >= trigger.Score.Value,
+                        _ => false
+                    };
+                    if (shouldApply)
+                        OnTrigger(trigger);
+                }
             }
         }
 

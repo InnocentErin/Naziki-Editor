@@ -378,7 +378,7 @@ namespace Naziki_Editor.Views
                     PreviewSessionPhase.PreviewReady => "Unity Original Player 已就绪",
                     _ => TxtPreviewState.Text
                 };
-                if (_previewDiagnostics.Availability == PreviewAvailabilityState.Ready &&
+                if (_previewDiagnostics.Availability is PreviewAvailabilityState.Ready or PreviewAvailabilityState.ReadyWithWarnings &&
                     _previewDiagnostics.Diagnostics.Count == 0 &&
                     _previewPlayback is UnityStoryboardPreviewHost { Performance: { } performance })
                 {
@@ -388,20 +388,21 @@ namespace Naziki_Editor.Views
                         $"{performance.EffectiveRenderScale * 100:F0}%";
                 }
                 TxtPreviewState.Foreground = new SolidColorBrush(
-                    _previewDiagnostics.Availability is PreviewAvailabilityState.Ready
+                    _previewDiagnostics.Availability is PreviewAvailabilityState.Ready or PreviewAvailabilityState.ReadyWithWarnings
                         ? Colors.LightGreen
                         : _previewDiagnostics.Availability is PreviewAvailabilityState.Starting or PreviewAvailabilityState.Connecting
                             ? Colors.Gold
                             : Colors.OrangeRed);
                 BtnRetryPreview.Visibility = _previewDiagnostics.Availability is
                     PreviewAvailabilityState.RuntimeMissing or
+                    PreviewAvailabilityState.InvalidData or
                     PreviewAvailabilityState.Disconnected or
                     PreviewAvailabilityState.Faulted
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 var summary = _previewDiagnostics.Summary;
-                BtnPreviewDiagnostics.IsEnabled = summary.ErrorCount + summary.WarningCount > 0;
-                DiagnosticBadge.Visibility = BtnPreviewDiagnostics.IsEnabled
+                BtnPreviewDiagnostics.IsEnabled = true;
+                DiagnosticBadge.Visibility = summary.ErrorCount + summary.WarningCount > 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 TxtDiagnosticBadge.Text = (summary.ErrorCount > 0
@@ -412,14 +413,31 @@ namespace Naziki_Editor.Views
                     summary.WarningCount > 0 ? Colors.Gold : Colors.Gray);
                 BtnPreviewDiagnostics.ToolTip =
                     $"Unity 预览诊断：{summary.ErrorCount} 个错误，{summary.WarningCount} 个警告";
-                // Keep the host in the visual tree during startup. A collapsed
-                // HwndHost never creates the HWND that Unity needs to launch.
-                _unityHost.Visibility = CanvasTabControl.SelectedIndex == 0
+                var phase = _previewDiagnostics.SessionStatus.Phase;
+                var hasUsableFrame = _previewDiagnostics.Availability is
+                    PreviewAvailabilityState.Ready or PreviewAvailabilityState.ReadyWithWarnings;
+                var isInitialLoading = _previewDiagnostics.LastKnownGood is null && phase is
+                    PreviewSessionPhase.LaunchingProcess or
+                    PreviewSessionPhase.InitializingGraphics or
+                    PreviewSessionPhase.ConnectingTransport or
+                    PreviewSessionPhase.AuthenticatingHost or
+                    PreviewSessionPhase.HostReady or
+                    PreviewSessionPhase.ValidatingSnapshot or
+                    PreviewSessionPhase.MaterializingVfs or
+                    PreviewSessionPhase.LoadingContent;
+                var isTerminal = _previewDiagnostics.Availability is
+                    PreviewAvailabilityState.RuntimeMissing or
+                    PreviewAvailabilityState.InvalidData or
+                    PreviewAvailabilityState.Disconnected or
+                    PreviewAvailabilityState.Faulted;
+                // The HwndHost must be visible until its HWND exists. Afterwards it is
+                // hidden for initial loading/terminal states so WPF can cover the viewport.
+                _unityHost.Visibility = CanvasTabControl.SelectedIndex == 0 &&
+                    (_unityHost.HostHandle == IntPtr.Zero || (!isInitialLoading && !isTerminal))
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                PreviewFallbackText.Visibility =
-                    _nativePreviewOpened &&
-                    _previewDiagnostics.Availability == PreviewAvailabilityState.Ready
+                LoadingOverlay.IsLoading = isInitialLoading;
+                PreviewFallbackText.Visibility = hasUsableFrame
                     ? Visibility.Collapsed
                     : Visibility.Visible;
                 BtnRepairResources.Visibility = Context is not null &&

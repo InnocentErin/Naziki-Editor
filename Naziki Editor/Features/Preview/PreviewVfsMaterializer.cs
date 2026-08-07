@@ -79,22 +79,25 @@ public sealed class PreviewVfsMaterializer : IPreviewVfsMaterializer
         var level = JObject.Parse(snapshot.LevelJson);
         var charts = level["charts"] as JArray
             ?? throw new InvalidDataException("The level file does not contain charts.");
-        var selectedChart = charts.OfType<JObject>().FirstOrDefault(chart =>
-                                string.Equals(chart.Value<string>("type"), "hard", StringComparison.OrdinalIgnoreCase))
-                            ?? charts.OfType<JObject>().FirstOrDefault(chart =>
-                                chart.Value<string>("type") is "easy" or "extreme")
-                            ?? throw new InvalidDataException("The level file has no supported chart.");
+        if (string.IsNullOrWhiteSpace(snapshot.ChartDifficulty))
+            throw new InvalidDataException(
+                "LEVEL_CHART_BINDING_MISSING: the project chart difficulty has not been resolved.");
+        var selectedCharts = charts.OfType<JObject>().Where(chart =>
+            string.Equals(chart.Value<string>("type"), snapshot.ChartDifficulty,
+                StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (selectedCharts.Length != 1)
+            throw new InvalidDataException(selectedCharts.Length == 0
+                ? $"LEVEL_CHART_BINDING_NOT_FOUND: level.json does not contain difficulty '{snapshot.ChartDifficulty}'."
+                : $"LEVEL_CHART_BINDING_AMBIGUOUS: level.json contains multiple '{snapshot.ChartDifficulty}' entries.");
+        var selectedChart = (JObject)selectedCharts[0].DeepClone();
 
-        level["music"] = new JObject { ["path"] = musicName };
-        level["music_preview"] = new JObject { ["path"] = musicName };
-        level["background"] = new JObject { ["path"] = backgroundName };
+        SetSectionPath(level, "music", musicName);
+        SetSectionPath(level, "music_preview", musicName);
+        SetSectionPath(level, "background", backgroundName);
         selectedChart["path"] = "chart.json";
-        selectedChart["music_override"] = new JObject { ["path"] = musicName };
-        selectedChart["storyboard"] = new JObject
-        {
-            ["path"] = "storyboard.json",
-            ["localizations"] = new JObject()
-        };
+        SetSectionPath(selectedChart, "music_override", musicName);
+        SetSectionPath(selectedChart, "storyboard", "storyboard.json");
+        level["charts"] = new JArray(selectedChart);
         await AtomicWriteAsync(levelPath, level.ToString(Formatting.Indented), cancellationToken).ConfigureAwait(false);
         await AtomicWriteAsync(
             Path.Combine(versionDirectory, "assets.manifest.json"),
@@ -109,6 +112,13 @@ public sealed class PreviewVfsMaterializer : IPreviewVfsMaterializer
             chartPath,
             storyboardPath,
             hashes);
+    }
+
+    private static void SetSectionPath(JObject owner, string property, string? path)
+    {
+        var section = owner[property] as JObject ?? new JObject();
+        section["path"] = path;
+        owner[property] = section;
     }
 
     public Task PruneAsync(string sessionId, IReadOnlySet<long> protectedVersions, long maximumBytes)

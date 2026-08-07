@@ -68,10 +68,11 @@ public static class EditorPreviewController
                 SendState("Paused", requestId);
                 break;
             case "preview.stop":
-                CurrentGame()?.PreviewEvaluateAt(0);
-                SendState("Stopped", requestId);
+                SeekAndReport(message, requestId, 0, "Stopped").Forget();
                 break;
             case "preview.seek":
+                Seek(message, requestId).Forget();
+                break;
             case "preview.scrub.update":
                 CurrentGame()?.PreviewEvaluateAt((float)(Payload(message).Value<double?>("time") ?? 0));
                 break;
@@ -87,20 +88,14 @@ public static class EditorPreviewController
             case "preview.clock.tick":
                 if (externalClock)
                     CurrentGame()?.PreviewAdvanceExternalClock(
-                        (float)(Payload(message).Value<double?>("time") ?? 0));
+                        (float)(Payload(message).Value<double?>("time") ?? 0)).Forget();
                 break;
             case "preview.scrub.begin":
                 BeginScrub(message, requestId).Forget();
                 break;
             case "preview.scrub.commit":
-            {
-                var game = CurrentGame();
-                game?.PreviewEvaluateAt((float)(Payload(message).Value<double?>("time") ?? 0));
-                if (string.Equals(Payload(message).Value<string>("resumeState"), "Playing", StringComparison.OrdinalIgnoreCase))
-                    game?.PreviewPlayFromCurrentTime();
-                Ack(message, requestId);
+                CommitScrub(message, requestId).Forget();
                 break;
-            }
             case "preview.settings.apply":
                 ApplySettings(Payload(message));
                 Ack(message, requestId);
@@ -272,6 +267,55 @@ public static class EditorPreviewController
         catch (Exception exception)
         {
             Reject(message, requestId, "scrub_begin_failed", exception.Message);
+        }
+    }
+
+    static async UniTask Seek(JObject message, string requestId)
+    {
+        try
+        {
+            var game = CurrentGame();
+            if (game != null)
+                await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
+            Ack(message, requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "seek_failed", exception.Message);
+        }
+    }
+
+    static async UniTask SeekAndReport(JObject message, string requestId, float time, string state)
+    {
+        try
+        {
+            var game = CurrentGame();
+            if (game != null) await game.PreviewSeekAsync(time);
+            SendState(state, requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "seek_failed", exception.Message);
+        }
+    }
+
+    static async UniTask CommitScrub(JObject message, string requestId)
+    {
+        try
+        {
+            var game = CurrentGame();
+            if (game != null)
+            {
+                await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
+                if (string.Equals(Payload(message).Value<string>("resumeState"), "Playing",
+                        StringComparison.OrdinalIgnoreCase))
+                    game.PreviewPlayFromCurrentTime();
+            }
+            Ack(message, requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "scrub_commit_failed", exception.Message);
         }
     }
 

@@ -210,7 +210,11 @@ public sealed class NativePreviewInfrastructureTests
             {
                 ["cytoidGameCoreV2"] =
                     inner.ToString(Newtonsoft.Json.Formatting.None)
-            }));
+            })
+        {
+            ConnectionId = "unbound",
+            Generation = 0
+        });
 
         Assert.Equal(PreviewAvailabilityState.InvalidData,
             host.Availability);
@@ -231,7 +235,11 @@ public sealed class NativePreviewInfrastructureTests
             {
                 ["code"] = "preview_open_failed",
                 ["message"] = "Exceed Timeout:00:00:30"
-            }));
+            })
+        {
+            ConnectionId = "unbound",
+            Generation = 0
+        });
         Assert.Equal("PREVIEW_UNITY_RUNTIME_EXCEPTION",
             Assert.Single(host.Diagnostics).Code);
     }
@@ -274,6 +282,7 @@ public sealed class NativePreviewInfrastructureTests
             Assert.Equal("Imported Artist", level.Value<string>("artist"));
             Assert.Equal("music.wav", level["music"]?["path"]?.Value<string>());
             Assert.Equal("background.png", level["background"]?["path"]?.Value<string>());
+            Assert.Single((JArray)level["charts"]!);
             Assert.Equal("chart.json", level["charts"]?[0]?["path"]?.Value<string>());
             Assert.Equal("storyboard.json", level["charts"]?[0]?["storyboard"]?["path"]?.Value<string>());
 
@@ -493,6 +502,7 @@ public sealed class NativePreviewInfrastructureTests
                 """,
             MusicPath = music,
             BackgroundPath = background,
+            ChartDifficulty = "hard",
             ProjectId = "test",
             ProjectName = "Test"
         };
@@ -546,6 +556,19 @@ public sealed class NativePreviewInfrastructureTests
             CancellationToken cancellationToken = default)
         {
             Sent.Add(message);
+            if (message.Type == "host.accept")
+            {
+                Raise(message with
+                {
+                    Type = "host.ready",
+                    Payload = new JObject
+                    {
+                        ["authenticationNonce"] =
+                            message.Payload.Value<string>("authenticationNonce"),
+                        ["hostRevision"] = 5
+                    }
+                });
+            }
             if (message.Type == "preview.open")
             {
                 Raise(message with
@@ -614,7 +637,7 @@ public sealed class NativePreviewInfrastructureTests
             IsRunning = true;
             Generation++;
             transport.Raise(new PreviewProtocolMessage(
-                "host.ready",
+                "host.hello",
                 options.SessionId,
                 Guid.NewGuid().ToString("N"),
                 0,
@@ -623,16 +646,21 @@ public sealed class NativePreviewInfrastructureTests
                 new JObject
                 {
                     ["authenticationNonce"] = options.AuthenticationNonce,
-                    ["hostRevision"] = 3,
+                    ["hostRevision"] = 5,
                     ["capabilities"] = new JObject
                     {
                         ["officialRuntimeDataOnly"] = true,
                         ["chartPreflightV2"] = true,
                         ["unityLogV1"] = true,
                         ["loadProgressV1"] = true,
-                        ["healthCheckV1"] = true
+                        ["healthCheckV1"] = true,
+                        ["threeWayHandshakeV2"] = true
                     }
-                }));
+                })
+            {
+                ConnectionId = options.ConnectionId,
+                Generation = options.Generation
+            });
             return Task.CompletedTask;
         }
 

@@ -151,8 +151,6 @@ namespace Cytoid.Storyboard
     {
         public Color Color;
         public string Path;
-        public float? Speed;
-        public bool? Loop;
     }
 
     [Serializable]

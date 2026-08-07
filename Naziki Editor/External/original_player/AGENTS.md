@@ -232,7 +232,7 @@ If you change envelope types or payloads:
 | 2026-07 | `CytoidCoreBuild` uses `EditorApplication.update` + explicit `EditorApplication.Exit(0)`; invocation MUST NOT pass `-quit` | Unity 6 batchmode + `-quit` exits the instant executeMethod returns, so `update` callbacks never fire and any async work is silently dropped. Empirically verified: `Thread.Sleep` deadlocks (compiler shares the main thread); `EditorApplication.Step()` is a no-op inside executeMethod (doesn't pump compilation, doesn't advance wall clock); `wantsToQuit` vetoes are ignored under `-quit`. CI uses game-ci/unity-builder `manualExit: true` (added in PR game-ci/unity-builder#574 specifically for this pattern). |
 | 2026-07 | Swift test suite runs in `tool/run_swift_tests_sandboxed.sh` (isolated SwiftPM sandbox with stub `Flutter` module) | The iOS plugin's pure-logic tests must run without the `FlutterFramework` SPM package or `UnityFramework` binary target — neither is available locally. Harness realizes the "isolated SwiftPM sandbox" convention already documented in 5 source files. Excludes `ShowGameSurfaceAtomicityTests` (asserts on real Flutter semantics) and `CytoidGameCorePlugin.swift` (UIKit + Flutter entry point). |
 | 2026-07 | Unity no longer owns community-level installation, profile persistence, first-launch state, or remote asset caching | Flutter supplies a complete settings snapshot plus a local VFS root for every bridge session. Unity retains only session runtime state and a minimal built-in/local loader for standalone Editor debugging. |
-| 2026-07 | Naziki editor preview supports internal and external clocks through `naziki.editor-preview.v1` | Unity remains the default clock; editor-audio mode sends latest-only time ticks and uses side-effect-free `PreviewEvaluateAt`. The production `cytoid.game-core.v2` protocol is unchanged. |
+| 2026-08 | Naziki editor preview uses the incompatible `naziki.editor-preview.v2` contract | Every launch has an immutable connection ID, generation, session and nonce; `host.hello` / `host.accept` / `host.ready` separates transport authentication from content loading. The production `cytoid.game-core.v2` protocol is unchanged. |
 
 Append new rows when architecture or default paths change.
 
@@ -263,23 +263,25 @@ Append new rows when architecture or default paths change.
 
 - `CYTOID_EDITOR_HOST` selects the Windows x64 Naziki preview runtime. It remains
   Bridge-embedded, forces Autoplay, disables gameplay input through the Auto mod,
-  and uses `naziki.editor-preview.v1` instead of modifying `cytoid.game-core.v2`.
+  and uses `naziki.editor-preview.v2` instead of modifying `cytoid.game-core.v2`.
 - Build entry points are `CytoidCoreBuild.BuildWindowsEditorPreview` (Mono
   development) and `CytoidCoreBuild.BuildWindowsEditorPreviewRelease` (IL2CPP).
   Both build `CoreHostBootstrap` + `Game`, force Direct3D 11, and output to the
   parent Naziki repository at `Runtime/OriginalPlayer/NazikiOriginalPlayer.exe`.
 - The WPF host embeds the independent process with `-parentHWND`. Communication is
-  a current-user named pipe with length-prefixed UTF-8 JSON, a per-launch nonce,
-  versioned snapshots, ACK/NACK, and a last-known-good policy.
+  a current-user named pipe with length-prefixed UTF-8 JSON, immutable per-launch
+  connection/generation/session/nonce values, three-way authentication, versioned
+  snapshots, ACK/NACK, independent heartbeat/load deadlines, and one automatic restart.
 - Editor transport and routing live in
   `engines/unity/Assets/Scripts/Host/EditorPreviewBridge.cs` and
   `EditorPreviewController.cs`. Entity hot reload and atomic fallback live in
   `engines/unity/Assets/Scripts/Storyboard/StoryboardHotReloadCoordinator.cs`.
 - Naziki projects import their original `level.json`. The preview VFS preserves
   its metadata while rebinding the selected chart, music, background, and
-  storyboard paths to immutable snapshot files. Session startup then uses the
+  storyboard paths to immutable snapshot files for the uniquely matched
+  `easy`, `hard`, or `extreme` chart. Session startup then uses the
   production `ExternalGameContentProvider.FromJson` parser; the editor-preview
-  pipe protocol itself remains `naziki.editor-preview.v1`.
+  pipe protocol itself remains `naziki.editor-preview.v2`.
 - Random-access preview evaluation is implemented by `Game.PreviewEvaluateAt`.
   It pauses audio and gameplay side effects, rebuilds the visible note window,
   recomputes deterministic Autoplay score/combo state, and evaluates storyboard
@@ -290,5 +292,5 @@ Append new rows when architecture or default paths change.
   evaluation and only rebuild the visible window for seeks or discontinuities.
 - The WPF Canvas owns device aspect ratios and player/level reload controls.
   Unity receives the resulting physical viewport and editor-only performance
-  settings through `naziki.editor-preview.v1`; production game behavior and
+  settings through `naziki.editor-preview.v2`; production game behavior and
   `cytoid.game-core.v2` remain unchanged.

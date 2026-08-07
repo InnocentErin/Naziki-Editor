@@ -28,6 +28,8 @@ namespace Naziki_Editor.Models
         [JsonProperty("storyboard_export_hash")]
         public string? StoryboardExportHash { get; set; }
         public string? ChartFilePath { get; set; }
+        [JsonProperty("chart_difficulty")]
+        public string? ChartDifficulty { get; set; }
         public string? AudioFilePath { get; set; }
         public string? BackgroundPath { get; set; }
 

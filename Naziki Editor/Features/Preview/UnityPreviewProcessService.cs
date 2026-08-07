@@ -7,6 +7,8 @@ namespace Naziki_Editor.Features.Preview;
 
 public sealed record UnityPreviewLaunchOptions(
     IntPtr ParentWindow,
+    string ConnectionId,
+    long Generation,
     string SessionId,
     string PipeName,
     string AuthenticationNonce,
@@ -105,6 +107,10 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
             Add(startInfo, Math.Clamp(options.JobWorkerCount, 1, 16).ToString(CultureInfo.InvariantCulture));
             Add(startInfo, "--naziki-preview-session");
             Add(startInfo, options.SessionId);
+            Add(startInfo, "--naziki-preview-connection");
+            Add(startInfo, options.ConnectionId);
+            Add(startInfo, "--naziki-preview-generation");
+            Add(startInfo, options.Generation.ToString(CultureInfo.InvariantCulture));
             Add(startInfo, "--naziki-preview-pipe");
             Add(startInfo, options.PipeName);
             Add(startInfo, "--naziki-preview-nonce");

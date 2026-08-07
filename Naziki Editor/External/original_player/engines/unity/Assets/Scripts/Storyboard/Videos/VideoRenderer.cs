@@ -93,7 +93,7 @@ namespace Cytoid.Storyboard.Videos
                 {
                     Debug.Log($"Android version code: {Context.AndroidVersionCode}");
                     Debug.Log($"Video path: {path}");
-                    Debug.LogError("Could not load video. Are you using Android Q or above?");
+                    Debug.LogWarning("Video Prepare failed; the editor preview will continue without this video.");
                 }
             }
         }
@@ -127,10 +127,7 @@ namespace Cytoid.Storyboard.Videos
             if (MainRenderer.IsRandomAccessEvaluation)
             {
                 var start = Component.States.Count == 0 ? 0 : Component.States[0].Time;
-                var speed = Component.States.Count == 0 ? 1 : Component.States[0].Speed ?? 1;
-                previewDesiredTime = Math.Max(0, (MainRenderer.Time - start) * speed);
-                if (VideoPlayer.length > 0 && Component.States[0].Loop == true)
-                    previewDesiredTime %= VideoPlayer.length;
+                previewDesiredTime = Math.Max(0, MainRenderer.Time - start);
                 previewSeekGeneration++;
                 VideoPlayer.Pause();
                 VideoPlayer.time = Math.Min(previewDesiredTime, Math.Max(0, VideoPlayer.length - .001));

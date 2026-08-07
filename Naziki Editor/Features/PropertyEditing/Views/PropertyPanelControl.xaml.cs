@@ -463,6 +463,7 @@ namespace Naziki_Editor.Views
             var state = sprite.BaseState;
             if (state != null)
             {
+                AddOfficialOffsets(state);
                 AddPropertyRow("素材路径", state.Path ?? "（未设置）", state, "Path");
                 AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0", state, "Opacity");
                 AddPropertyRow("图层(Layer)", state.Layer?.ToString() ?? "0", state, "Layer");
@@ -470,8 +471,8 @@ namespace Naziki_Editor.Views
                 AddPropertyRow("X 坐标", FormatUnitFloat(state.X), state, "X");
                 AddPropertyRow("Y 坐标", FormatUnitFloat(state.Y), state, "Y");
                 AddPropertyRow("Z 坐标", FormatUnitFloat(state.Z), state, "Z");
-                AddPropertyRow("宽度 (W)", FormatUnitFloat(state.W), state, "W");
-                AddPropertyRow("高度 (H)", FormatUnitFloat(state.H), state, "H");
+                AddPropertyRow("宽度", FormatUnitFloat(state.Width), state, "Width");
+                AddPropertyRow("高度", FormatUnitFloat(state.Height), state, "Height");
                 AddPropertyRow("保持宽高比", state.PreserveAspect?.ToString() ?? "未设置", state, "PreserveAspect");
                 AddPropertyRow("颜色覆写", state.Color ?? "默认", state, "Color");
             }
@@ -484,6 +485,7 @@ namespace Naziki_Editor.Views
             var state = text.BaseState;
             if (state != null)
             {
+                AddOfficialOffsets(state);
                 AddPropertyRow("文本内容", state.TextContent ?? "（空）", state, "TextContent");
                 AddPropertyRow("字号大小", state.Size?.ToString() ?? "默认", state, "Size");
                 AddPropertyRow("字体种类", state.Font ?? "默认", state, "Font");
@@ -538,13 +540,19 @@ namespace Naziki_Editor.Views
             var state = video.BaseState;
             if (state != null)
             {
+                AddOfficialOffsets(state);
                 AddPropertyRow("视频路径", state.Path ?? "（未设置）", state, "Path");
-                AddPropertyRow("播放速度", state.Speed?.ToString() ?? "1.0", state, "Speed");
-                AddPropertyRow("循环播放", state.Loop?.ToString() ?? "false", state, "Loop");
                 AddPropertyRow("不透明度", state.Opacity?.ToString() ?? "1.0", state, "Opacity");
-                AddPropertyRow("宽度 (W)", FormatUnitFloat(state.W), state, "W");
-                AddPropertyRow("高度 (H)", FormatUnitFloat(state.H), state, "H");
+                AddPropertyRow("宽度", FormatUnitFloat(state.Width), state, "Width");
+                AddPropertyRow("高度", FormatUnitFloat(state.Height), state, "Height");
+                AddPropertyRow("颜色", state.Color ?? "默认", state, "Color");
             }
+        }
+
+        private void AddOfficialOffsets(StageObjectState state)
+        {
+            AddPropertyRow("DX offset", FormatUnitFloat(state.Dx), state, "Dx");
+            AddPropertyRow("DY offset", FormatUnitFloat(state.Dy), state, "Dy");
         }
 
         private void BuildControllerForm(C2SceneController controller)

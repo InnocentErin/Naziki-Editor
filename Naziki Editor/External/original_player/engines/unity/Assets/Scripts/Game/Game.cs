@@ -551,7 +551,7 @@ public class Game : MonoBehaviour
         {
             Storyboard.Renderer.IsRandomAccessEvaluation = true;
             Storyboard.Renderer.OnGameUpdate(this);
-            Storyboard.ApplyPreviewTriggers(targetTime);
+            Storyboard.ReplayPreviewTriggers(targetTime);
         }
         Renderer.OnUpdate();
     }
@@ -560,7 +560,7 @@ public class Game : MonoBehaviour
     /// Advances an editor-owned clock without rebuilding the complete visible note
     /// window. Discontinuities still use PreviewEvaluateAt for deterministic seeking.
     /// </summary>
-    public void PreviewAdvanceExternalClock(float targetTime)
+    public async UniTask PreviewAdvanceExternalClock(float targetTime)
     {
         if (!GameEmbedMode.IsEditorPreview || !IsLoaded) return;
         var previewDuration = Mathf.Max(MusicLength, ChartLength);
@@ -571,10 +571,11 @@ public class Game : MonoBehaviour
             return;
         }
         previewPausedAtEnd = false;
-        var delta = targetTime - Time;
+        var previousTime = Time;
+        var delta = targetTime - previousTime;
         if (delta < -0.001f || delta > 0.25f)
         {
-            PreviewEvaluateAt(targetTime);
+            await PreviewSeekAsync(targetTime);
             return;
         }
 
@@ -606,7 +607,7 @@ public class Game : MonoBehaviour
         {
             Storyboard.Renderer.IsRandomAccessEvaluation = true;
             Storyboard.Renderer.OnGameUpdate(this);
-            Storyboard.ApplyPreviewTriggers(targetTime);
+            Storyboard.AdvancePreviewTriggers(previousTime, targetTime);
         }
         Renderer.OnUpdate();
     }
@@ -670,6 +671,14 @@ public class Game : MonoBehaviour
         {
             candidate?.Dispose();
         }
+    }
+
+    public async UniTask PreviewSeekAsync(float targetTime)
+    {
+        if (!GameEmbedMode.IsEditorPreview || !IsLoaded) return;
+        if (Storyboard != null)
+            await PreviewReplaceStoryboard(Storyboard.RootObject.ToString());
+        PreviewEvaluateAt(targetTime);
     }
 #endif
 

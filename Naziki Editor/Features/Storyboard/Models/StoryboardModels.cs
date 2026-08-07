@@ -138,6 +138,8 @@ namespace Naziki_Editor.Models
         [JsonProperty("x")] public UnitFloat X { get; set; }
         [JsonProperty("y")] public UnitFloat Y { get; set; }
         [JsonProperty("z")] public UnitFloat Z { get; set; }
+        [JsonProperty("dx")] public UnitFloat Dx { get; set; }
+        [JsonProperty("dy")] public UnitFloat Dy { get; set; }
         [JsonProperty("rot_x")] public float? RotX { get; set; }
         [JsonProperty("rot_y")] public float? RotY { get; set; }
         [JsonProperty("rot_z")] public float? RotZ { get; set; }
@@ -200,6 +202,7 @@ namespace Naziki_Editor.Models
     public class VideoState : StageObjectState
     {
         [JsonProperty("path")] public string Path { get; set; }
+        [JsonProperty("color")] public string Color { get; set; }
         [JsonProperty("w")] public UnitFloat W { get; set; }
         [JsonProperty("h")] public UnitFloat H { get; set; }
         [JsonProperty("preserve_aspect")] public bool? PreserveAspect { get; set; }

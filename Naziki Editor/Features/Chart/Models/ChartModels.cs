@@ -12,7 +12,7 @@ namespace Naziki_Editor.Models
     public class C2Chart
     {
         public int format_version { get; set; }
-        public int time_base { get; set; }
+        public double time_base { get; set; }
 
         // 🎵 新增：音频偏移与结算控制 (来自官方 JSON 示例)
         public double? music_offset { get; set; }

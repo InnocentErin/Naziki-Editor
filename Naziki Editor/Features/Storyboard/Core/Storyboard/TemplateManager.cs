@@ -128,8 +128,8 @@ namespace Naziki_Editor.Core
             var baseProps = new[] { "Time", "Easing", "AddTime", "RelativeTime", "Destroy" };
 
             // 通用的空间与外观（根据你的统计）
-            var spatialProps = new[] { "X", "Y", "Z", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height", "W", "H", "PivotX", "PivotY" };
-            var appearanceProps = new[] { "Opacity", "Layer", "Order", "Color", "PreserveAspect" };
+            var spatialProps = new[] { "X", "Y", "Z", "Dx", "Dy", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height" };
+            var appearanceProps = new[] { "Opacity", "Layer", "Order", "Color" };
 
             var allowed = new HashSet<string>(baseProps);
 
@@ -147,19 +147,20 @@ namespace Naziki_Editor.Core
                     allowed.UnionWith(spatialProps);
                     allowed.UnionWith(appearanceProps);
                     // 追加文字专属
-                    allowed.UnionWith(new[] { "TextContent", "Size", "Align", "LetterSpacing", "LineSpacing", "Font", "FontStyle" });
+                    allowed.UnionWith(new[] { "TextContent", "Size", "Align", "LetterSpacing", "Font", "FontWeight" });
                     break;
 
                 case TemplateType.Sprite:
                     allowed.UnionWith(spatialProps);
                     allowed.UnionWith(appearanceProps);
+                    allowed.Add("PreserveAspect");
                     allowed.UnionWith(new[] { "Path" }); // 精灵专属
                     break;
 
                 case TemplateType.Video:
                     allowed.UnionWith(spatialProps);
                     allowed.UnionWith(appearanceProps);
-                    allowed.UnionWith(new[] { "Path", "Loop", "Speed" }); // 视频专属
+                    allowed.UnionWith(new[] { "Path" }); // 视频专属
                     break;
 
                 case TemplateType.Line:

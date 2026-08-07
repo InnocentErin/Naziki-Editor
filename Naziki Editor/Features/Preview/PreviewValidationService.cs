@@ -153,6 +153,8 @@ public sealed class PreviewValidationService : IPreviewValidationService
             "背景图片不存在或尚未配置。",
             SupportedBackgroundExtensions,
             diagnostics);
+        WarnPlatformDependentAsset(snapshot.BackgroundPath, diagnostics,
+            "Background image decoding is not guaranteed by the official Cytoid runtime for this format.");
         ValidateAssetReferences(snapshot, diagnostics);
 
         return new PreviewValidationResult(snapshot.Version, diagnostics);
@@ -334,7 +336,31 @@ public sealed class PreviewValidationService : IPreviewValidationService
                     PreviewDiagnosticSource.Asset,
                     property.Path));
             }
+            else
+            {
+                WarnPlatformDependentAsset(fullPath, diagnostics,
+                    "Asset decoding depends on the official Unity runtime and target platform.",
+                    property.Path);
+            }
         }
+    }
+
+    private static void WarnPlatformDependentAsset(
+        string? path,
+        ICollection<PreviewDiagnostic> diagnostics,
+        string message,
+        string? jsonPath = null)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        if (extension is not (".bmp" or ".gif" or ".webp" or
+            ".mp4" or ".webm" or ".mov" or ".avi")) return;
+        diagnostics.Add(new PreviewDiagnostic(
+            "PREVIEW_ASSET_PLATFORM_DEPENDENT",
+            $"{message} ({extension})",
+            PreviewDiagnosticSeverity.Warning,
+            PreviewDiagnosticSource.Asset,
+            jsonPath ?? path));
     }
 
     private static PreviewDiagnostic Error(

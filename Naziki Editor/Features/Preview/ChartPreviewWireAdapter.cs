@@ -100,7 +100,6 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
         }
 
         var issues = new List<ChartPreviewWireIssue>();
-        RequireInteger(root["time_base"], "$.time_base", issues);
         RequireArray(root["page_list"], "$.page_list", issues);
         RequireArray(root["tempo_list"], "$.tempo_list", issues);
         RequireArray(root["note_list"], "$.note_list", issues);

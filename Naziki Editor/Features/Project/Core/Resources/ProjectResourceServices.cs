@@ -298,7 +298,8 @@ public sealed class ProjectResourceService : IProjectResourceService
             case ProjectResourceKind.Background:
                 if (!ImageExtensions.Contains(extension))
                     throw new InvalidDataException($"不支持的背景图片格式：{extension}");
-                ValidateImage(sourcePath);
+                if (extension is ".png" or ".jpg" or ".jpeg")
+                    ValidateImage(sourcePath);
                 break;
             case ProjectResourceKind.Asset:
                 if (!AssetExtensions.Contains(extension))
@@ -332,6 +333,8 @@ public sealed class ProjectResourceService : IProjectResourceService
             .Select(Path.GetFullPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var chartDifficulty = CytoidLevelChartBinding.Resolve(
+            request.LevelSourcePath, request.ChartSourcePath);
         foreach (var assetSource in assetSources)
             ValidateSource(ProjectResourceKind.Asset, assetSource);
 
@@ -388,6 +391,7 @@ public sealed class ProjectResourceService : IProjectResourceService
                 LastModifiedTime = now,
                 LevelFilePath = ToProjectRelativePath(projectFile, level),
                 ChartFilePath = ToProjectRelativePath(projectFile, chart),
+                ChartDifficulty = chartDifficulty,
                 AudioFilePath = ToProjectRelativePath(projectFile, music),
                 BackgroundPath = ToProjectRelativePath(projectFile, background),
                 StoryboardExportPath = ToProjectRelativePath(projectFile, storyboard),

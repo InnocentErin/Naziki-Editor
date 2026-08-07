@@ -17,9 +17,9 @@ using UnityEngine;
 /// </summary>
 public sealed class EditorPreviewBridge : MonoBehaviour
 {
-    public const string Protocol = "naziki.editor-preview.v1";
+    public const string Protocol = "naziki.editor-preview.v2";
     const int MaxMessageBytes = 64 * 1024 * 1024;
-    public const int HostRevision = 4;
+    public const int HostRevision = 5;
     static EditorPreviewBridge instance;
     static readonly object WriteLock = new object();
 
@@ -33,7 +33,10 @@ public sealed class EditorPreviewBridge : MonoBehaviour
     CancellationTokenSource lifetime;
     NamedPipeClientStream pipe;
     string sessionId;
+    string connectionId;
+    long generation;
     string nonce;
+    bool hostAccepted;
     Thread readerThread;
     Thread writerThread;
     long droppedTelemetryMessages;
@@ -61,6 +64,8 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         unityVersion = Application.unityVersion;
         sessionId = ReadArgument("--naziki-preview-session") ?? "unbound";
+        connectionId = ReadArgument("--naziki-preview-connection") ?? "unbound";
+        long.TryParse(ReadArgument("--naziki-preview-generation"), out generation);
         nonce = ReadArgument("--naziki-preview-nonce") ?? string.Empty;
         var pipeName = ReadArgument("--naziki-preview-pipe");
         if (string.IsNullOrWhiteSpace(pipeName))
@@ -93,9 +98,26 @@ public sealed class EditorPreviewBridge : MonoBehaviour
             {
                 var message = JObject.Parse(json);
                 if (message.Value<string>("protocol") != Protocol) continue;
-                var messageSession = message.Value<string>("SessionId") ??
-                                     message.Value<string>("sessionId");
-                if (!string.Equals(messageSession, sessionId, StringComparison.Ordinal)) continue;
+                if (!string.Equals(message.Value<string>("connectionId"), connectionId,
+                        StringComparison.Ordinal) ||
+                    message.Value<long?>("generation") != generation ||
+                    !string.Equals(message.Value<string>("sessionId"), sessionId,
+                        StringComparison.Ordinal)) continue;
+                if (message.Value<string>("type") == "host.accept")
+                {
+                    if (!string.Equals(message["payload"]?.Value<string>("authenticationNonce"), nonce,
+                            StringComparison.Ordinal))
+                        continue;
+                    hostAccepted = true;
+                    SendProtocol("host.ready", message.Value<string>("requestId"), new JObject
+                    {
+                        ["authenticationNonce"] = nonce,
+                        ["unityVersion"] = unityVersion,
+                        ["hostRevision"] = HostRevision
+                    });
+                    continue;
+                }
+                if (!hostAccepted) continue;
                 EditorPreviewController.Handle(message);
             }
             catch (Exception exception)
@@ -104,6 +126,7 @@ public sealed class EditorPreviewBridge : MonoBehaviour
             }
         }
 
+        if (!hostAccepted) return;
         var game = FindObjectOfType<Game>();
         DrainUnityLogs(game);
         if (game == null || !game.IsLoaded) return;
@@ -157,7 +180,7 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         {
             pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
             pipe.Connect(15000);
-            SendProtocol("host.ready", Guid.NewGuid().ToString("N"), new JObject
+            SendProtocol("host.hello", Guid.NewGuid().ToString("N"), new JObject
             {
                 ["authenticationNonce"] = nonce,
                 ["unityVersion"] = unityVersion,
@@ -169,7 +192,8 @@ public sealed class EditorPreviewBridge : MonoBehaviour
                     ["unityLogV1"] = true,
                     ["loadProgressV1"] = true,
                     ["healthCheckV1"] = true,
-                    ["persistentBridgeV1"] = true
+                    ["persistentBridgeV1"] = true,
+                    ["threeWayHandshakeV2"] = true
                 }
             });
             var header = new byte[4];
@@ -213,16 +237,19 @@ public sealed class EditorPreviewBridge : MonoBehaviour
     {
         var target = instance;
         if (target?.pipe == null || !target.pipe.IsConnected) return;
+        if (!target.hostAccepted && type != "host.hello" && type != "host.ready") return;
         var message = new JObject
         {
             ["protocol"] = Protocol,
-            ["Type"] = type,
-            ["SessionId"] = target.sessionId,
-            ["RequestId"] = requestId,
-            ["EditorVersion"] = editorVersion,
-            ["BasePreviewVersion"] = basePreviewVersion,
-            ["TargetPreviewVersion"] = targetPreviewVersion,
-            ["Payload"] = payload ?? new JObject()
+            ["connectionId"] = target.connectionId,
+            ["generation"] = target.generation,
+            ["sessionId"] = target.sessionId,
+            ["type"] = type,
+            ["requestId"] = requestId,
+            ["editorVersion"] = editorVersion,
+            ["basePreviewVersion"] = basePreviewVersion,
+            ["targetPreviewVersion"] = targetPreviewVersion,
+            ["payload"] = payload ?? new JObject()
         };
         target.reliableOutgoing.Enqueue(message.ToString(Formatting.None));
         target.outgoingSignal.Set();
@@ -235,13 +262,15 @@ public sealed class EditorPreviewBridge : MonoBehaviour
         var message = new JObject
         {
             ["protocol"] = Protocol,
-            ["Type"] = type,
-            ["SessionId"] = target.sessionId,
-            ["RequestId"] = requestId,
-            ["EditorVersion"] = 0,
-            ["BasePreviewVersion"] = 0,
-            ["TargetPreviewVersion"] = 0,
-            ["Payload"] = payload ?? new JObject()
+            ["connectionId"] = target.connectionId,
+            ["generation"] = target.generation,
+            ["sessionId"] = target.sessionId,
+            ["type"] = type,
+            ["requestId"] = requestId,
+            ["editorVersion"] = 0,
+            ["basePreviewVersion"] = 0,
+            ["targetPreviewVersion"] = 0,
+            ["payload"] = payload ?? new JObject()
         }.ToString(Formatting.None);
         if (target.latestOutgoing.ContainsKey(type))
             Interlocked.Increment(ref target.droppedTelemetryMessages);

@@ -574,6 +574,7 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
         if (materialized.Triggers.Count > 0)
             root["triggers"] = materialized.Triggers.DeepClone();
 
+        CytoidStoryboardWireCompatibility.Normalize(root, issues);
         ValidateReferences(root, chart, issues);
         return new StoryboardRuntimeExportResult(root, issues);
     }

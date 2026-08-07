@@ -47,6 +47,16 @@ public sealed class StoryboardPreviewService :
         var assetRoot = _resources.ResolvePath(context, ProjectResourceKind.Asset) ?? projectDirectory;
 
         var levelPath = _resources.ResolvePath(context, ProjectResourceKind.Level);
+        var chartPath = _resources.ResolvePath(context, ProjectResourceKind.Chart);
+        var chartDifficulty = context.ProjectData?.ChartDifficulty;
+        if (string.IsNullOrWhiteSpace(chartDifficulty) &&
+            !string.IsNullOrWhiteSpace(levelPath) && File.Exists(levelPath) &&
+            !string.IsNullOrWhiteSpace(chartPath) && File.Exists(chartPath))
+        {
+            chartDifficulty = CytoidLevelChartBinding.Resolve(levelPath, chartPath);
+            if (context.ProjectData is not null)
+                context.ProjectData.ChartDifficulty = chartDifficulty;
+        }
         var exported = _bridge.Export(context);
         if (!exported.Success)
             throw new JsonSerializationException(string.Join(
@@ -70,6 +80,7 @@ public sealed class StoryboardPreviewService :
                 : null,
             MusicPath = _resources.ResolvePath(context, ProjectResourceKind.Music),
             BackgroundPath = _resources.ResolvePath(context, ProjectResourceKind.Background),
+            ChartDifficulty = chartDifficulty,
             ProjectId = context.ProjectData is null
                 ? _sessionId
                 : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(

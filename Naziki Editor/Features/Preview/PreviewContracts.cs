@@ -1,4 +1,5 @@
 using Naziki_Editor.State;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Naziki_Editor.Features.Preview;
@@ -31,6 +32,7 @@ public enum PreviewAvailabilityState
     Starting,
     Connecting,
     Ready,
+    ReadyWithWarnings,
     InvalidData,
     Disconnected,
     Faulted
@@ -52,6 +54,31 @@ public enum PreviewSessionPhase
     Disconnected
 }
 
+public enum PreviewConnectionState
+{
+    Disabled,
+    ProcessStarting,
+    GraphicsStarting,
+    PipeConnecting,
+    Handshaking,
+    Healthy,
+    Restarting,
+    Disconnected,
+    ProtocolIncompatible,
+    Faulted
+}
+
+public enum PreviewContentState
+{
+    Empty,
+    Validating,
+    Materializing,
+    Loading,
+    Ready,
+    ReadyWithWarnings,
+    Failed
+}
+
 public sealed record PreviewSessionStatus(
     long Generation,
     PreviewSessionPhase Phase,
@@ -62,7 +89,11 @@ public sealed record PreviewSessionStatus(
     int HostRevision,
     string? RequestId,
     long? SnapshotVersion,
-    string? Detail);
+    string? Detail)
+{
+    public PreviewConnectionState ConnectionState { get; init; }
+    public PreviewContentState ContentState { get; init; }
+}
 
 public enum PreviewDiagnosticSeverity
 {
@@ -94,6 +125,7 @@ public sealed record StoryboardPreviewSnapshot(
     public string? LevelJson { get; init; }
     public string? MusicPath { get; init; }
     public string? BackgroundPath { get; init; }
+    public string? ChartDifficulty { get; init; }
     public string? ProjectId { get; init; }
     public string ProjectName { get; init; } = "Naziki Preview";
 }
@@ -192,13 +224,20 @@ public sealed record PreviewSettings(
     string AspectRatio);
 
 public sealed record PreviewProtocolMessage(
-    string Type,
-    string SessionId,
-    string RequestId,
-    long EditorVersion,
-    long BasePreviewVersion,
-    long TargetPreviewVersion,
-    JObject Payload);
+    [property: JsonProperty("type")] string Type,
+    [property: JsonProperty("sessionId")] string SessionId,
+    [property: JsonProperty("requestId")] string RequestId,
+    [property: JsonProperty("editorVersion")] long EditorVersion,
+    [property: JsonProperty("basePreviewVersion")] long BasePreviewVersion,
+    [property: JsonProperty("targetPreviewVersion")] long TargetPreviewVersion,
+    [property: JsonProperty("payload")] JObject Payload)
+{
+    [JsonProperty("connectionId")]
+    public string ConnectionId { get; init; } = string.Empty;
+
+    [JsonProperty("generation")]
+    public long Generation { get; init; }
+}
 
 public interface IStoryboardPreviewDataSource
 {

@@ -7,9 +7,9 @@ namespace Naziki_Editor.Core.Compilation
 {
     public static class TemplateClassifier
     {
-        private static readonly HashSet<string> SpriteExclusive = new HashSet<string> { "Path", "PreserveAspect", "W", "H" };
-        private static readonly HashSet<string> TextExclusive = new HashSet<string> { "TextContent", "Size", "Align", "LetterSpacing", "LineSpacing", "Font", "FontStyle" };
-        private static readonly HashSet<string> VideoExclusive = new HashSet<string> { "Path", "Loop", "Speed", "PreserveAspect", "W", "H" };
+        private static readonly HashSet<string> SpriteExclusive = new HashSet<string> { "Path", "PreserveAspect" };
+        private static readonly HashSet<string> TextExclusive = new HashSet<string> { "TextContent", "Size", "Align", "LetterSpacing", "Font", "FontWeight" };
+        private static readonly HashSet<string> VideoExclusive = new HashSet<string>();
         private static readonly HashSet<string> LineExclusive = new HashSet<string> { "Pos", "X1", "X2", "Y1", "Y2", "Width" };
 
         private static readonly HashSet<string> ControllerExclusive = new HashSet<string>
@@ -27,7 +27,7 @@ namespace Naziki_Editor.Core.Compilation
 
         private static readonly HashSet<string> StageObjectGeneric = new HashSet<string>
         {
-            "X", "Y", "Z", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Opacity", "Layer", "Order", "PivotX", "PivotY", "Color"
+            "X", "Y", "Z", "Dx", "Dy", "RotX", "RotY", "RotZ", "Scale", "ScaleX", "ScaleY", "Width", "Height", "Opacity", "Layer", "Order", "Color"
         };
 
         // ==========================================
@@ -83,11 +83,7 @@ namespace Naziki_Editor.Core.Compilation
             if (controllerScore > 0) return TemplateType.Controller;
             if (noteScore > 0) return TemplateType.NoteController;
 
-            if (videoScore > 0)
-            {
-                if (activeProps.Contains("Loop") || activeProps.Contains("Speed")) return TemplateType.Video;
-                return TemplateType.Sprite;
-            }
+            if (videoScore > 0) return TemplateType.Video;
             if (spriteScore > 0) return TemplateType.Sprite;
 
             if (genericStageScore > 0) return TemplateType.StageObject;

@@ -12,10 +12,10 @@ namespace Naziki_Editor.Core
     public class ChartTimeEngine : ITimeEngine
     {
         private List<TempoEvent> _tempoList;
-        private int _timeBase;
+        private double _timeBase;
 
         // 构造法术：当我们读取到谱面时，把谱面的 Tempo 列表和 TimeBase 喂给这个引擎
-        public ChartTimeEngine(List<TempoEvent> tempoList, int timeBase)
+        public ChartTimeEngine(List<TempoEvent> tempoList, double timeBase)
         {
             // 防呆设计：万一谱面里的速度没按时间排好，我们强行给它按 tick 从小到大排个序！
             _tempoList = tempoList.OrderBy(t => t.tick).ToList();

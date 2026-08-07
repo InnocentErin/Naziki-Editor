@@ -24,6 +24,7 @@ public sealed class UnityStoryboardPreviewHost :
     private readonly object _sync = new();
     private readonly ConcurrentDictionary<string, PendingVersion> _pendingVersions = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<PreviewProtocolMessage>> _pendingCommands = new();
+    private readonly ConcurrentQueue<PreviewDiagnostic> _activeLoadWarnings = new();
     private readonly SemaphoreSlim _reloadGate = new(1, 1);
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private IDisposable? _changeSubscription;
@@ -33,17 +34,25 @@ public sealed class UnityStoryboardPreviewHost :
     private int _pixelWidth = 1;
     private int _pixelHeight = 1;
     private string _authenticationNonce = Guid.NewGuid().ToString("N");
+    private string _connectionId = "unbound";
     private string _transportSessionId = "unbound";
     private string _sessionId = "unbound";
     private CancellationTokenSource? _startCancellation;
     private TaskCompletionSource<bool>? _hostReadyCompletion;
     private Timer? _healthTimer;
     private int _healthCheckInFlight;
+    private int _recoveryInFlight;
     private int _shuttingDown;
     private long _generation;
     private int _hostRevision;
     private DateTimeOffset _phaseStartedAt = DateTimeOffset.Now;
     private DateTimeOffset _lastMessageAt = DateTimeOffset.Now;
+    private DateTimeOffset _lastHeartbeatAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _loadStartedAt = DateTimeOffset.MinValue;
+    private DateTimeOffset? _lastLoadProgressAt;
+    private DateTimeOffset? _healthySince;
+    private int _heartbeatFailureCount;
+    private int _activeLoadStage = -1;
     private PreviewSessionPhase _phase = PreviewSessionPhase.Idle;
     private string? _activeRequestId;
     private long? _activeSnapshotVersion;
@@ -102,7 +111,9 @@ public sealed class UnityStoryboardPreviewHost :
     {
     }
 
-    public bool IsAvailable => _availability == PreviewAvailabilityState.Ready && _hostReady;
+    public bool IsAvailable =>
+        _availability is PreviewAvailabilityState.Ready or PreviewAvailabilityState.ReadyWithWarnings &&
+        _hostReady;
     public double CurrentTime => Volatile.Read(ref _currentTime);
     public double Duration => Volatile.Read(ref _duration);
     public PreviewPlaybackState State => _state;
@@ -117,7 +128,11 @@ public sealed class UnityStoryboardPreviewHost :
         _hostRevision,
         _activeRequestId,
         _activeSnapshotVersion,
-        _phaseDetail);
+        _phaseDetail)
+    {
+        ConnectionState = GetConnectionState(),
+        ContentState = GetContentState()
+    };
     public IReadOnlyList<PreviewDiagnostic> Diagnostics => _diagnostics;
     public PreviewDiagnosticSummary Summary
     {
@@ -342,7 +357,11 @@ public sealed class UnityStoryboardPreviewHost :
                     _dataSource?.CurrentVersion ?? 0,
                     _previewVersion,
                     _previewVersion,
-                    new JObject()), shutdownTimeout.Token).ConfigureAwait(false);
+                    new JObject())
+                {
+                    ConnectionId = _connectionId,
+                    Generation = _generation
+                }, shutdownTimeout.Token).ConfigureAwait(false);
             }
             catch { }
         }
@@ -505,6 +524,7 @@ public sealed class UnityStoryboardPreviewHost :
             }
 
             var generation = Interlocked.Increment(ref _generation);
+            _connectionId = Guid.NewGuid().ToString("N");
             _hostReady = false;
             _hostRevision = 0;
             _hostReadyCompletion = new TaskCompletionSource<bool>(
@@ -513,28 +533,33 @@ public sealed class UnityStoryboardPreviewHost :
             SetDiagnostics(PreviewAvailabilityState.Starting, []);
             _startCancellation?.Cancel();
             _startCancellation?.Dispose();
-            _startCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            _startCancellation = new CancellationTokenSource();
             var token = _startCancellation.Token;
             _authenticationNonce = Guid.NewGuid().ToString("N");
             _transportSessionId = Guid.NewGuid().ToString("N");
+            _lastHeartbeatAt = DateTimeOffset.MinValue;
+            _heartbeatFailureCount = 0;
+            _healthySince = null;
             var connectionTask = _transport.StartAsync(token);
             TransitionTo(PreviewSessionPhase.InitializingGraphics);
             await _process.StartAsync(new UnityPreviewLaunchOptions(
                 _parentWindow,
+                _connectionId,
+                generation,
                 _transportSessionId,
                 _transport.PipeName,
                 _authenticationNonce,
                 _pixelWidth,
                 _pixelHeight,
-                _settings.Current.RenderThreads), token).ConfigureAwait(false);
+                _settings.Current.RenderThreads), token)
+                .WaitAsync(TimeSpan.FromSeconds(30), token).ConfigureAwait(false);
             if (generation != Volatile.Read(ref _generation))
                 throw new OperationCanceledException("Preview generation was superseded.");
             TransitionTo(PreviewSessionPhase.ConnectingTransport);
             SetDiagnostics(PreviewAvailabilityState.Connecting, []);
-            await connectionTask.ConfigureAwait(false);
+            await connectionTask.WaitAsync(TimeSpan.FromSeconds(15), token).ConfigureAwait(false);
             TransitionTo(PreviewSessionPhase.AuthenticatingHost);
-            await _hostReadyCompletion.Task.WaitAsync(token).ConfigureAwait(false);
-            _startCancellation.CancelAfter(Timeout.InfiniteTimeSpan);
+            await _hostReadyCompletion.Task.WaitAsync(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
             EnsureHealthTimer();
         }
         catch (FileNotFoundException ex)
@@ -578,6 +603,7 @@ public sealed class UnityStoryboardPreviewHost :
                     $"原生预览启动失败：{ex.Message}",
                     PreviewDiagnosticSeverity.Error,
                     PreviewDiagnosticSource.Transport)]);
+            ScheduleAutomaticRecovery();
         }
         finally
         {
@@ -610,7 +636,9 @@ public sealed class UnityStoryboardPreviewHost :
             var requestId = Guid.NewGuid().ToString("N");
             var completion = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            _pendingVersions[requestId] = new PendingVersion(snapshot, materialized, State, completion);
+            _pendingVersions[requestId] = new PendingVersion(
+                snapshot, materialized, State, completion, validation.Diagnostics);
+            BeginLoadWatch(requestId);
             TransitionTo(PreviewSessionPhase.LoadingContent, requestId, snapshot.Version);
             await SendCommandAsync(command, new JObject
             {
@@ -666,7 +694,9 @@ public sealed class UnityStoryboardPreviewHost :
             var requestId = Guid.NewGuid().ToString("N");
             var completion = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            _pendingVersions[requestId] = new PendingVersion(snapshot, materialized, State, completion);
+            _pendingVersions[requestId] = new PendingVersion(
+                snapshot, materialized, State, completion, validation.Diagnostics);
+            BeginLoadWatch(requestId);
             TransitionTo(PreviewSessionPhase.LoadingContent, requestId, snapshot.Version);
             await SendCommandAsync(
                 changes.Kind == StoryboardPreviewChangeKind.Incremental
@@ -736,16 +766,29 @@ public sealed class UnityStoryboardPreviewHost :
             editorVersion ?? _dataSource?.CurrentVersion ?? 0,
             basePreviewVersion ?? _previewVersion,
             targetPreviewVersion ?? _previewVersion,
-            payload));
+            payload)
+        {
+            ConnectionId = _connectionId,
+            Generation = _generation
+        });
 
     private void OnMessageReceived(object? sender, PreviewProtocolMessage message)
     {
-        if (!string.Equals(message.SessionId, GetSessionId(), StringComparison.Ordinal))
+        if (!string.Equals(message.ConnectionId, _connectionId, StringComparison.Ordinal) ||
+            message.Generation != Volatile.Read(ref _generation) ||
+            !string.Equals(message.SessionId, GetSessionId(), StringComparison.Ordinal))
+        {
+            AddOrMergeDiagnostic(new PreviewDiagnostic(
+                "PREVIEW_STALE_ENVELOPE_IGNORED",
+                $"Ignored stale Preview message '{message.Type}'.",
+                PreviewDiagnosticSeverity.Information,
+                PreviewDiagnosticSource.Transport), _availability);
             return;
+        }
         _lastMessageAt = DateTimeOffset.Now;
         switch (message.Type)
         {
-            case "host.ready":
+            case "host.hello":
                 if (!string.Equals(
                         message.Payload.Value<string>("authenticationNonce"),
                         _authenticationNonce,
@@ -768,12 +811,13 @@ public sealed class UnityStoryboardPreviewHost :
                         ? capabilityObject.Value<bool?>(name) == true
                         : capabilitiesToken is JArray capabilityArray &&
                           capabilityArray.Values<string>().Contains(name, StringComparer.Ordinal);
-                if (hostRevision < 3 ||
+                if (hostRevision < 5 ||
                     !HasCapability("officialRuntimeDataOnly") ||
                     !HasCapability("chartPreflightV2") ||
                     !HasCapability("unityLogV1") ||
                     !HasCapability("loadProgressV1") ||
-                    !HasCapability("healthCheckV1"))
+                    !HasCapability("healthCheckV1") ||
+                    !HasCapability("threeWayHandshakeV2"))
                 {
                     _hostReadyCompletion?.TrySetException(
                         new InvalidDataException("Unity Preview host revision or capabilities are incompatible."));
@@ -787,8 +831,25 @@ public sealed class UnityStoryboardPreviewHost :
                     return;
                 }
                 _hostRevision = hostRevision;
+                _ = SendCommandAsync("host.accept", new JObject
+                {
+                    ["authenticationNonce"] = _authenticationNonce,
+                    ["hostRevision"] = 5
+                }, message.RequestId);
+                break;
+            case "host.ready":
+                if (_hostRevision < 5 || !string.Equals(
+                        message.Payload.Value<string>("authenticationNonce"),
+                        _authenticationNonce,
+                        StringComparison.Ordinal))
+                {
+                    _hostReadyCompletion?.TrySetException(
+                        new InvalidDataException("Unity Preview completed an invalid handshake."));
+                    return;
+                }
                 _hostReady = true;
-                _automaticRestartCount = 0;
+                _lastHeartbeatAt = DateTimeOffset.Now;
+                _healthySince = DateTimeOffset.Now;
                 TransitionTo(PreviewSessionPhase.HostReady);
                 SetDiagnostics(PreviewAvailabilityState.Connecting, []);
                 _hostReadyCompletion?.TrySetResult(true);
@@ -800,12 +861,11 @@ public sealed class UnityStoryboardPreviewHost :
                         ["pixelHeight"] = _pixelHeight,
                         ["active"] = true
                     });
-                if (_lastKnownGood is not null)
-                    ApplySnapshot(_lastKnownGood.Snapshot with { PlaybackTime = CurrentTime });
-                else if (!_changeInFlight && _context is not null && _dataSource is not null)
-                    ApplySnapshot(_dataSource.GetSnapshot(_context, CurrentTime));
                 break;
             case "preview.load.started":
+                if (!IsCurrentLoadMessage(message))
+                    break;
+                NoteLoadProgress(message, 0, "started");
                 TransitionTo(
                     PreviewSessionPhase.LoadingContent,
                     message.RequestId,
@@ -813,14 +873,23 @@ public sealed class UnityStoryboardPreviewHost :
                 SetDiagnostics(PreviewAvailabilityState.Connecting, []);
                 break;
             case "preview.load.progress":
+                if (!IsCurrentLoadMessage(message))
+                    break;
+                var stage = message.Payload.Value<string>("stage");
+                var stageIndex = LoadStageIndex(stage);
+                if (stageIndex < _activeLoadStage)
+                    break;
+                NoteLoadProgress(message, stageIndex, stage);
                 TransitionTo(
                     PreviewSessionPhase.LoadingContent,
                     message.RequestId,
                     message.TargetPreviewVersion,
-                    message.Payload.Value<string>("stage"));
+                    stage);
                 Changed?.Invoke(this, EventArgs.Empty);
                 break;
             case "preview.load.ready":
+                if (!IsCurrentLoadMessage(message))
+                    break;
                 var readyTime = message.Payload.Value<double?>("time");
                 var readyDuration = message.Payload.Value<double?>("duration");
                 if (readyTime.HasValue)
@@ -830,9 +899,13 @@ public sealed class UnityStoryboardPreviewHost :
                 AcceptPending(message);
                 break;
             case "preview.load.failed":
+                if (!IsCurrentLoadMessage(message))
+                    break;
                 RejectPending(message);
                 break;
             case "preview.health.ok":
+                _lastHeartbeatAt = DateTimeOffset.Now;
+                _heartbeatFailureCount = 0;
                 CompletePendingCommand(message);
                 break;
             case "preview.ack":
@@ -987,7 +1060,25 @@ public sealed class UnityStoryboardPreviewHost :
                 CurrentTime,
                 pending.PlaybackState);
             TransitionTo(PreviewSessionPhase.PreviewReady, message.RequestId, message.TargetPreviewVersion);
-            SetDiagnostics(PreviewAvailabilityState.Ready, []);
+            var readyDiagnostics = pending.Diagnostics
+                .Where(item => item.Severity != PreviewDiagnosticSeverity.Error)
+                .ToList();
+            if (message.Payload["warnings"] is JArray warnings)
+            {
+                readyDiagnostics.AddRange(warnings.Values<string>().Select(warning =>
+                    new PreviewDiagnostic(
+                        "PREVIEW_UNITY_WARNING",
+                        warning,
+                        PreviewDiagnosticSeverity.Warning,
+                        PreviewDiagnosticSource.Unity)));
+            }
+            readyDiagnostics.AddRange(_activeLoadWarnings.ToArray());
+            SetDiagnostics(
+                readyDiagnostics.Any(item => item.Severity == PreviewDiagnosticSeverity.Warning)
+                    ? PreviewAvailabilityState.ReadyWithWarnings
+                    : PreviewAvailabilityState.Ready,
+                readyDiagnostics);
+            ClearLoadWatch(message.RequestId);
             _ = _vfs.PruneAsync(
                 pending.Snapshot.SessionId,
                 new HashSet<long> { pending.Snapshot.Version },
@@ -1025,6 +1116,7 @@ public sealed class UnityStoryboardPreviewHost :
             return;
         }
         Pause();
+        ClearLoadWatch(message.RequestId);
         TransitionTo(PreviewSessionPhase.Failed, message.RequestId, message.TargetPreviewVersion);
         SetDiagnostics(PreviewAvailabilityState.InvalidData,
             [new PreviewDiagnostic(
@@ -1091,6 +1183,7 @@ public sealed class UnityStoryboardPreviewHost :
                     "与 Unity Preview 的连接已断开。",
                     PreviewDiagnosticSeverity.Error,
                     PreviewDiagnosticSource.Transport)]);
+            ScheduleAutomaticRecovery();
         }
     }
 
@@ -1112,8 +1205,28 @@ public sealed class UnityStoryboardPreviewHost :
                 $"Unity Preview 已异常退出（退出码 {processExit.ExitCode?.ToString() ?? "unknown"}）。",
                 PreviewDiagnosticSeverity.Error,
                 PreviewDiagnosticSource.Unity)]);
-        if (_automaticRestartCount++ == 0)
-            _ = RestartAsync();
+        ScheduleAutomaticRecovery();
+    }
+
+    private void ScheduleAutomaticRecovery()
+    {
+        if (_automaticRestartCount >= 1 ||
+            Interlocked.Exchange(ref _recoveryInFlight, 1) != 0)
+            return;
+        _automaticRestartCount++;
+        _ = RestartAfterFailureAsync();
+    }
+
+    private async Task RestartAfterFailureAsync()
+    {
+        try
+        {
+            await RestartAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            Volatile.Write(ref _recoveryInFlight, 0);
+        }
     }
 
     private async Task RestartAsync()
@@ -1130,6 +1243,15 @@ public sealed class UnityStoryboardPreviewHost :
         await _transport.StopAsync().ConfigureAwait(false);
         _hostReady = false;
         await EnsureStartedAsync().ConfigureAwait(false);
+        if (!_hostReady)
+            return;
+        var snapshot = _lastKnownGood is { } lastKnownGood
+            ? lastKnownGood.Snapshot with { PlaybackTime = CurrentTime }
+            : null;
+        if (snapshot is null && _context is not null && _dataSource is not null)
+            snapshot = _dataSource.GetSnapshot(_context, CurrentTime);
+        if (snapshot is not null)
+            ApplySnapshot(snapshot);
     }
 
     private async Task RestartForNewSessionAsync()
@@ -1294,51 +1416,127 @@ public sealed class UnityStoryboardPreviewHost :
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    private void BeginLoadWatch(string requestId)
+    {
+        while (_activeLoadWarnings.TryDequeue(out _)) { }
+        _loadStartedAt = DateTimeOffset.Now;
+        _lastLoadProgressAt = null;
+        _activeLoadStage = -1;
+        _activeRequestId = requestId;
+    }
+
+    private void ClearLoadWatch(string requestId)
+    {
+        if (!string.Equals(_activeRequestId, requestId, StringComparison.Ordinal))
+            return;
+        _loadStartedAt = DateTimeOffset.MinValue;
+        _lastLoadProgressAt = null;
+        _activeLoadStage = -1;
+    }
+
+    private bool IsCurrentLoadMessage(PreviewProtocolMessage message) =>
+        string.Equals(message.RequestId, _activeRequestId, StringComparison.Ordinal) &&
+        message.TargetPreviewVersion == _activeSnapshotVersion &&
+        _pendingVersions.ContainsKey(message.RequestId);
+
+    private void NoteLoadProgress(PreviewProtocolMessage message, int stageIndex, string? stage)
+    {
+        _lastLoadProgressAt = DateTimeOffset.Now;
+        _activeLoadStage = Math.Max(_activeLoadStage, stageIndex);
+        _phaseDetail = stage;
+    }
+
+    private static int LoadStageIndex(string? stage) => stage switch
+    {
+        "started" => 0,
+        "accepted" => 1,
+        "readingVfs" => 2,
+        "parsingLevel" => 3,
+        "startingGame" => 4,
+        "loadingSceneAndAssets" => 5,
+        "evaluatingFirstFrame" => 6,
+        _ => 0
+    };
+
     private void EnsureHealthTimer()
     {
         _healthTimer ??= new Timer(
             _ => _ = RunHealthCheckAsync(),
             null,
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(5));
     }
 
     private async Task RunHealthCheckAsync()
     {
-        if (!_hostReady || !_transport.IsConnected ||
-            _phase != PreviewSessionPhase.LoadingContent ||
-            DateTimeOffset.Now - _lastMessageAt < TimeSpan.FromSeconds(10) ||
-            Interlocked.Exchange(ref _healthCheckInFlight, 1) != 0)
+        if (!_hostReady || !_transport.IsConnected)
+            return;
+        var now = DateTimeOffset.Now;
+        if (_healthySince.HasValue && now - _healthySince.Value >= TimeSpan.FromSeconds(30))
+        {
+            _automaticRestartCount = 0;
+            _healthySince = now;
+        }
+        if (_phase == PreviewSessionPhase.LoadingContent && _loadStartedAt != DateTimeOffset.MinValue)
+        {
+            var failure = _lastLoadProgressAt is null && now - _loadStartedAt >= TimeSpan.FromSeconds(5)
+                ? "Unity Preview did not report initial load progress within 5 seconds."
+                : now - _loadStartedAt >= TimeSpan.FromSeconds(120)
+                    ? "Unity Preview content load exceeded the 120 second absolute limit."
+                    : _lastLoadProgressAt.HasValue && now - _lastLoadProgressAt.Value >= TimeSpan.FromSeconds(30)
+                        ? "Unity Preview content load made no progress for 30 seconds."
+                        : null;
+            if (failure is not null)
+            {
+                FailPendingAndRecover("PREVIEW_LOAD_TIMEOUT", failure);
+                return;
+            }
+        }
+        if (Interlocked.Exchange(ref _healthCheckInFlight, 1) != 0)
             return;
         try
         {
             await SendCommandAndWaitAsync(
                 "preview.health.check",
                 new JObject { ["generation"] = _generation },
-                TimeSpan.FromSeconds(10)).ConfigureAwait(false);
-            _lastMessageAt = DateTimeOffset.Now;
+                TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            _lastHeartbeatAt = DateTimeOffset.Now;
+            _heartbeatFailureCount = 0;
         }
         catch (Exception ex)
         {
-            var failure = new TimeoutException(
-                "Unity Preview stopped responding while loading content.", ex);
-            foreach (var item in _pendingVersions.ToArray())
-                if (_pendingVersions.TryRemove(item.Key, out var pending))
-                    pending.Completion.TrySetException(failure);
-            TransitionTo(PreviewSessionPhase.Failed);
-            SetDiagnostics(PreviewAvailabilityState.Faulted,
-                [new PreviewDiagnostic(
+            if (++_heartbeatFailureCount >= 2)
+                FailPendingAndRecover(
                     "PREVIEW_RUNTIME_UNRESPONSIVE",
-                    failure.Message,
-                    PreviewDiagnosticSeverity.Error,
-                    PreviewDiagnosticSource.Unity,
-                    Suggestion: "Restart Unity Preview and inspect the Unity log for the last loading stage.")]);
-            CompleteChangeQueue();
+                    "Unity Preview missed two consecutive 5 second heartbeats.",
+                    ex);
         }
         finally
         {
             Volatile.Write(ref _healthCheckInFlight, 0);
         }
+    }
+
+    private void FailPendingAndRecover(string code, string message, Exception? inner = null)
+    {
+        var failure = new TimeoutException(message, inner);
+        foreach (var item in _pendingVersions.ToArray())
+        {
+            if (_pendingVersions.TryRemove(item.Key, out var pending))
+                pending.Completion.TrySetException(failure);
+        }
+        _hostReady = false;
+        Pause();
+        TransitionTo(PreviewSessionPhase.Failed);
+        SetDiagnostics(PreviewAvailabilityState.Faulted,
+            [new PreviewDiagnostic(
+                code,
+                message,
+                PreviewDiagnosticSeverity.Error,
+                PreviewDiagnosticSource.Unity,
+                Suggestion: "Restart Unity Preview and inspect diagnostics for the last loading stage.")]);
+        CompleteChangeQueue();
+        ScheduleAutomaticRecovery();
     }
 
     private void RestorePlayback(PreviewPlaybackRestorePoint restore)
@@ -1357,6 +1555,40 @@ public sealed class UnityStoryboardPreviewHost :
         _diagnostics = diagnostics;
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    private PreviewConnectionState GetConnectionState()
+    {
+        if (_availability == PreviewAvailabilityState.Disabled)
+            return PreviewConnectionState.Disabled;
+        if (_diagnostics.Any(item => item.Code == "PREVIEW_RUNTIME_OUTDATED"))
+            return PreviewConnectionState.ProtocolIncompatible;
+        if (_hostReady && _transport.IsConnected && _process.IsRunning)
+            return PreviewConnectionState.Healthy;
+        return _phase switch
+        {
+            PreviewSessionPhase.LaunchingProcess => PreviewConnectionState.ProcessStarting,
+            PreviewSessionPhase.InitializingGraphics => PreviewConnectionState.GraphicsStarting,
+            PreviewSessionPhase.ConnectingTransport => PreviewConnectionState.PipeConnecting,
+            PreviewSessionPhase.AuthenticatingHost => PreviewConnectionState.Handshaking,
+            PreviewSessionPhase.Disconnected => PreviewConnectionState.Disconnected,
+            PreviewSessionPhase.Failed => PreviewConnectionState.Faulted,
+            _ => PreviewConnectionState.Disconnected
+        };
+    }
+
+    private PreviewContentState GetContentState() => _availability switch
+    {
+        PreviewAvailabilityState.Ready => PreviewContentState.Ready,
+        PreviewAvailabilityState.ReadyWithWarnings => PreviewContentState.ReadyWithWarnings,
+        PreviewAvailabilityState.InvalidData or PreviewAvailabilityState.Faulted => PreviewContentState.Failed,
+        _ => _phase switch
+        {
+            PreviewSessionPhase.ValidatingSnapshot => PreviewContentState.Validating,
+            PreviewSessionPhase.MaterializingVfs => PreviewContentState.Materializing,
+            PreviewSessionPhase.LoadingContent => PreviewContentState.Loading,
+            _ => PreviewContentState.Empty
+        }
+    };
 
     private void HandleUnityLog(PreviewProtocolMessage message)
     {
@@ -1388,6 +1620,9 @@ public sealed class UnityStoryboardPreviewHost :
         };
         AddOrMergeDiagnostic(diagnostic,
             severity == PreviewDiagnosticSeverity.Error ? PreviewAvailabilityState.InvalidData : _availability);
+        if (severity == PreviewDiagnosticSeverity.Warning &&
+            _phase == PreviewSessionPhase.LoadingContent)
+            _activeLoadWarnings.Enqueue(diagnostic);
 
         var errorSeverity = string.Equals(unityType, "Assert", StringComparison.OrdinalIgnoreCase)
             ? ErrorSeverity.Critical
@@ -1489,7 +1724,8 @@ public sealed class UnityStoryboardPreviewHost :
         StoryboardPreviewSnapshot Snapshot,
         PreviewVfsVersion Vfs,
         PreviewPlaybackState PlaybackState,
-        TaskCompletionSource<bool> Completion);
+        TaskCompletionSource<bool> Completion,
+        IReadOnlyList<PreviewDiagnostic> Diagnostics);
 
     private sealed class PreviewUnityRuntimeException(string message)
         : InvalidOperationException(message);
