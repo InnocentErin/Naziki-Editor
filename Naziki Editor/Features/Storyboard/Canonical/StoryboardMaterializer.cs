@@ -197,6 +197,8 @@ public sealed class StoryboardMaterializer : IStoryboardMaterializer
             activationSeconds,
             noteId,
             baseState,
+            entity.RootEasing,
+            entity.RootDestroy,
             completeOutput);
     }
 
@@ -478,6 +480,8 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
             }
             MaterializedStoryboardFrame? promotedFrame = null;
             var exportBaseState = entity.BaseState;
+            var exportRootEasing = entity.RootEasing;
+            var exportRootDestroy = entity.RootDestroy;
             if (entity.ActivationMode == StoryboardActivationMode.FirstFrame)
             {
                 promotedFrame = entity.Frames
@@ -486,9 +490,17 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
                     .ThenBy(frame => frame.Sequence)
                     .FirstOrDefault();
                 if (promotedFrame is not null)
+                {
                     exportBaseState = promotedFrame.EffectiveState;
+                    exportRootEasing ??= promotedFrame.Easing;
+                    exportRootDestroy ??= promotedFrame.Destroy;
+                }
             }
             var json = StoryboardCanonicalValues.ToWireObject(exportBaseState);
+            if (!string.IsNullOrWhiteSpace(exportRootEasing))
+                json["easing"] = exportRootEasing;
+            if (exportRootDestroy.HasValue)
+                json["destroy"] = exportRootDestroy.Value;
             if (!string.IsNullOrWhiteSpace(entity.RuntimeId))
                 json["id"] = entity.RuntimeId;
             if (!string.IsNullOrWhiteSpace(entity.TargetId))
@@ -644,9 +656,42 @@ public sealed class StoryboardRuntimeExporter : IStoryboardRuntimeExporter
                         StoryboardDiagnosticSeverity.Error));
             }
         }
-        if (root["triggers"] is not JArray triggers) return;
         var noteIds = chart?.note_list.Select(note => note.id)
             .ToHashSet() ?? [];
+        if (root["note_controllers"] is JArray noteControllers)
+        {
+            for (var index = 0; index < noteControllers.Count; index++)
+            {
+                if (noteControllers[index] is not JObject controller)
+                    continue;
+                var path = $"$.note_controllers[{index}].note";
+                if (controller["note"]?.Type != JTokenType.Integer)
+                {
+                    issues.Add(new StoryboardImportIssue(
+                        "RUNTIME_NOTE_CONTROLLER_BINDING_MISSING",
+                        path,
+                        "A runtime NoteController requires an integer root note binding.",
+                        StoryboardDiagnosticSeverity.Error));
+                    continue;
+                }
+
+                var noteId = controller.Value<int>("note");
+                if (chart is null)
+                    issues.Add(new StoryboardImportIssue(
+                        "RUNTIME_NOTE_CONTROLLER_CHART_MISSING",
+                        path,
+                        $"Cannot validate NoteController note {noteId} without a chart.",
+                        StoryboardDiagnosticSeverity.Warning));
+                else if (!noteIds.Contains(noteId))
+                    issues.Add(new StoryboardImportIssue(
+                        "RUNTIME_NOTE_CONTROLLER_NOTE_MISSING",
+                        path,
+                        $"NoteController references missing note {noteId}.",
+                        StoryboardDiagnosticSeverity.Error));
+            }
+        }
+
+        if (root["triggers"] is not JArray triggers) return;
         foreach (var (trigger, index) in triggers.OfType<JObject>()
                      .Select((trigger, index) => (trigger, index)))
         {

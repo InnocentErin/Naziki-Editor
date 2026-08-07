@@ -17,7 +17,8 @@ public sealed class UnityPreviewHwndHost : HwndHost
             0,
             "static",
             string.Empty,
-            WindowStyles.WS_CHILD | WindowStyles.WS_VISIBLE | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_CLIPSIBLINGS,
+            WindowStyles.WS_CHILD | WindowStyles.WS_VISIBLE | WindowStyles.WS_CLIPCHILDREN |
+            WindowStyles.WS_CLIPSIBLINGS | WindowStyles.SS_BLACKRECT,
             0,
             0,
             Math.Max(1, (int)ActualWidth),
@@ -54,13 +55,27 @@ public sealed class UnityPreviewHwndHost : HwndHost
                 SetWindowPosFlags.SWP_NOACTIVATE | SetWindowPosFlags.SWP_NOZORDER);
     }
 
+    public void RefreshSurface()
+    {
+        if (_handle == IntPtr.Zero)
+            return;
+        _ = RedrawWindow(
+            _handle,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            RedrawWindowFlags.RDW_INVALIDATE |
+            RedrawWindowFlags.RDW_UPDATENOW |
+            RedrawWindowFlags.RDW_ALLCHILDREN);
+    }
+
     [Flags]
     private enum WindowStyles : uint
     {
         WS_CHILD = 0x40000000,
         WS_VISIBLE = 0x10000000,
         WS_CLIPSIBLINGS = 0x04000000,
-        WS_CLIPCHILDREN = 0x02000000
+        WS_CLIPCHILDREN = 0x02000000,
+        SS_BLACKRECT = 0x00000004
     }
 
     [Flags]
@@ -68,6 +83,14 @@ public sealed class UnityPreviewHwndHost : HwndHost
     {
         SWP_NOZORDER = 0x0004,
         SWP_NOACTIVATE = 0x0010
+    }
+
+    [Flags]
+    private enum RedrawWindowFlags : uint
+    {
+        RDW_INVALIDATE = 0x0001,
+        RDW_ALLCHILDREN = 0x0080,
+        RDW_UPDATENOW = 0x0100
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -99,4 +122,12 @@ public sealed class UnityPreviewHwndHost : HwndHost
         int cx,
         int cy,
         SetWindowPosFlags flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RedrawWindow(
+        IntPtr hwnd,
+        IntPtr updateRectangle,
+        IntPtr updateRegion,
+        RedrawWindowFlags flags);
 }

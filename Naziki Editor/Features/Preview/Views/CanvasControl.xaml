@@ -39,6 +39,12 @@
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="BtnRefreshPreview"
+                                Content="刷新界面"
+                                Padding="10,3"
+                                Margin="8,0,0,0"
+                                ToolTip="重绘 Unity 预览画面，并保留当前时间和播放状态"
+                                Click="BtnRefreshPreview_Click"/>
                         <Button x:Name="BtnReloadPlayer"
                                 DockPanel.Dock="Right"
                                 Content="重载播放器"

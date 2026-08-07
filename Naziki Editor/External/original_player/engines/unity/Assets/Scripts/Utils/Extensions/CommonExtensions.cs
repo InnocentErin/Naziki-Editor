@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using DG.Tweening;
@@ -569,8 +570,16 @@ public static class CommonExtensions
 
     public static Texture2D ToTexture2D(this byte[] bytes)
     {
+        if (bytes == null || bytes.Length == 0)
+            throw new InvalidDataException(
+                "PREVIEW_ASSET_DECODE_FAILED: image payload is empty.");
         var texture = new Texture2D(2, 2); // Texture size does not matter
-        texture.LoadImage(bytes);
+        if (!ImageConversion.LoadImage(texture, bytes, false))
+        {
+            UnityEngine.Object.Destroy(texture);
+            throw new InvalidDataException(
+                "PREVIEW_ASSET_DECODE_FAILED: ImageConversion.LoadImage rejected the image payload.");
+        }
         return texture;
     }
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using Naziki_Editor.Core.Charting;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -147,7 +148,7 @@ public sealed class ChartJsonCodecTests
         var wire = JObject.Parse(_codec.EncodeWire(
             result.Document!, ChartRuntimeProfile.BundledUnity));
 
-        Assert.Null(wire["music_offset"]);
+        Assert.Equal(0, wire.Value<double>("music_offset"));
         Assert.Equal(0, wire.Value<double>("start_offset_time"));
         Assert.Equal(0.8, wire.Value<double>("opacity"));
         Assert.NotNull(wire["page_list"]![0]!["PositionFunction"]);
@@ -155,7 +156,8 @@ public sealed class ChartJsonCodecTests
             wire["note_list"]![0]!.Value<double>("approach_rate"));
         Assert.Equal(1,
             wire["note_list"]![0]!.Value<int>("NoteDirection"));
-        Assert.Null(wire["note_list"]![0]!["is_forward"]);
+        Assert.False(wire["note_list"]![0]!.Value<bool>("is_forward"));
+        Assert.False(wire["note_list"]![0]!.Value<bool>("has_sibling"));
 
         var diagnostics = _codec.Validate(
             result.Document!.Source,
@@ -187,5 +189,105 @@ public sealed class ChartJsonCodecTests
         Assert.Contains(result.Diagnostics, item =>
             item.Code == "CHART_NOTE_LIST_EMPTY" &&
             item.Path == "$.note_list");
+    }
+
+    [Fact]
+    public void BundledUnityValidation_BlocksNonSequentialIdsAndUnsupportedTypes()
+    {
+        var result = _codec.Decode("""
+        {
+          "time_base":480,
+          "page_list":[{"start_tick":0,"end_tick":960,"scan_line_direction":1}],
+          "tempo_list":[{"tick":0,"value":500000}],
+          "event_order_list":[],
+          "note_list":[
+            {"id":4,"page_index":0,"type":8,"tick":240,"x":0.5,
+             "hold_tick":0,"next_id":-1}
+          ]
+        }
+        """, ChartRuntimeProfile.BundledUnity);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_NOTE_ID_SEQUENCE_INVALID");
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_NOTE_TYPE_INVALID");
+    }
+
+    [Fact]
+    public void BundledUnityValidation_BlocksDragCyclesAndEmptyEventGroups()
+    {
+        var result = _codec.Decode("""
+        {
+          "time_base":480,
+          "page_list":[{"start_tick":0,"end_tick":960,"scan_line_direction":1}],
+          "tempo_list":[{"tick":0,"value":500000}],
+          "event_order_list":[{"tick":0,"event_list":[]}],
+          "note_list":[
+            {"id":0,"page_index":0,"type":3,"tick":100,"x":0.2,"hold_tick":0,"next_id":1},
+            {"id":1,"page_index":0,"type":4,"tick":200,"x":0.4,"hold_tick":0,"next_id":2},
+            {"id":2,"page_index":0,"type":4,"tick":300,"x":0.6,"hold_tick":0,"next_id":1}
+          ]
+        }
+        """, ChartRuntimeProfile.BundledUnity);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_NOTE_DRAG_CYCLE");
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_EVENT_LIST_EMPTY");
+    }
+
+    [Fact]
+    public void BundledUnityValidation_KeepsOutsidePageNoteAsWarning()
+    {
+        var result = _codec.Decode("""
+        {
+          "time_base":480,
+          "page_list":[{"start_tick":0,"end_tick":960,"scan_line_direction":7}],
+          "tempo_list":[{"tick":0,"value":500000}],
+          "event_order_list":[],
+          "note_list":[
+            {"id":0,"page_index":0,"type":0,"tick":1200,"x":0.5,"hold_tick":0,"next_id":-1}
+          ]
+        }
+        """, ChartRuntimeProfile.BundledUnity);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_NOTE_OUTSIDE_PAGE" &&
+            item.Severity == ChartDiagnosticSeverity.Warning);
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "CHART_PAGE_DIRECTION_NONSTANDARD" &&
+            item.Severity == ChartDiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void BundledUnityWire_PreservesUnknownFieldsAndRemovesNullsAfterDefaults()
+    {
+        var result = _codec.Decode("""
+        {
+          "time_base":480,
+          "custom":{"mode":"performance"},
+          "event_order_list":null,
+          "page_list":[{"start_tick":0,"end_tick":960,"scan_line_direction":1}],
+          "tempo_list":[{"tick":0,"value":500000}],
+          "note_list":[
+            {"id":0,"page_index":0,"type":0,"tick":240,"x":0.5,
+             "hold_tick":null,"next_id":null,"custom_note":true}
+          ]
+        }
+        """);
+
+        var wire = JObject.Parse(_codec.EncodeWire(
+            result.Document!, ChartRuntimeProfile.BundledUnity));
+
+        Assert.Equal("performance", wire["custom"]!.Value<string>("mode"));
+        Assert.Empty((JArray)wire["event_order_list"]!);
+        Assert.Equal(0, wire["note_list"]![0]!.Value<double>("hold_tick"));
+        Assert.Equal(-1, wire["note_list"]![0]!.Value<int>("next_id"));
+        Assert.True(wire["note_list"]![0]!.Value<bool>("custom_note"));
+        Assert.DoesNotContain(wire.DescendantsAndSelf().OfType<JValue>(),
+            value => value.Type == JTokenType.Null);
     }
 }

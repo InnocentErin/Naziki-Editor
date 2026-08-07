@@ -72,7 +72,7 @@ namespace Cytoid.Storyboard.Videos
                 }
                 var path = MainRenderer.Game.UsesExternalContent
                     ? GameLaunchVfs.ResolveRequiredFilePath(
-                        MainRenderer.Game.Level.Path,
+                        MainRenderer.Storyboard.AssetRoot,
                         videoPath,
                         "storyboard.video.path")
                     : MainRenderer.Game.Level.Path + videoPath;

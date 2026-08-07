@@ -26,6 +26,12 @@ public interface IUnityPreviewProcessService : IDisposable
     event EventHandler<UnityPreviewProcessExited>? Exited;
     Task StartAsync(UnityPreviewLaunchOptions options, CancellationToken cancellationToken = default);
     Task ReparentAsync(IntPtr parentWindow, CancellationToken cancellationToken = default);
+    Task SyncGraphicsWindowAsync(
+        IntPtr parentWindow,
+        int pixelWidth,
+        int pixelHeight,
+        bool forceRedraw = true,
+        CancellationToken cancellationToken = default);
     Task StopAsync(TimeSpan gracefulTimeout, CancellationToken cancellationToken = default);
 }
 
@@ -139,6 +145,7 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
                     _graphicsWindow = graphicsWindow;
                 }
             }
+            SyncGraphicsWindow(graphicsWindow, options.ParentWindow, options.PixelWidth, options.PixelHeight, true);
         }
         catch
         {
@@ -189,6 +196,23 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
             if (ReferenceEquals(_process, process))
                 _graphicsWindow = graphicsWindow;
         }
+    }
+
+    public async Task SyncGraphicsWindowAsync(
+        IntPtr parentWindow,
+        int pixelWidth,
+        int pixelHeight,
+        bool forceRedraw = true,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReparentAsync(parentWindow, cancellationToken).ConfigureAwait(false);
+        IntPtr graphicsWindow;
+        lock (_sync)
+            graphicsWindow = _graphicsWindow;
+        if (graphicsWindow == IntPtr.Zero || !IsWindow(graphicsWindow))
+            return;
+        SyncGraphicsWindow(graphicsWindow, parentWindow, pixelWidth, pixelHeight, forceRedraw);
     }
 
     public async Task StopAsync(TimeSpan gracefulTimeout, CancellationToken cancellationToken = default)
@@ -308,6 +332,44 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
                 $"Failed to reparent the Unity Preview window (Win32={error}).");
     }
 
+    private static void SyncGraphicsWindow(
+        IntPtr child,
+        IntPtr parent,
+        int pixelWidth,
+        int pixelHeight,
+        bool forceRedraw)
+    {
+        ReparentWindow(child, parent);
+        var style = GetWindowLongPtr(child, WindowLongIndex.Style).ToInt64();
+        style = (style | (long)(WindowStyles.Child | WindowStyles.Visible)) & ~(long)WindowStyles.Popup;
+        _ = SetWindowLongPtr(child, WindowLongIndex.Style, new IntPtr(style));
+        if (!SetWindowPos(
+                child,
+                IntPtr.Zero,
+                0,
+                0,
+                Math.Max(1, pixelWidth),
+                Math.Max(1, pixelHeight),
+                SetWindowPosFlags.NoActivate |
+                SetWindowPosFlags.NoZOrder |
+                SetWindowPosFlags.ShowWindow |
+                SetWindowPosFlags.FrameChanged))
+        {
+            throw new InvalidOperationException(
+                $"Failed to size the Unity Preview window (Win32={Marshal.GetLastWin32Error()}).");
+        }
+        if (forceRedraw)
+        {
+            _ = RedrawWindow(
+                parent,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                RedrawWindowFlags.Invalidate |
+                RedrawWindowFlags.UpdateNow |
+                RedrawWindowFlags.AllChildren);
+        }
+    }
+
     private static IntPtr FindProcessChildWindow(IntPtr parentWindow, uint processId)
     {
         var result = IntPtr.Zero;
@@ -337,7 +399,33 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
 
     private enum WindowLongIndex
     {
+        Style = -16,
         UserData = -21
+    }
+
+    [Flags]
+    private enum WindowStyles : long
+    {
+        Child = 0x40000000L,
+        Popup = 0x80000000L,
+        Visible = 0x10000000L
+    }
+
+    [Flags]
+    private enum SetWindowPosFlags : uint
+    {
+        NoZOrder = 0x0004,
+        NoActivate = 0x0010,
+        FrameChanged = 0x0020,
+        ShowWindow = 0x0040
+    }
+
+    [Flags]
+    private enum RedrawWindowFlags : uint
+    {
+        Invalidate = 0x0001,
+        UpdateNow = 0x0100,
+        AllChildren = 0x0080
     }
 
     private enum WindowMessage : uint
@@ -350,6 +438,28 @@ public sealed class UnityPreviewProcessService : IUnityPreviewProcessService
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr window, WindowLongIndex index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr window, WindowLongIndex index, IntPtr value);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        SetWindowPosFlags flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RedrawWindow(
+        IntPtr window,
+        IntPtr updateRectangle,
+        IntPtr updateRegion,
+        RedrawWindowFlags flags);
 
     private delegate bool EnumWindowsCallback(IntPtr window, IntPtr parameter);
 

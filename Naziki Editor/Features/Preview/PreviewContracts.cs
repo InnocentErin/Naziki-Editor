@@ -102,6 +102,13 @@ public enum PreviewDiagnosticSeverity
     Error
 }
 
+public enum PreviewDiagnosticImpact
+{
+    Advisory,
+    StoryboardOnly,
+    PreviewBlocking
+}
+
 public enum PreviewDiagnosticSource
 {
     Editor,
@@ -128,6 +135,8 @@ public sealed record StoryboardPreviewSnapshot(
     public string? ChartDifficulty { get; init; }
     public string? ProjectId { get; init; }
     public string ProjectName { get; init; } = "Naziki Preview";
+    public bool StoryboardEnabled { get; init; } = true;
+    public IReadOnlyList<PreviewDiagnostic> CaptureDiagnostics { get; init; } = [];
 }
 
 public sealed record StoryboardEntityChange(
@@ -172,6 +181,8 @@ public sealed record PreviewDiagnostic(
     public string? Scene { get; init; }
     public int? Frame { get; init; }
     public long? SnapshotVersion { get; init; }
+    public PreviewDiagnosticImpact Impact { get; init; } = PreviewDiagnosticImpact.PreviewBlocking;
+    public string? Stage { get; init; }
 }
 
 public sealed record PreviewDiagnosticSummary(
@@ -187,7 +198,13 @@ public sealed record PreviewValidationResult(
     long EditorVersion,
     IReadOnlyList<PreviewDiagnostic> Diagnostics)
 {
-    public bool IsValid => Diagnostics.All(item => item.Severity != PreviewDiagnosticSeverity.Error);
+    public bool CanStartPreview => Diagnostics.All(item =>
+        item.Severity != PreviewDiagnosticSeverity.Error ||
+        item.Impact != PreviewDiagnosticImpact.PreviewBlocking);
+    public bool CanLoadStoryboard => Diagnostics.All(item =>
+        item.Severity != PreviewDiagnosticSeverity.Error ||
+        item.Impact == PreviewDiagnosticImpact.Advisory);
+    public bool IsValid => CanStartPreview;
     public int WarningCount => Diagnostics.Count(item => item.Severity == PreviewDiagnosticSeverity.Warning);
     public static PreviewValidationResult Valid(long version) => new(version, []);
 }

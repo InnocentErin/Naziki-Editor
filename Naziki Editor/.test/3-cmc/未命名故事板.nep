@@ -1,0 +1,20 @@
+{
+  "format_version": 3,
+  "ProjectName": "未命名故事板",
+  "EditorVersion": "1.0.0",
+  "CreationTime": "2026-08-07T21:46:54.6561422+08:00",
+  "LastModifiedTime": "2026-08-07T21:46:54.6561422+08:00",
+  "LevelFilePath": "level/level.json",
+  "StoryboardExportPath": "level/storyboard.json",
+  "storyboard_source_path": ".naziki/storyboard.editor.json",
+  "storyboard_source_hash": "2d2345f4d5ac1cdd0147c43a0a2bf978a3bdd61ddfd9d50389d3c75ba9d216de",
+  "storyboard_export_hash": "782310e3463e7e2d45a12dc82100be5c38a39a9ae7364224d15a24af843dbf95",
+  "ChartFilePath": "level/energy_synergy_matrix.json",
+  "chart_difficulty": "extreme",
+  "AudioFilePath": "music/energy_synergy_matrix.ogg",
+  "BackgroundPath": "assets/background/energy_synergy_matrix.jpg",
+  "MaterialFolderPath": "assets",
+  "LastTimelinePosition": 0.0,
+  "CanvasZoomLevel": 1.0,
+  "ControlBoardIdMaps": {}
+}

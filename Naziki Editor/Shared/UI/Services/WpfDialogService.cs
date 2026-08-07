@@ -44,6 +44,22 @@ namespace Naziki_Editor.Views.Services
             }, nameof(ShowErrorDialog));
         }
 
+        public void ShowDiagnosticDialog(
+            string message,
+            string title,
+            string? diagnosticDetails = null,
+            bool hasErrors = true)
+        {
+            ExecuteOnUIThread(() =>
+            {
+                ErrorDialog.ShowDiagnostic(
+                    message,
+                    string.IsNullOrEmpty(title) ? "Naziki Editor" : title,
+                    diagnosticDetails,
+                    hasErrors ? "error" : "warning");
+            }, nameof(ShowDiagnosticDialog));
+        }
+
         public ConfirmResult ShowConfirm(string message, string title, DialogMessageType type = DialogMessageType.Question)
         {
             string iconType = type switch

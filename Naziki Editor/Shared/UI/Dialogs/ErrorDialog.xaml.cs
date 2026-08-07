@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,8 @@ namespace Naziki_Editor.Views.Dialogs
         Message,
         /// <summary>错误消息，含忽略/关闭/复制三按钮</summary>
         Error,
+        /// <summary>非致命诊断报告，提供复制详情和关闭按钮。</summary>
+        Diagnostic,
         /// <summary>二选一确认，含是/否按钮</summary>
         YesNo,
         /// <summary>三选一确认，含是/否/取消按钮</summary>
@@ -36,7 +39,8 @@ namespace Naziki_Editor.Views.Dialogs
         Cancel,
         Ignore,
         Close,
-        Copy
+        Copy,
+        Dismiss
     }
 
     /// <summary>
@@ -102,7 +106,7 @@ namespace Naziki_Editor.Views.Dialogs
 
         private void ConfigureInitialSize()
         {
-            if (_mode == ErrorDialogMode.Error)
+            if (_mode is ErrorDialogMode.Error or ErrorDialogMode.Diagnostic)
             {
                 Width = 820;
                 Height = 600;
@@ -213,6 +217,11 @@ namespace Naziki_Editor.Views.Dialogs
                     AddButton("关闭程序", "DangerButtonStyle", ErrorDialogResult.Close);
                     break;
 
+                case ErrorDialogMode.Diagnostic:
+                    AddButton("复制详细信息", "PrimaryButtonStyle", ErrorDialogResult.Copy);
+                    AddButton("关闭", "DialogButtonStyle", ErrorDialogResult.Dismiss, isDefault: true);
+                    break;
+
                 case ErrorDialogMode.YesNo:
                     AddButton("是", "PrimaryButtonStyle", ErrorDialogResult.Yes, isDefault: true);
                     AddButton("否", "DialogButtonStyle", ErrorDialogResult.No);
@@ -297,6 +306,7 @@ namespace Naziki_Editor.Views.Dialogs
             _result = _mode switch
             {
                 ErrorDialogMode.Error => ErrorDialogResult.Ignore,
+                ErrorDialogMode.Diagnostic => ErrorDialogResult.Dismiss,
                 ErrorDialogMode.Confirm => ErrorDialogResult.Cancel,
                 ErrorDialogMode.YesNo => ErrorDialogResult.No,
                 _ => ErrorDialogResult.OK
@@ -319,7 +329,9 @@ namespace Naziki_Editor.Views.Dialogs
                 // 视觉反馈：短暂改变按钮文字
                 if (ButtonPanel.Children.Count > 0)
                 {
-                    var copyBtn = ButtonPanel.Children[1] as Button; // Copy button is always second
+                    var copyBtn = ButtonPanel.Children
+                        .OfType<Button>()
+                        .FirstOrDefault(button => Equals(button.Tag, ErrorDialogResult.Copy));
                     if (copyBtn != null)
                     {
                         var original = copyBtn.Content;
@@ -385,6 +397,16 @@ namespace Naziki_Editor.Views.Dialogs
                                                    string? errorDetails = null)
         {
             return ShowDialog(title, message, ErrorDialogMode.Error, errorDetails, "error");
+        }
+
+        public static ErrorDialogResult ShowDiagnostic(
+            string message,
+            string title = "诊断",
+            string? diagnosticDetails = null,
+            string iconType = "warning")
+        {
+            return ShowDialog(
+                title, message, ErrorDialogMode.Diagnostic, diagnosticDetails, iconType);
         }
 
         /// <summary>

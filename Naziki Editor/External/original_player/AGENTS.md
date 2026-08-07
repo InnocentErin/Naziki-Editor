@@ -286,6 +286,10 @@ Append new rows when architecture or default paths change.
   It pauses audio and gameplay side effects, rebuilds the visible note window,
   recomputes deterministic Autoplay score/combo state, and evaluates storyboard
   renderers at the requested time without destructive reverse-time disposal.
+- Editor time/control commands are serialized through one controller gate. A
+  `preview.play` response is emitted only after any preceding seek finishes and
+  the loaded game has actually entered playback; rejected controls retain a
+  non-playing state in the WPF host.
 - Random access retires notes and drag lines through their public `Collect()`
   lifecycle; direct pool collection is forbidden because it leaves event
   subscriptions and model state behind. External-clock ticks use incremental
@@ -294,3 +298,6 @@ Append new rows when architecture or default paths change.
   Unity receives the resulting physical viewport and editor-only performance
   settings through `naziki.editor-preview.v2`; production game behavior and
   `cytoid.game-core.v2` remain unchanged.
+- The WPF host also owns native child-window sizing and redraw. It synchronizes
+  the Unity graphics HWND after attachment, load completion, resize, visibility
+  changes, and explicit surface refresh without reloading level content.

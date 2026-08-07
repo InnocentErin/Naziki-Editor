@@ -125,8 +125,8 @@ public sealed class PlaybackCoordinator : IPlaybackCoordinator
             _audio.Seek(time);
             _audio.Play();
             _editorClockTimer.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(20));
+            SetPlaying(true);
         }
-        SetPlaying(true);
     }
 
     public void Pause()
@@ -134,10 +134,12 @@ public sealed class PlaybackCoordinator : IPlaybackCoordinator
         if (_effectiveClock == PlaybackClockSource.UnityPreview)
             _preview.Pause();
         else
+        {
             CaptureEditorTime();
+            SetPlaying(false);
+        }
         _audio.Pause();
         _editorClockTimer.Change(Timeout.Infinite, Timeout.Infinite);
-        SetPlaying(false);
     }
 
     public void Stop()
@@ -147,7 +149,8 @@ public sealed class PlaybackCoordinator : IPlaybackCoordinator
         _preview.Stop();
         _editorClockTimer.Change(Timeout.Infinite, Timeout.Infinite);
         SetCurrentTime(0);
-        SetPlaying(false);
+        if (_effectiveClock == PlaybackClockSource.EditorAudio)
+            SetPlaying(false);
     }
 
     public void Seek(double seconds)

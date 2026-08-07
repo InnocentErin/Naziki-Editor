@@ -1,0 +1,37 @@
+{
+  
+  "version": 2,
+  "schema_version": 2,
+
+  "id": "timitini.ccc4th.energy_synergy_matrix_",
+  
+  "title": "Energy Synergy Matrix",
+  "title_localized": " ",
+
+  "artist": "Tanchiky",
+  "artist_localized": " ",
+  "artist_source": "https://twitter.com/tanchiky?s=20",
+
+  "illustrator": "からめる (KARAMERU)",
+  "illustrator_source": "https://twitter.com/purinharumaki?s=20",
+
+  "charter": "timitini",
+  
+  "music": {
+    "path": "energy_synergy_matrix.ogg"
+  },
+  "music_preview": {
+    "path": "energy_synergy_matrix_preview.ogg"
+  },
+  "background": {
+    "path": "energy_synergy_matrix.jpg"
+  },
+  "charts": [
+    {
+      "type": "extreme",
+	  "name": "E!S!M!RUN!",
+      "difficulty": 15,
+      "path": "energy_synergy_matrix.json"
+    }
+  ]
+}

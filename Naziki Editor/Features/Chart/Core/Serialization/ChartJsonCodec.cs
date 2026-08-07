@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
 using Naziki_Editor.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -140,8 +141,6 @@ public sealed class ChartJsonCodec : IChartJsonCodec
     {
         ArgumentNullException.ThrowIfNull(document);
         var root = (JObject)document.Source.DeepClone();
-        if (profile == ChartRuntimeProfile.BundledUnity)
-            return root.ToString(Formatting.None);
         NormalizeWireDefaults(root);
         ApplyProfile(root, profile);
         RemoveNulls(root);
@@ -202,6 +201,22 @@ public sealed class ChartJsonCodec : IChartJsonCodec
         }
 
         ValidateProfileCompatibility();
+        ValidateFiniteNumbers();
+        if (profile == ChartRuntimeProfile.BundledUnity)
+        {
+            ValidateBundledUnityRuntime(notes);
+            for (var index = 0; index < diagnostics.Count; index++)
+            {
+                if (diagnostics[index].Code == "CHART_NOTE_OUTSIDE_PAGE")
+                {
+                    diagnostics[index] = diagnostics[index] with
+                    {
+                        Severity = ChartDiagnosticSeverity.Warning,
+                        Message = "音符 Tick 超出其声明页面；内置播放器会保留该演出数据。"
+                    };
+                }
+            }
+        }
         return diagnostics;
 
         void ValidateProfileCompatibility()
@@ -394,6 +409,181 @@ public sealed class ChartJsonCodec : IChartJsonCodec
             }
         }
 
+        void ValidateFiniteNumbers()
+        {
+            foreach (var value in source.DescendantsAndSelf().OfType<JValue>())
+            {
+                if (value.Type is not (JTokenType.Float or JTokenType.Integer))
+                    continue;
+                if (TryReadFiniteDouble(value, out _))
+                    continue;
+                Add("CHART_NUMBER_NONFINITE",
+                    string.IsNullOrWhiteSpace(value.Path) ? "$" : $"$.{value.Path}",
+                    "谱面中的所有数值都必须是有限数。",
+                    ChartDiagnosticSeverity.Error);
+            }
+        }
+
+        void ValidateBundledUnityRuntime(JArray? noteValues)
+        {
+            if (noteValues is not null)
+            {
+                var nextById = new Dictionary<int, int>();
+                for (var index = 0; index < noteValues.Count; index++)
+                {
+                    var path = $"$.note_list[{index}]";
+                    if (noteValues[index] is not JObject note)
+                        continue;
+
+                    if (!TryReadInt32(note["id"], out var id) || id != index)
+                        Add("CHART_NOTE_ID_SEQUENCE_INVALID", $"{path}.id",
+                            $"内置 Unity 播放器要求音符 ID 严格等于其数组索引；此处应为 {index}。",
+                            ChartDiagnosticSeverity.Error);
+
+                    if (!TryReadInt32(note["type"], out var type) || type is < 0 or > 7)
+                        Add("CHART_NOTE_TYPE_INVALID", $"{path}.type",
+                            "内置 Unity 播放器仅支持 0..7 的音符类型。",
+                            ChartDiagnosticSeverity.Error);
+
+                    if (!TryReadInt32(note["page_index"], out _))
+                        Add("CHART_NOTE_PAGE_INDEX_TYPE_INVALID", $"{path}.page_index",
+                            "page_index 必须是整数。",
+                            ChartDiagnosticSeverity.Error);
+
+                    RequireFiniteNoteNumber(note, "tick", path);
+                    RequireFiniteNoteNumber(note, "x", path);
+                    RequireFiniteNoteNumber(note, "hold_tick", path, defaultWhenMissing: 0d);
+
+                    foreach (var optionalName in new[] { "size", "opacity", "hitbox" })
+                    {
+                        if (note[optionalName] is not null && note[optionalName]!.Type != JTokenType.Null)
+                            RequireFiniteNoteNumber(note, optionalName, path);
+                    }
+
+                    if (note["approach_rate"] is not null && note["approach_rate"]!.Type != JTokenType.Null)
+                    {
+                        if (!TryReadFiniteDouble(note["approach_rate"], out var approachRate) || approachRate <= 0)
+                            Add("CHART_NOTE_APPROACH_RATE_INVALID", $"{path}.approach_rate",
+                                "approach_rate 必须是大于 0 的有限数，否则播放器会产生除零或无穷时间。",
+                                ChartDiagnosticSeverity.Error);
+                    }
+
+                    var next = -1;
+                    if (note["next_id"] is not null && note["next_id"]!.Type != JTokenType.Null &&
+                        !TryReadInt32(note["next_id"], out next))
+                    {
+                        Add("CHART_NOTE_NEXT_ID_TYPE_INVALID", $"{path}.next_id",
+                            "next_id 必须是整数。",
+                            ChartDiagnosticSeverity.Error);
+                        continue;
+                    }
+
+                    if (next < -1 || next >= noteValues.Count)
+                        Add("CHART_NOTE_NEXT_INDEX_INVALID", $"{path}.next_id",
+                            "next_id 必须为 -1、0（结束链）或现有音符 ID。",
+                            ChartDiagnosticSeverity.Error);
+                    else
+                        nextById[index] = next;
+                }
+
+                ValidateDragCycles(nextById);
+            }
+
+            if (source["event_order_list"] is not null &&
+                source["event_order_list"] is not JArray)
+            {
+                Add("CHART_EVENT_ORDER_LIST_INVALID", "$.event_order_list",
+                    "event_order_list 必须是数组。",
+                    ChartDiagnosticSeverity.Error);
+            }
+            else if (source["event_order_list"] is JArray eventOrders)
+            {
+                for (var index = 0; index < eventOrders.Count; index++)
+                {
+                    var path = $"$.event_order_list[{index}]";
+                    if (eventOrders[index] is not JObject order)
+                    {
+                        Add("CHART_EVENT_ORDER_INVALID", path,
+                            "事件组必须是 JSON 对象。",
+                            ChartDiagnosticSeverity.Error);
+                        continue;
+                    }
+
+                    if (!TryReadFiniteDouble(order["tick"], out _))
+                        Add("CHART_EVENT_TICK_INVALID", $"{path}.tick",
+                            "事件 Tick 必须是有限数。",
+                            ChartDiagnosticSeverity.Error);
+
+                    if (order["event_list"] is not JArray { Count: > 0 } events)
+                    {
+                        Add("CHART_EVENT_LIST_EMPTY", $"{path}.event_list",
+                            "内置 Unity 播放器会读取事件组的首个事件，因此 event_list 不能为空。",
+                            ChartDiagnosticSeverity.Error);
+                        continue;
+                    }
+
+                    if (events[0] is not JObject firstEvent ||
+                        !TryReadInt32(firstEvent["type"], out _))
+                        Add("CHART_EVENT_TYPE_INVALID", $"{path}.event_list[0].type",
+                            "事件组首个事件的 type 必须是整数。",
+                            ChartDiagnosticSeverity.Error);
+                }
+            }
+        }
+
+        void RequireFiniteNoteNumber(
+            JObject note,
+            string property,
+            string notePath,
+            double? defaultWhenMissing = null)
+        {
+            var token = note[property];
+            if ((token is null || token.Type == JTokenType.Null) && defaultWhenMissing.HasValue)
+                return;
+            if (!TryReadFiniteDouble(token, out _))
+                Add("CHART_NOTE_NUMBER_INVALID", $"{notePath}.{property}",
+                    $"音符字段 {property} 必须是有限数。",
+                    ChartDiagnosticSeverity.Error);
+        }
+
+        void ValidateDragCycles(IReadOnlyDictionary<int, int> nextById)
+        {
+            var resolved = new HashSet<int>();
+            var reported = new HashSet<int>();
+            foreach (var start in nextById.Keys)
+            {
+                if (resolved.Contains(start))
+                    continue;
+                var chain = new List<int>();
+                var positions = new Dictionary<int, int>();
+                var current = start;
+                while (true)
+                {
+                    if (resolved.Contains(current))
+                        break;
+                    if (positions.TryGetValue(current, out var cycleStart))
+                    {
+                        var cycle = chain.Skip(cycleStart).ToArray();
+                        var representative = cycle.Min();
+                        if (reported.Add(representative))
+                            Add("CHART_NOTE_DRAG_CYCLE", $"$.note_list[{current}].next_id",
+                                $"拖链形成循环：{string.Join(" -> ", cycle)} -> {current}。",
+                                ChartDiagnosticSeverity.Error);
+                        break;
+                    }
+
+                    positions[current] = chain.Count;
+                    chain.Add(current);
+                    if (!nextById.TryGetValue(current, out var next) || next <= 0)
+                        break;
+                    current = next;
+                }
+
+                foreach (var id in chain)
+                    resolved.Add(id);
+            }
+        }
+
         void Add(string code, string path, string message,
             ChartDiagnosticSeverity severity) =>
             diagnostics.Add(new ChartDiagnostic(
@@ -402,13 +592,23 @@ public sealed class ChartJsonCodec : IChartJsonCodec
 
     private static void NormalizeWireDefaults(JObject root)
     {
-        root["music_offset"] ??= 0d;
+        SetDefault(root, "music_offset", 0d);
+        SetDefault(root, "event_order_list", new JArray());
         if (root["note_list"] is not JArray notes) return;
         foreach (var note in notes.OfType<JObject>())
         {
-            note["has_sibling"] ??= false;
-            note["is_forward"] ??= false;
+            SetDefault(note, "has_sibling", false);
+            SetDefault(note, "is_forward", false);
+            SetDefault(note, "hold_tick", 0d);
+            SetDefault(note, "next_id", -1);
+            SetDefault(note, "approach_rate", 1d);
         }
+    }
+
+    private static void SetDefault(JObject root, string property, JToken value)
+    {
+        if (root[property] is null || root[property]!.Type == JTokenType.Null)
+            root[property] = value;
     }
 
     private static void ApplyProfile(
@@ -449,6 +649,25 @@ public sealed class ChartJsonCodec : IChartJsonCodec
 
     private static bool IsFinite(double? value) =>
         value.HasValue && double.IsFinite(value.Value);
+
+    private static bool TryReadInt32(JToken? token, out int value)
+    {
+        value = default;
+        if (token?.Type != JTokenType.Integer)
+            return false;
+        return int.TryParse(token.ToString(Formatting.None),
+            NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool TryReadFiniteDouble(JToken? token, out double value)
+    {
+        value = default;
+        if (token?.Type is not (JTokenType.Integer or JTokenType.Float))
+            return false;
+        return double.TryParse(token.ToString(Formatting.None),
+                   NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+               double.IsFinite(value);
+    }
 
     private static ChartDecodeResult Failure(
         string code,

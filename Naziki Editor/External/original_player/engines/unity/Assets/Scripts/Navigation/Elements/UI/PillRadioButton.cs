@@ -23,15 +23,34 @@ public class PillRadioButton : RadioButton
         label.fontStyle = FontStyle.Normal;
     }
 
+    private void OnDisable()
+    {
+        KillTweens();
+    }
+
+    private void OnDestroy()
+    {
+        KillTweens();
+    }
+
+    private void KillTweens()
+    {
+        if (label == null) return;
+        label.DOKill();
+        label.transform.DOKill();
+    }
+
     public override void OnPointerDown(PointerEventData eventData)
     {
         base.OnPointerDown(eventData);
+        label.transform.DOKill();
         label.transform.DOScale(0.9f, 0.2f).SetEase(Ease.OutCubic);
     }
 
     public override void OnPointerUp(PointerEventData eventData)
     {
         base.OnPointerUp(eventData);
+        label.transform.DOKill();
         label.transform.DOScale(1f, 0.2f).SetEase(Ease.OutCubic);
     }
 
@@ -41,6 +60,7 @@ public class PillRadioButton : RadioButton
         if (pulse) pulseElement.Pulse();
         SetBorderWidth(0);
         label.font = Context.FontManager.BoldFont;
+        label.DOKill();
         label.DOColor(activeTextColor, 0.2f).SetEase(Ease.OutCubic);
     }
 
@@ -49,6 +69,7 @@ public class PillRadioButton : RadioButton
         base.Unselect();
         SetBorderWidth(4);
         label.font = Context.FontManager.RegularFont;
+        label.DOKill();
         label.DOColor(Color.white, 0.2f).SetEase(Ease.OutCubic);
     }
 

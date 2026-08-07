@@ -196,6 +196,29 @@ public sealed class OfficialPreviewCompatibilityTests
         Assert.Contains("Add(startInfo, \"-screen-fullscreen\")", process, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void UnityPreview_ControlCommandsAreSerializedAndStaleSceneScriptsAreRemoved()
+    {
+        var root = FindRepositoryRoot();
+        var unityRoot = Path.Combine(
+            root, "External", "original_player", "engines", "unity", "Assets");
+        var controller = File.ReadAllText(Path.Combine(
+            unityRoot, "Scripts", "Host", "EditorPreviewController.cs"));
+        var scene = File.ReadAllText(Path.Combine(unityRoot, "Scenes", "Game.unity"));
+        var pill = File.ReadAllText(Path.Combine(
+            unityRoot, "Scripts", "Navigation", "Elements", "UI", "PillRadioButton.cs"));
+
+        Assert.Contains("static readonly SemaphoreSlim ControlGate", controller, StringComparison.Ordinal);
+        foreach (var command in new[] { "Play", "Pause", "Stop", "Seek", "BeginScrub", "CommitScrub", "ApplyViewport" })
+            Assert.Contains($"RunControl(message, requestId, {command})", controller, StringComparison.Ordinal);
+        Assert.Contains("SendState(\"Playing\", requestId)", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("8bbed4453743401b8e2a0f936bff8271", scene, StringComparison.Ordinal);
+        Assert.DoesNotContain("49429363b41b4132a930c7e0d9459b47", scene, StringComparison.Ordinal);
+        Assert.DoesNotContain("e4841f7b36e246a39eb8d716f6ef5b10", scene, StringComparison.Ordinal);
+        Assert.Contains("label.DOKill()", pill, StringComparison.Ordinal);
+        Assert.Contains("label.transform.DOKill()", pill, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);

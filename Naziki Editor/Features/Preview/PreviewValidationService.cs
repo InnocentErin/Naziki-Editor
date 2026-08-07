@@ -53,24 +53,32 @@ public sealed class PreviewValidationService : IPreviewValidationService
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
-        var diagnostics = new List<PreviewDiagnostic>();
+        var diagnostics = new List<PreviewDiagnostic>(snapshot.CaptureDiagnostics);
 
         if (_readiness is not null)
         {
             foreach (var item in _readiness.Evaluate(context).Diagnostics)
             {
+                var source = item.Resource switch
+                {
+                    ProjectResourceKind.Level => PreviewDiagnosticSource.Level,
+                    ProjectResourceKind.Chart => PreviewDiagnosticSource.Chart,
+                    ProjectResourceKind.Storyboard => PreviewDiagnosticSource.Storyboard,
+                    _ => PreviewDiagnosticSource.Asset
+                };
                 diagnostics.Add(new PreviewDiagnostic(
                     $"PROJECT_{item.Code.ToString().ToUpperInvariant()}",
                     item.Message,
                     PreviewDiagnosticSeverity.Error,
-                    item.Resource switch
-                    {
-                        ProjectResourceKind.Level => PreviewDiagnosticSource.Level,
-                        ProjectResourceKind.Chart => PreviewDiagnosticSource.Chart,
-                        _ => PreviewDiagnosticSource.Asset
-                    },
+                    source,
                     item.Path,
-                    Suggestion: "使用工程资源修复向导补全或更换该文件。"));
+                    Suggestion: "使用工程资源修复向导补全或更换该文件。")
+                {
+                    Impact = source == PreviewDiagnosticSource.Storyboard
+                        ? PreviewDiagnosticImpact.StoryboardOnly
+                        : PreviewDiagnosticImpact.PreviewBlocking,
+                    Stage = "readiness"
+                });
             }
         }
 
@@ -87,7 +95,13 @@ public sealed class PreviewValidationService : IPreviewValidationService
                 },
                 PreviewDiagnosticSource.Storyboard,
                 item.Path,
-                item.Node is IStoryboardEntity entity ? entity.Id : null));
+                item.Node is IStoryboardEntity entity ? entity.Id : null)
+            {
+                Impact = item.Severity == StoryboardDiagnosticSeverity.Error
+                    ? PreviewDiagnosticImpact.StoryboardOnly
+                    : PreviewDiagnosticImpact.Advisory,
+                Stage = "validate"
+            });
         }
 
         if (!string.IsNullOrWhiteSpace(snapshot.LevelJson))
@@ -121,7 +135,13 @@ public sealed class PreviewValidationService : IPreviewValidationService
                         _ => PreviewDiagnosticSeverity.Information
                     },
                     PreviewDiagnosticSource.Chart,
-                    item.Path));
+                    item.Path)
+                {
+                    Impact = item.Severity == ChartDiagnosticSeverity.Error
+                        ? PreviewDiagnosticImpact.PreviewBlocking
+                        : PreviewDiagnosticImpact.Advisory,
+                    Stage = "validate"
+                });
             }
             foreach (var issue in _chartWire.Validate(snapshot.ChartJson))
             {
@@ -157,7 +177,7 @@ public sealed class PreviewValidationService : IPreviewValidationService
             "Background image decoding is not guaranteed by the official Cytoid runtime for this format.");
         ValidateAssetReferences(snapshot, diagnostics);
 
-        return new PreviewValidationResult(snapshot.Version, diagnostics);
+        return new PreviewValidationResult(snapshot.Version, MergeDiagnostics(diagnostics));
     }
 
     private static void ValidateJson(
@@ -290,7 +310,7 @@ public sealed class PreviewValidationService : IPreviewValidationService
                 continue;
             if (string.IsNullOrWhiteSpace(assetRoot))
             {
-                diagnostics.Add(Error("PREVIEW_ASSET_ROOT_MISSING",
+                diagnostics.Add(StoryboardAssetError("PREVIEW_ASSET_ROOT_MISSING",
                     $"无法解析素材“{reference}”，项目素材根目录未配置。",
                     PreviewDiagnosticSource.Asset,
                     property.Path));
@@ -305,7 +325,7 @@ public sealed class PreviewValidationService : IPreviewValidationService
                 if (!fullPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    diagnostics.Add(Error("PREVIEW_ASSET_PATH_ESCAPE",
+                    diagnostics.Add(StoryboardAssetError("PREVIEW_ASSET_PATH_ESCAPE",
                         $"素材路径“{reference}”越过项目素材目录。",
                         PreviewDiagnosticSource.Asset,
                         property.Path));
@@ -314,7 +334,7 @@ public sealed class PreviewValidationService : IPreviewValidationService
             }
             catch (Exception ex)
             {
-                diagnostics.Add(Error("PREVIEW_ASSET_PATH_INVALID",
+                diagnostics.Add(StoryboardAssetError("PREVIEW_ASSET_PATH_INVALID",
                     $"素材路径“{reference}”无效：{ex.Message}",
                     PreviewDiagnosticSource.Asset,
                     property.Path));
@@ -324,14 +344,14 @@ public sealed class PreviewValidationService : IPreviewValidationService
             var extension = Path.GetExtension(fullPath);
             if (!SupportedAssetExtensions.Contains(extension))
             {
-                diagnostics.Add(Error("PREVIEW_ASSET_UNSUPPORTED",
+                diagnostics.Add(StoryboardAssetError("PREVIEW_ASSET_UNSUPPORTED",
                     $"原生预览不支持素材类型“{extension}”。",
                     PreviewDiagnosticSource.Asset,
                     property.Path));
             }
             else if (!File.Exists(fullPath))
             {
-                diagnostics.Add(Error("PREVIEW_ASSET_NOT_FOUND",
+                diagnostics.Add(StoryboardAssetError("PREVIEW_ASSET_NOT_FOUND",
                     $"找不到素材“{reference}”。",
                     PreviewDiagnosticSource.Asset,
                     property.Path));
@@ -360,16 +380,64 @@ public sealed class PreviewValidationService : IPreviewValidationService
             $"{message} ({extension})",
             PreviewDiagnosticSeverity.Warning,
             PreviewDiagnosticSource.Asset,
-            jsonPath ?? path));
+            jsonPath ?? path)
+        {
+            Impact = PreviewDiagnosticImpact.Advisory,
+            Stage = "validate"
+        });
     }
+
+    private static PreviewDiagnostic StoryboardAssetError(
+        string code,
+        string message,
+        PreviewDiagnosticSource source,
+        string? path = null,
+        string? suggestion = null) =>
+        Error(code, message, source, path, suggestion,
+            PreviewDiagnosticImpact.StoryboardOnly) with
+        {
+            Stage = "resolve-assets"
+        };
+
+    private static IReadOnlyList<PreviewDiagnostic> MergeDiagnostics(
+        IEnumerable<PreviewDiagnostic> diagnostics) =>
+        diagnostics
+            .GroupBy(item => new
+            {
+                item.Code,
+                item.Source,
+                item.Path,
+                item.EntityId,
+                item.Stage,
+                item.Impact
+            })
+            .Select(group =>
+            {
+                var primary = group
+                    .OrderByDescending(item => item.Severity)
+                    .ThenBy(item => item.Timestamp)
+                    .First();
+                return primary with
+                {
+                    RepeatCount = group.Sum(item => Math.Max(1, item.RepeatCount))
+                };
+            })
+            .ToArray();
 
     private static PreviewDiagnostic Error(
         string code,
         string message,
         PreviewDiagnosticSource source,
         string? path = null,
-        string? suggestion = null) =>
-        new(code, message, PreviewDiagnosticSeverity.Error, source, path, Suggestion: suggestion);
+        string? suggestion = null,
+        PreviewDiagnosticImpact? impact = null) =>
+        new(code, message, PreviewDiagnosticSeverity.Error, source, path, Suggestion: suggestion)
+        {
+            Impact = impact ?? (source == PreviewDiagnosticSource.Storyboard
+                ? PreviewDiagnosticImpact.StoryboardOnly
+                : PreviewDiagnosticImpact.PreviewBlocking),
+            Stage = "validate"
+        };
 
     private static IEnumerable<JToken> Traverse(JToken token)
     {

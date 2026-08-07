@@ -96,6 +96,12 @@ public sealed class EditorStoryboardEntity
     [JsonProperty("base_patch")]
     public JObject BasePatch { get; set; } = new();
 
+    [JsonProperty("root_easing")]
+    public string? RootEasing { get; set; }
+
+    [JsonProperty("root_destroy")]
+    public bool? RootDestroy { get; set; }
+
     [JsonProperty("root_template")]
     public EditorTemplateBinding? RootTemplate { get; set; }
 

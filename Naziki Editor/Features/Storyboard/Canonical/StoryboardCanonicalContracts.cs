@@ -134,6 +134,8 @@ public sealed record MaterializedStoryboardEntity(
     double? EffectiveActivationTime,
     int? BoundNoteId,
     JObject BaseState,
+    string? RootEasing,
+    bool? RootDestroy,
     IReadOnlyList<MaterializedStoryboardFrame> Frames);
 
 public sealed record MaterializedStoryboard(

@@ -57,14 +57,49 @@ public sealed class StoryboardPreviewService :
             if (context.ProjectData is not null)
                 context.ProjectData.ChartDifficulty = chartDifficulty;
         }
-        var exported = _bridge.Export(context);
-        if (!exported.Success)
-            throw new JsonSerializationException(string.Join(
-                Environment.NewLine,
-                exported.Issues.Where(issue =>
-                        issue.Severity == StoryboardDiagnosticSeverity.Error)
-                    .Select(issue => $"{issue.Path}: {issue.Message}")));
-        var runtimeStoryboardJson = exported.Json.ToString(Formatting.None);
+        var runtimeStoryboardJson = "{}";
+        var storyboardEnabled = true;
+        var captureDiagnostics = new List<PreviewDiagnostic>();
+        try
+        {
+            var exported = _bridge.Export(context);
+            captureDiagnostics.AddRange(exported.Issues.Select(issue =>
+                new PreviewDiagnostic(
+                    issue.Code,
+                    issue.Message,
+                    issue.Severity switch
+                    {
+                        StoryboardDiagnosticSeverity.Error => PreviewDiagnosticSeverity.Error,
+                        StoryboardDiagnosticSeverity.Warning => PreviewDiagnosticSeverity.Warning,
+                        _ => PreviewDiagnosticSeverity.Information
+                    },
+                    PreviewDiagnosticSource.Storyboard,
+                    issue.Path)
+                {
+                    Impact = issue.Severity == StoryboardDiagnosticSeverity.Error
+                        ? PreviewDiagnosticImpact.StoryboardOnly
+                        : PreviewDiagnosticImpact.Advisory,
+                    Stage = "export"
+                }));
+            storyboardEnabled = exported.Success;
+            if (storyboardEnabled)
+                runtimeStoryboardJson = exported.Json.ToString(Formatting.None);
+        }
+        catch (Exception ex)
+        {
+            storyboardEnabled = false;
+            captureDiagnostics.Add(new PreviewDiagnostic(
+                "PREVIEW_STORYBOARD_EXPORT_FAILED",
+                $"故事板运行时导出失败，预览将仅播放谱面：{ex.Message}",
+                PreviewDiagnosticSeverity.Error,
+                PreviewDiagnosticSource.Storyboard,
+                "$.storyboard")
+            {
+                Impact = PreviewDiagnosticImpact.StoryboardOnly,
+                Stage = "export",
+                StackTrace = ex.ToString()
+            });
+        }
 
         return new StoryboardPreviewSnapshot(
             _sessionId,
@@ -86,7 +121,9 @@ public sealed class StoryboardPreviewService :
                 : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                     System.Text.Encoding.UTF8.GetBytes(context.ProjectFilePath ?? context.ProjectData.ProjectName)))
                     .ToLowerInvariant()[..24],
-            ProjectName = context.ProjectData?.ProjectName ?? "Naziki Preview"
+            ProjectName = context.ProjectData?.ProjectName ?? "Naziki Preview",
+            StoryboardEnabled = storyboardEnabled,
+            CaptureDiagnostics = captureDiagnostics
         };
     }
 

@@ -59,7 +59,7 @@ namespace Cytoid.Storyboard.Sprites
 
                 LoadPath = MainRenderer.Game.UsesExternalContent
                     ? GameLaunchVfs.ResolveRequiredFileUri(
-                        MainRenderer.Game.Level.Path,
+                        MainRenderer.Storyboard.AssetRoot,
                         spritePath,
                         "storyboard.sprite.path")
                     : "file://" + MainRenderer.Game.Level.Path + spritePath;

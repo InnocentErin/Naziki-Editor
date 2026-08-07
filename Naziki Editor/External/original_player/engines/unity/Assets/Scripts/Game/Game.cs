@@ -37,6 +37,7 @@ public class Game : MonoBehaviour
     public Cytoid.Storyboard.Storyboard Storyboard { get; protected set; }
 
     public string StoryboardPath { get; protected set; }
+    public Exception StoryboardLoadException { get; private set; }
 
     public float Time { get; protected set; }
     public float MusicLength { get; protected set; }
@@ -270,19 +271,39 @@ public class Game : MonoBehaviour
         if (!string.IsNullOrEmpty(storyboardText))
         {
             Debug.Log($"[CYTOID-DBG] Game.Initialize: loading storyboard (text length={storyboardText.Length})");
-            // Initialize storyboard
+            Cytoid.Storyboard.Storyboard candidate = null;
             try
             {
-                Storyboard = new Cytoid.Storyboard.Storyboard(this, storyboardText);
-                Storyboard.Parse();
-                await Storyboard.Initialize();
+                candidate = new Cytoid.Storyboard.Storyboard(this, storyboardText);
+                candidate.Parse();
+                await candidate.Initialize();
+                Storyboard = candidate;
+                candidate = null;
+                StoryboardLoadException = null;
                 Debug.Log("[CYTOID-DBG] Game.Initialize: storyboard loaded OK");
                 print(contentProvider.IsExternal ? "Loaded storyboard from external payload" : $"Loaded storyboard from {StoryboardPath}");
             }
             catch (Exception e)
             {
-                Debug.LogError($"[CYTOID-DBG] Game.Initialize: STORYBOARD LOAD FAILED: {e}");
-                Debug.LogError("Could not load storyboard.");
+                try
+                {
+                    candidate?.Dispose();
+                }
+                catch (Exception disposeException)
+                {
+                    Debug.LogWarning($"Storyboard cleanup failed after initialization error: {disposeException}");
+                }
+
+                Storyboard = null;
+                StoryboardLoadException = e;
+                if (GameEmbedMode.IsEditorPreview)
+                {
+                    Debug.LogWarning($"[PREVIEW_STORYBOARD_LOAD_FAILED] Storyboard disabled; chart preview will continue. {e}");
+                }
+                else
+                {
+                    Debug.LogError($"Could not load storyboard: {e}");
+                }
             }
         }
         else
@@ -652,7 +673,9 @@ public class Game : MonoBehaviour
         EditorPreviewBridge.NotifyPreviewPausedAtEnd(duration);
     }
 
-    public async UniTask PreviewReplaceStoryboard(string storyboardJson)
+    public async UniTask PreviewReplaceStoryboard(
+        string storyboardJson,
+        string assetRoot = null)
     {
         if (!GameEmbedMode.IsEditorPreview || !IsLoaded)
             throw new InvalidOperationException("Game is not ready for storyboard replacement.");
@@ -660,15 +683,31 @@ public class Game : MonoBehaviour
         Cytoid.Storyboard.Storyboard candidate = null;
         try
         {
-            candidate = new Cytoid.Storyboard.Storyboard(this, storyboardJson);
+            candidate = new Cytoid.Storyboard.Storyboard(
+                this,
+                storyboardJson,
+                assetRoot ?? Storyboard?.AssetRoot ?? Level.Path);
             candidate.Parse();
             await candidate.Initialize();
             var previous = Storyboard;
             Storyboard = candidate;
             candidate = null;
-            previous?.Dispose();
+            try
+            {
+                previous?.Dispose();
+            }
+            catch (Exception disposeException)
+            {
+                Debug.LogWarning($"Previous storyboard cleanup failed after replacement: {disposeException}");
+            }
+            StoryboardLoadException = null;
             Storyboard.Renderer.IsRandomAccessEvaluation = !State.IsPlaying;
             Storyboard.Renderer.OnGameUpdate(this);
+        }
+        catch (Exception exception)
+        {
+            StoryboardLoadException = exception;
+            throw;
         }
         finally
         {

@@ -17,6 +17,7 @@ public static class EditorPreviewController
     static bool externalClock;
     static JObject lastSettingsPayload;
     static int loadInProgress;
+    static readonly SemaphoreSlim ControlGate = new SemaphoreSlim(1, 1);
     public static long CurrentPreviewVersion => previewVersion;
 
     public static void Handle(JObject message)
@@ -60,49 +61,147 @@ public static class EditorPreviewController
                 ApplyChanges(message, requestId).Forget();
                 break;
             case "preview.play":
-                CurrentGame()?.PreviewPlayFromCurrentTime();
-                SendState("Playing", requestId);
+                RunControl(message, requestId, Play).Forget();
                 break;
             case "preview.pause":
-                CurrentGame()?.PreviewPause();
-                SendState("Paused", requestId);
+                RunControl(message, requestId, Pause).Forget();
                 break;
             case "preview.stop":
-                SeekAndReport(message, requestId, 0, "Stopped").Forget();
+                RunControl(message, requestId, Stop).Forget();
                 break;
             case "preview.seek":
-                Seek(message, requestId).Forget();
+                RunControl(message, requestId, Seek).Forget();
                 break;
             case "preview.scrub.update":
-                CurrentGame()?.PreviewEvaluateAt((float)(Payload(message).Value<double?>("time") ?? 0));
+                RunControl(message, requestId, UpdateScrub).Forget();
                 break;
             case "preview.clock.set":
-                externalClock = string.Equals(
-                    Payload(message).Value<string>("mode"),
-                    "external",
-                    StringComparison.OrdinalIgnoreCase);
-                if (externalClock)
-                    CurrentGame()?.PreviewPause();
-                Ack(message, requestId);
+                RunControl(message, requestId, SetClock).Forget();
                 break;
             case "preview.clock.tick":
-                if (externalClock)
-                    CurrentGame()?.PreviewAdvanceExternalClock(
-                        (float)(Payload(message).Value<double?>("time") ?? 0)).Forget();
+                RunControl(message, requestId, TickClock).Forget();
                 break;
             case "preview.scrub.begin":
-                BeginScrub(message, requestId).Forget();
+                RunControl(message, requestId, BeginScrub).Forget();
                 break;
             case "preview.scrub.commit":
-                CommitScrub(message, requestId).Forget();
+                RunControl(message, requestId, CommitScrub).Forget();
                 break;
             case "preview.settings.apply":
                 ApplySettings(Payload(message));
                 Ack(message, requestId);
                 break;
             case "preview.viewport.apply":
-                ApplyViewport(message, requestId).Forget();
+                RunControl(message, requestId, ApplyViewport).Forget();
                 break;
+        }
+    }
+
+    static async UniTask RunControl(
+        JObject message,
+        string requestId,
+        Func<JObject, string, UniTask> operation)
+    {
+        await ControlGate.WaitAsync();
+        try
+        {
+            await operation(message, requestId);
+        }
+        finally
+        {
+            ControlGate.Release();
+        }
+    }
+
+    static UniTask Play(JObject message, string requestId)
+    {
+        try
+        {
+            var game = RequireLoadedGame();
+            game.PreviewPlayFromCurrentTime();
+            SendState("Playing", requestId);
+        }
+        catch (Exception exception)
+        {
+            CurrentGame()?.PreviewPause();
+            Reject(message, requestId, "play_failed", exception.Message);
+        }
+        return UniTask.CompletedTask;
+    }
+
+    static UniTask Pause(JObject message, string requestId)
+    {
+        try
+        {
+            var game = RequireLoadedGame();
+            game.PreviewPause();
+            SendState("Paused", requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "pause_failed", exception.Message);
+        }
+        return UniTask.CompletedTask;
+    }
+
+    static async UniTask Stop(JObject message, string requestId)
+    {
+        try
+        {
+            var game = RequireLoadedGame();
+            await game.PreviewSeekAsync(0);
+            SendState("Stopped", requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "stop_failed", exception.Message);
+        }
+    }
+
+    static UniTask UpdateScrub(JObject message, string requestId)
+    {
+        try
+        {
+            RequireLoadedGame().PreviewEvaluateAt(
+                (float)(Payload(message).Value<double?>("time") ?? 0));
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "scrub_update_failed", exception.Message);
+        }
+        return UniTask.CompletedTask;
+    }
+
+    static UniTask SetClock(JObject message, string requestId)
+    {
+        try
+        {
+            externalClock = string.Equals(
+                Payload(message).Value<string>("mode"),
+                "external",
+                StringComparison.OrdinalIgnoreCase);
+            if (externalClock)
+                RequireLoadedGame().PreviewPause();
+            Ack(message, requestId);
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "clock_set_failed", exception.Message);
+        }
+        return UniTask.CompletedTask;
+    }
+
+    static async UniTask TickClock(JObject message, string requestId)
+    {
+        try
+        {
+            if (externalClock)
+                await RequireLoadedGame().PreviewAdvanceExternalClock(
+                    (float)(Payload(message).Value<double?>("time") ?? 0));
+        }
+        catch (Exception exception)
+        {
+            Reject(message, requestId, "clock_tick_failed", exception.Message);
         }
     }
 
@@ -194,7 +293,8 @@ public static class EditorPreviewController
                 await OpenSnapshot(message, requestId);
                 return;
             }
-            await game.PreviewReplaceStoryboard(File.ReadAllText(Path.Combine(root, "storyboard.json")));
+            await game.PreviewReplaceStoryboard(
+                File.ReadAllText(Path.Combine(root, "storyboard.json")), root);
             LoadEvent(message, requestId, "preview.load.progress", "evaluatingFirstFrame");
             game.PreviewEvaluateAt(game.Time);
             currentSignature = nextSignature;
@@ -202,7 +302,8 @@ public static class EditorPreviewController
         }
         catch (Exception exception)
         {
-            LoadFailed(message, requestId, "snapshot_replace_failed", exception);
+            AcceptLoadedVersion(message, requestId, null, game,
+                exception, "PREVIEW_STORYBOARD_HOT_RELOAD_FAILED");
         }
         finally
         {
@@ -229,14 +330,16 @@ public static class EditorPreviewController
                 return;
             }
             var json = File.ReadAllText(Path.Combine(root, "storyboard.json"));
-            await StoryboardHotReloadCoordinator.Apply(game, json, Payload(message)["changes"] as JArray);
+            await StoryboardHotReloadCoordinator.Apply(
+                game, json, Payload(message)["changes"] as JArray, root);
             game.PreviewEvaluateAt(game.Time);
             currentSignature = nextSignature;
             AcceptLoadedVersion(message, requestId, null, game);
         }
         catch (Exception exception)
         {
-            LoadFailed(message, requestId, "hot_reload_failed", exception);
+            AcceptLoadedVersion(message, requestId, null, game,
+                exception, "PREVIEW_STORYBOARD_HOT_RELOAD_FAILED");
         }
         finally
         {
@@ -257,12 +360,12 @@ public static class EditorPreviewController
     {
         try
         {
-            var game = CurrentGame();
-            if (game == null || !game.IsLoaded) return;
+            var game = RequireLoadedGame();
             game.PreviewPause();
             if (game.Storyboard != null)
                 await game.PreviewReplaceStoryboard(game.Storyboard.RootObject.ToString());
             game.PreviewEvaluateAt((float)(Payload(message).Value<double?>("time") ?? 0));
+            Ack(message, requestId);
         }
         catch (Exception exception)
         {
@@ -274,24 +377,9 @@ public static class EditorPreviewController
     {
         try
         {
-            var game = CurrentGame();
-            if (game != null)
-                await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
+            var game = RequireLoadedGame();
+            await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
             Ack(message, requestId);
-        }
-        catch (Exception exception)
-        {
-            Reject(message, requestId, "seek_failed", exception.Message);
-        }
-    }
-
-    static async UniTask SeekAndReport(JObject message, string requestId, float time, string state)
-    {
-        try
-        {
-            var game = CurrentGame();
-            if (game != null) await game.PreviewSeekAsync(time);
-            SendState(state, requestId);
         }
         catch (Exception exception)
         {
@@ -303,15 +391,13 @@ public static class EditorPreviewController
     {
         try
         {
-            var game = CurrentGame();
-            if (game != null)
-            {
-                await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
-                if (string.Equals(Payload(message).Value<string>("resumeState"), "Playing",
-                        StringComparison.OrdinalIgnoreCase))
-                    game.PreviewPlayFromCurrentTime();
-            }
-            Ack(message, requestId);
+            var game = RequireLoadedGame();
+            await game.PreviewSeekAsync((float)(Payload(message).Value<double?>("time") ?? 0));
+            var resume = string.Equals(Payload(message).Value<string>("resumeState"), "Playing",
+                StringComparison.OrdinalIgnoreCase);
+            if (resume)
+                game.PreviewPlayFromCurrentTime();
+            SendState(resume ? "Playing" : "Paused", requestId);
         }
         catch (Exception exception)
         {
@@ -330,9 +416,8 @@ public static class EditorPreviewController
             ApplySettings(payload);
             await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
             await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
-            var game = CurrentGame();
-            if (game != null && game.IsLoaded)
-                game.PreviewEvaluateAt((float)(payload.Value<double?>("time") ?? game.Time));
+            var game = RequireLoadedGame();
+            game.PreviewEvaluateAt((float)(payload.Value<double?>("time") ?? game.Time));
             Ack(message, requestId);
         }
         catch (Exception exception)
@@ -463,6 +548,13 @@ public static class EditorPreviewController
     }
 
     static Game CurrentGame() => UnityEngine.Object.FindObjectOfType<Game>();
+    static Game RequireLoadedGame()
+    {
+        var game = CurrentGame();
+        if (game == null || !game.IsLoaded)
+            throw new InvalidOperationException("Unity Preview has no loaded game.");
+        return game;
+    }
     static JObject Payload(JObject message) =>
         message["Payload"] as JObject ?? message["payload"] as JObject ?? new JObject();
     static string StringValue(JObject message, string name) =>
@@ -503,7 +595,9 @@ public static class EditorPreviewController
         JObject source,
         string requestId,
         JObject chartIdentity,
-        Game game)
+        Game game,
+        Exception additionalDiagnostic = null,
+        string additionalCode = null)
     {
         previewVersion = LongValue(source, "TargetPreviewVersion");
         var payload = chartIdentity == null
@@ -511,6 +605,28 @@ public static class EditorPreviewController
             : new JObject { ["chartIdentity"] = chartIdentity };
         payload["time"] = game?.Time ?? 0;
         payload["duration"] = game?.PreviewDuration ?? 0;
+        var diagnostics = new JArray();
+        var exception = additionalDiagnostic ?? game?.StoryboardLoadException;
+        if (exception != null)
+        {
+            var diagnostic = ExceptionDiagnostic(
+                exception,
+                additionalCode ?? "PREVIEW_STORYBOARD_LOAD_FAILED",
+                false,
+                "storyboard",
+                additionalDiagnostic == null ? "initialize" : "hot-reload");
+            diagnostics.Add(diagnostic);
+            payload["warnings"] = new JArray(diagnostic.Value<string>("message"));
+            var retained = additionalDiagnostic != null && game?.Storyboard != null;
+            payload["storyboardLoaded"] = game?.Storyboard != null;
+            payload["storyboardRetained"] = retained;
+        }
+        else
+        {
+            payload["storyboardLoaded"] = true;
+            payload["storyboardRetained"] = false;
+        }
+        payload["diagnostics"] = diagnostics;
         EditorPreviewBridge.SendProtocol(
             "preview.load.ready",
             requestId,
@@ -537,7 +653,10 @@ public static class EditorPreviewController
         JObject source,
         string requestId,
         string code,
-        Exception exception) =>
+        Exception exception)
+    {
+        var diagnostic = ExceptionDiagnostic(
+            exception, code, true, "unity", "contentLoad");
         EditorPreviewBridge.SendProtocol(
             "preview.load.failed",
             requestId,
@@ -545,13 +664,46 @@ public static class EditorPreviewController
             {
                 ["code"] = code,
                 ["message"] = SafeDiagnosticText(exception.Message, 2048),
-                ["stage"] = "contentLoad",
-                ["resourcePath"] = string.Empty,
-                ["stackTrace"] = SafeDiagnosticText(exception.StackTrace, 8192)
+                ["stage"] = diagnostic.Value<string>("stage"),
+                ["resourcePath"] = diagnostic.Value<string>("resourcePath"),
+                ["path"] = diagnostic.Value<string>("path"),
+                ["entityId"] = diagnostic.Value<string>("entityId"),
+                ["stackTrace"] = diagnostic.Value<string>("stackTrace"),
+                ["diagnostics"] = new JArray(diagnostic)
             },
             LongValue(source, "EditorVersion"),
             LongValue(source, "BasePreviewVersion"),
             LongValue(source, "TargetPreviewVersion"));
+    }
+
+    static JObject ExceptionDiagnostic(
+        Exception exception,
+        string fallbackCode,
+        bool fatal,
+        string fallbackSource,
+        string fallbackStage)
+    {
+        string DataString(string key) => exception.Data.Contains(key)
+            ? exception.Data[key]?.ToString()
+            : null;
+        var code = DataString("code") ?? fallbackCode;
+        var source = DataString("source") ?? fallbackSource;
+        var stage = DataString("stage") ?? fallbackStage;
+        var resourcePath = DataString("resourcePath") ?? DataString("storyboardPath") ?? string.Empty;
+        return new JObject
+        {
+            ["code"] = code,
+            ["source"] = source,
+            ["message"] = SafeDiagnosticText(exception.Message, 2048),
+            ["path"] = DataString("path") ?? resourcePath,
+            ["resourcePath"] = resourcePath,
+            ["entityId"] = DataString("entityId") ?? string.Empty,
+            ["stage"] = stage,
+            ["fatal"] = fatal,
+            ["severity"] = "error",
+            ["stackTrace"] = SafeDiagnosticText(exception.ToString(), 8192)
+        };
+    }
 
     static string SafeDiagnosticText(string value, int maximumLength)
     {

@@ -1,0 +1,5332 @@
+{
+  "sprites": [
+    {
+      "path": "prince.png",
+      "preserve_aspect": true,
+      "x": 600.0,
+      "y": 0.0,
+      "scale_x": 1.2,
+      "scale_y": 1.2,
+      "opacity": 0.4,
+      "layer": 1,
+      "time": 78.0,
+      "states": [
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 78.35
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 78.4
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 78.4
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 79.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 80.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 80.80000000000001
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 81.60000000000001
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 81.6
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 82.39999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 83.19999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 84.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 84.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 84.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 85.6
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 86.39999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 87.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 88.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 88.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 88.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 89.6
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 90.4
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 91.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 91.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 92.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 92.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 93.60000000000001
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 94.4
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 94.4
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 95.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 96.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 96.80000000000001
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 97.60000000000001
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 97.6
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 98.39999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 99.19999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 100.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 100.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.4,
+          "layer": 1,
+          "time": 100.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 101.6
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 102.39999999999999
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.15,
+          "layer": 1,
+          "time": 103.2
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -25.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.35,
+          "layer": 1,
+          "time": 104.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 0.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.45,
+          "layer": 1,
+          "time": 116.8
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 0.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.45,
+          "layer": 1,
+          "time": 120.0
+        },
+        {
+          "path": "prince.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 0.0,
+          "scale_x": 1.2,
+          "scale_y": 1.2,
+          "opacity": 0.0,
+          "layer": 1,
+          "time": 120.0
+        }
+      ]
+    },
+    {
+      "path": "ice.png",
+      "preserve_aspect": true,
+      "x": -150.0,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "layer": 1,
+      "time": 40.0,
+      "states": [
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 40.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 40.8
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 41.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 42.4
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 43.2
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 44.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 44.800000000000004
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 45.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 46.400000000000006
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 47.199999999999996
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 48.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 48.8
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 49.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 50.4
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 51.2
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 52.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 52.800000000000004
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 53.599999999999994
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 54.4
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 55.199999999999996
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 56.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 56.8
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 57.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 58.4
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 59.2
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 60.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 60.800000000000004
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 61.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 62.400000000000006
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 63.199999999999996
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 64.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 64.8
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 65.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 65.6
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 78.0
+        },
+        {
+          "path": "ice.png",
+          "preserve_aspect": true,
+          "x": -600.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 78.4
+        }
+      ]
+    },
+    {
+      "path": "witch.png",
+      "preserve_aspect": true,
+      "x": 150.0,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "layer": 1,
+      "time": 40.0,
+      "states": [
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 40.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 40.8
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 41.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 42.4
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 43.2
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 44.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 44.800000000000004
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 45.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 46.400000000000006
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 47.199999999999996
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 48.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 48.8
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 49.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 50.4
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 51.2
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 52.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 52.800000000000004
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 53.599999999999994
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 54.4
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 55.199999999999996
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 56.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 56.8
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 57.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 58.4
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 59.2
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 60.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 60.800000000000004
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 61.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 62.400000000000006
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 63.199999999999996
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 64.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.3,
+          "time": 64.8
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.5,
+          "time": 65.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 65.6
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 78.0
+        },
+        {
+          "path": "witch.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.1,
+          "time": 78.4
+        }
+      ]
+    },
+    {
+      "path": "black.png",
+      "scale_x": 5.0,
+      "scale_y": 5.0,
+      "opacity": 0.6,
+      "layer": 0,
+      "time": 40.0,
+      "states": [
+        {
+          "path": "black.png",
+          "scale_x": 5.0,
+          "scale_y": 5.0,
+          "opacity": 0.6,
+          "layer": 0,
+          "time": 65.6
+        },
+        {
+          "path": "black.png",
+          "scale_x": 5.0,
+          "scale_y": 5.0,
+          "opacity": 0.0,
+          "layer": 0,
+          "time": 65.6
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "x": -300.0,
+      "y": -150.0,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 32.0,
+      "states": [
+        {
+          "path": "cat.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "y": -150.0,
+          "scale_x": 0.8,
+          "scale_y": 0.8,
+          "opacity": 0.8,
+          "time": 33.2
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "x": -300.0,
+      "y": -75.0,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 32.1,
+      "states": [
+        {
+          "path": "cat.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "y": -75.0,
+          "scale_x": 0.8,
+          "scale_y": 0.8,
+          "opacity": 0.8,
+          "time": 33.300000000000004
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "x": -300.0,
+      "y": 0.0,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 32.2,
+      "states": [
+        {
+          "path": "cat.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "y": 0.0,
+          "scale_x": 0.8,
+          "scale_y": 0.8,
+          "opacity": 0.8,
+          "time": 33.400000000000006
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "x": -300.0,
+      "y": 75.0,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 32.3,
+      "states": [
+        {
+          "path": "cat.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "y": 75.0,
+          "scale_x": 0.8,
+          "scale_y": 0.8,
+          "opacity": 0.8,
+          "time": 33.5
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "x": -300.0,
+      "y": 150.0,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 32.4,
+      "states": [
+        {
+          "path": "cat.png",
+          "preserve_aspect": true,
+          "x": 600.0,
+          "y": 150.0,
+          "scale_x": 0.8,
+          "scale_y": 0.8,
+          "opacity": 0.8,
+          "time": 33.6
+        }
+      ]
+    },
+    {
+      "path": "cat.png",
+      "preserve_aspect": true,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "opacity": 0.8,
+      "time": 120.0
+    },
+    {
+      "path": "princess.png",
+      "preserve_aspect": true,
+      "scale_x": 1.5,
+      "scale_y": 1.5,
+      "layer": 1,
+      "time": 20.8,
+      "states": [
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 20.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 21.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 22.400000000000002
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 23.200000000000003
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 24.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 24.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 25.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 26.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 27.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 28.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 28.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 29.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 30.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 31.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 32.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 32.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 33.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 34.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 35.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 36.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 36.800000000000004
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.0,
+          "time": 38.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.0,
+          "time": 52.7
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.0,
+          "time": 52.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 52.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 53.599999999999994
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 54.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 55.199999999999996
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 56.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 56.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 57.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 58.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 59.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 60.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 60.800000000000004
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "time": 61.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "time": 62.400000000000006
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": 0.0,
+          "time": 62.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.15,
+          "x": 0.0,
+          "time": 65.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": 0.0,
+          "time": 78.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 78.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 79.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 80.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 80.80000000000001
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 81.60000000000001
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 82.39999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 83.19999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 84.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 84.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 85.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 86.39999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 87.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 88.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 88.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 89.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 90.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 91.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 92.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 92.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 93.60000000000001
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 94.4
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 95.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 96.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 96.80000000000001
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 97.60000000000001
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 98.39999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 99.19999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 100.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 100.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 101.6
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 102.39999999999999
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 25.0,
+          "opacity": 0.15,
+          "x": -150.0,
+          "time": 103.2
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": -25.0,
+          "opacity": 0.35,
+          "x": -150.0,
+          "time": 104.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 0.0,
+          "opacity": 0.45,
+          "x": -150.0,
+          "time": 116.8
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 0.0,
+          "opacity": 0.45,
+          "x": -70.0,
+          "time": 120.0
+        },
+        {
+          "path": "princess.png",
+          "preserve_aspect": true,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "layer": 1,
+          "y": 0.0,
+          "opacity": 0.0,
+          "x": -70.0,
+          "time": 120.0
+        }
+      ]
+    },
+    {
+      "path": "heart.png",
+      "preserve_aspect": true,
+      "x": -250.0,
+      "y": 0.0,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "opacity": 0.0,
+      "time": 1.6,
+      "states": [
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.9,
+          "time": 1.7000000000000002
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.2,
+          "time": 3.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.9,
+          "time": 3.3000000000000003
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.2,
+          "time": 4.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.9,
+          "time": 4.8999999999999995
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.2,
+          "time": 6.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 250.0,
+          "y": 0.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.9,
+          "time": 6.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 7.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 8.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 8.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 8.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 8.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 8.9
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 9.3
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 9.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 9.7
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 10.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 10.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 10.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 10.9
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 11.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 11.299999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 11.7
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 12.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 12.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 12.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 12.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 12.9
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 13.3
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 13.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 13.7
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 14.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 14.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 14.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 14.9
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 15.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 15.299999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 15.7
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 16.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 16.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 16.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 16.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 16.900000000000002
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 17.3
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 17.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 17.700000000000003
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 18.1
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 18.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 18.5
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 18.9
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 19.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 19.21
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 2.0,
+          "scale_y": 2.0,
+          "opacity": 0.5,
+          "time": 19.3
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 1.5,
+          "scale_y": 1.5,
+          "opacity": 0.5,
+          "time": 19.7
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 20.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 104.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 104.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 104.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 104.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 104.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 104.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 104.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 104.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 105.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 105.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 105.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 105.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 106.19999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 106.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 106.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 106.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 107.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 107.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 107.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 107.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 108.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 108.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 108.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 108.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 108.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 0.0,
+          "scale_x": 7.0,
+          "scale_y": 7.0,
+          "opacity": 0.0,
+          "time": 108.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 109.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 109.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 109.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 109.6
+        }
+      ]
+    },
+    {
+      "path": "heart.png",
+      "preserve_aspect": true,
+      "time": 104.4,
+      "states": [
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 104.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 104.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 104.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 105.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 105.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 105.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 105.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 106.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 106.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 106.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 106.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 106.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 107.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 107.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 107.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 107.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 108.19999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 108.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 108.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 108.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 109.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 109.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 109.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 109.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 109.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 109.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 110.0
+        }
+      ]
+    },
+    {
+      "path": "heart.png",
+      "preserve_aspect": true,
+      "time": 110.4,
+      "states": [
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 110.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 110.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 110.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 111.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 111.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 111.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 112.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 112.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 112.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 112.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 113.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 113.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 113.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 114.19999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 114.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 114.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 115.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 115.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -50.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 115.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -150.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": -200.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 116.0
+        }
+      ]
+    },
+    {
+      "path": "heart.png",
+      "preserve_aspect": true,
+      "time": 110.8,
+      "states": [
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 110.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 111.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 111.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 111.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 111.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 112.19999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 112.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 112.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 112.80000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 113.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 113.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 113.60000000000001
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 113.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 114.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 114.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.4
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 114.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 114.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 114.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 115.2
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.39999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 115.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 200.0,
+          "y": 300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 115.6
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 150.0,
+          "y": 150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 115.8
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 100.0,
+          "y": 0.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.3,
+          "time": 116.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 50.0,
+          "y": -150.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "opacity": 0.6,
+          "time": 116.19999999999999
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "x": 0.0,
+          "y": -300.0,
+          "scale_x": 0.25,
+          "scale_y": 0.25,
+          "opacity": 0.0,
+          "time": 116.39999999999999
+        }
+      ]
+    },
+    {
+      "path": "heart.png",
+      "preserve_aspect": true,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "opacity": 0.0,
+      "time": 116.8,
+      "states": [
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "opacity": 0.4,
+          "time": 120.0
+        },
+        {
+          "path": "heart.png",
+          "preserve_aspect": true,
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "opacity": 0.0,
+          "time": 120.0
+        }
+      ]
+    }
+  ],
+  "texts": [
+    {
+      "text": "Charter:",
+      "size": 40.0,
+      "color": "#2E64FE",
+      "x": -250.0,
+      "y": 250.0,
+      "opacity": 0.0,
+      "time": 1.5,
+      "states": [
+        {
+          "text": "Charter:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 1.6
+        },
+        {
+          "text": "Charter:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 2.4000000000000004
+        },
+        {
+          "text": "Charter:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 0.0,
+          "time": 2.8000000000000003
+        }
+      ]
+    },
+    {
+      "text": "He2O3",
+      "size": 40.0,
+      "color": "#F78181",
+      "x": 250.0,
+      "y": 250.0,
+      "opacity": 0.0,
+      "time": 3.1,
+      "states": [
+        {
+          "text": "He2O3",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 3.2
+        },
+        {
+          "text": "He2O3",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 4.0
+        },
+        {
+          "text": "He2O3",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 0.0,
+          "time": 4.4
+        }
+      ]
+    },
+    {
+      "text": "Artist:",
+      "size": 40.0,
+      "color": "#2E64FE",
+      "x": -250.0,
+      "y": 250.0,
+      "opacity": 0.0,
+      "time": 4.7,
+      "states": [
+        {
+          "text": "Artist:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 4.8
+        },
+        {
+          "text": "Artist:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 5.6
+        },
+        {
+          "text": "Artist:",
+          "size": 40.0,
+          "color": "#2E64FE",
+          "x": -250.0,
+          "y": 250.0,
+          "opacity": 0.0,
+          "time": 6.0
+        }
+      ]
+    },
+    {
+      "text": "seiya-murai",
+      "size": 40.0,
+      "color": "#F78181",
+      "x": 250.0,
+      "y": 250.0,
+      "opacity": 0.0,
+      "time": 6.3,
+      "states": [
+        {
+          "text": "seiya-murai",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 6.4
+        },
+        {
+          "text": "seiya-murai",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 1.0,
+          "time": 7.2
+        },
+        {
+          "text": "seiya-murai",
+          "size": 40.0,
+          "color": "#F78181",
+          "x": 250.0,
+          "y": 250.0,
+          "opacity": 0.0,
+          "time": 7.6000000000000005
+        }
+      ]
+    }
+  ],
+  "controllers": [
+    {
+      "perspective": true,
+      "time": 0.0,
+      "states": [
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 20.400000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 20.8
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 33.2
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 33.6
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 38.400000000000006
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 40.0
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 0.0,
+          "time": 65.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 15.0,
+          "time": 67.2
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": -15.0,
+          "time": 68.8
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 15.0,
+          "time": 70.4
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": -15.0,
+          "time": 72.0
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 15.0,
+          "time": 73.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 0.0,
+          "time": 75.2
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "rot_z": 0.0,
+          "time": 76.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "rot_z": 0.0,
+          "time": 78.4
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "rot_z": 0.0,
+          "time": 116.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "rot_z": 0.0,
+          "time": 117.60000000000001
+        }
+      ]
+    },
+    {
+      "time": 0.0,
+      "states": [
+        {
+          "arcade": true,
+          "arcade_intensity": 0.7,
+          "arcade_interference_size": 2.0,
+          "arcade_contrast": 2.0,
+          "time": 0.0
+        }
+      ]
+    },
+    {
+      "time": 0.0,
+      "states": [
+        {
+          "ui_opacity": 0.0,
+          "time": 0.0
+        },
+        {
+          "ui_opacity": 0.0,
+          "time": 8.0
+        },
+        {
+          "ui_opacity": 0.25,
+          "time": 8.0
+        },
+        {
+          "ui_opacity": 0.25,
+          "gray_scale": true,
+          "gray_scale_intensity": 0.0,
+          "time": 38.400000000000006
+        },
+        {
+          "ui_opacity": 0.25,
+          "gray_scale": true,
+          "gray_scale_intensity": 0.6,
+          "time": 40.0
+        },
+        {
+          "ui_opacity": 0.25,
+          "gray_scale": true,
+          "gray_scale_intensity": 0.6,
+          "time": 65.60000000000001
+        },
+        {
+          "ui_opacity": 0.0,
+          "gray_scale": true,
+          "gray_scale_intensity": 0.6,
+          "time": 65.60000000000001
+        },
+        {
+          "ui_opacity": 0.0,
+          "gray_scale": true,
+          "gray_scale_intensity": 0.6,
+          "time": 76.80000000000001
+        },
+        {
+          "ui_opacity": 0.25,
+          "gray_scale": false,
+          "gray_scale_intensity": 0.0,
+          "time": 78.4
+        },
+        {
+          "ui_opacity": 0.25,
+          "gray_scale": false,
+          "gray_scale_intensity": 0.0,
+          "time": 104.0
+        },
+        {
+          "ui_opacity": 0.0,
+          "gray_scale": false,
+          "gray_scale_intensity": 0.0,
+          "time": 104.0
+        }
+      ]
+    },
+    {
+      "time": 0.0,
+      "states": [
+        {
+          "perspective": true,
+          "time": 44.800000000000004
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 44.800000000000004
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 44.85
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 44.95
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 45.2
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 45.25
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 45.35
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 45.6
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 45.65
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 45.75
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 46.0
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 46.05
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 46.15
+        },
+        {
+          "perspective": true,
+          "fov": 58.2,
+          "time": 78.4
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 78.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 78.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 78.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 79.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 79.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 79.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 80.0
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 80.05
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 80.15
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 80.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 80.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 80.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 81.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 81.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 81.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 82.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 82.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 82.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 83.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 83.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 83.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 84.0
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 84.05
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 84.15
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 84.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 84.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 84.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 85.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 85.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 85.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 86.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 86.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 86.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 87.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 87.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 87.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 88.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 88.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 88.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 89.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 89.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 89.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 90.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 90.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 90.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 91.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 91.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 91.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 92.0
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 92.05
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 92.15
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 92.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 92.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 92.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 93.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 93.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 93.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 94.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 94.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 94.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 95.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 95.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 95.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 96.0
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 96.05
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 96.15
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 96.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 96.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 96.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 97.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 97.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 97.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 98.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 98.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 98.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 99.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 99.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 99.35000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 100.0
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 100.05
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 100.15
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 100.80000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 100.85000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 100.95000000000002
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 101.60000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 101.65
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 101.75000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 102.4
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 102.45
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 102.55000000000001
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 103.2
+        },
+        {
+          "perspective": true,
+          "fov": 50.2,
+          "time": 103.25
+        },
+        {
+          "perspective": true,
+          "fov": 53.2,
+          "time": 103.35000000000001
+        }
+      ]
+    },
+    {
+      "time": 0.0,
+      "states": [
+        {
+          "background_dim": 1.0,
+          "time": 0.0,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 1.6,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 7.6000000000000005,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 7.630000000000001,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 7.733333333333333,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 7.763333333333334,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 7.866666666666667,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 7.896666666666667,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 8.0,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 20.0,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.9,
+          "time": 20.8,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.9,
+          "time": 33.4,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 33.6,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 38.400000000000006,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 38.400000000000006,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 76.80000000000001,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 78.4,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 0.8,
+          "time": 120.0,
+          "easing": "easeinquad"
+        },
+        {
+          "background_dim": 1.0,
+          "time": 120.0,
+          "easing": "easeinquad"
+        }
+      ]
+    }
+  ]
+}

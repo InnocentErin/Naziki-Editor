@@ -1,6 +1,8 @@
 param(
     [string]$RuntimePath = (Join-Path $PSScriptRoot '..\Runtime\OriginalPlayer\NazikiOriginalPlayer.exe'),
-    [string]$VfsRoot
+    [string]$VfsRoot,
+    [switch]$RequireStoryboard,
+    [switch]$TestStoryboardFailureRetention
 )
 
 $ErrorActionPreference = 'Stop'
@@ -130,7 +132,195 @@ try {
             }
         }
         if (-not $loadReady) { throw 'Unity did not report preview.load.ready within 120 seconds.' }
-        Write-Output "Preview content load succeeded (requestId=$loadRequestId, progressEvents=$progressCount, duration=$($loadReady.payload.duration))."
+        if ($RequireStoryboard -and $loadReady.payload.storyboardLoaded -ne $true) {
+            $diagnostics = $loadReady.payload.diagnostics | ConvertTo-Json -Depth 12 -Compress
+            throw "Unity loaded the chart but did not initialize the storyboard: $diagnostics"
+        }
+        Write-Output "Preview content load succeeded (requestId=$loadRequestId, progressEvents=$progressCount, duration=$($loadReady.payload.duration), storyboardLoaded=$($loadReady.payload.storyboardLoaded))."
+
+        $seekRequestId = [Guid]::NewGuid().ToString('N')
+        $playRequestId = [Guid]::NewGuid().ToString('N')
+        $seekTime = [Math]::Min(1.0, [Math]::Max(0.0, [double]$loadReady.payload.duration / 4.0))
+        foreach ($command in @(
+            [ordered]@{ type = 'preview.seek'; requestId = $seekRequestId; payload = @{ time = $seekTime } },
+            [ordered]@{ type = 'preview.play'; requestId = $playRequestId; payload = @{} }
+        )) {
+            Write-Frame $pipe ([ordered]@{
+                protocol = 'naziki.editor-preview.v2'
+                connectionId = $connectionId
+                generation = $generation
+                sessionId = $sessionId
+                type = $command.type
+                requestId = $command.requestId
+                editorVersion = 1
+                basePreviewVersion = 1
+                targetPreviewVersion = 1
+                payload = $command.payload
+            })
+        }
+
+        $seekAcknowledged = $false
+        $playingState = $null
+        $controlDeadline = [DateTime]::UtcNow.AddSeconds(10)
+        while ([DateTime]::UtcNow -lt $controlDeadline -and -not $playingState) {
+            $message = Read-Frame $pipe 5000
+            if ($message.requestId -eq $seekRequestId -and $message.type -eq 'preview.ack') {
+                $seekAcknowledged = $true
+                continue
+            }
+            if ($message.requestId -eq $playRequestId -and $message.type -eq 'preview.rejected') {
+                throw "Unity rejected preview.play: $($message | ConvertTo-Json -Depth 12 -Compress)"
+            }
+            if ($message.requestId -eq $playRequestId -and $message.type -eq 'preview.state' -and
+                $message.payload.state -eq 'Playing') {
+                if (-not $seekAcknowledged) {
+                    throw 'Unity reported Playing before the preceding seek completed.'
+                }
+                $playingState = $message
+            }
+        }
+        if (-not $playingState) { throw 'Unity did not confirm preview.play within 10 seconds.' }
+
+        $advancedTime = $null
+        $advanceDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while ([DateTime]::UtcNow -lt $advanceDeadline -and -not $advancedTime) {
+            $message = Read-Frame $pipe 5000
+            if ($message.type -eq 'preview.time' -and
+                [double]$message.payload.time -ge ($seekTime + 0.25)) {
+                $advancedTime = [double]$message.payload.time
+            }
+        }
+        if (-not $advancedTime) { throw 'Unity playback time did not advance after preview.play.' }
+
+        $pauseTimes = @()
+        foreach ($pauseIndex in 1..2) {
+            if ($pauseIndex -eq 2) { Start-Sleep -Milliseconds 600 }
+            $pauseRequestId = [Guid]::NewGuid().ToString('N')
+            Write-Frame $pipe ([ordered]@{
+                protocol = 'naziki.editor-preview.v2'
+                connectionId = $connectionId
+                generation = $generation
+                sessionId = $sessionId
+                type = 'preview.pause'
+                requestId = $pauseRequestId
+                editorVersion = 1
+                basePreviewVersion = 1
+                targetPreviewVersion = 1
+                payload = @{}
+            })
+            while ($true) {
+                $message = Read-Frame $pipe 5000
+                if ($message.requestId -eq $pauseRequestId -and $message.type -eq 'preview.rejected') {
+                    throw "Unity rejected preview.pause: $($message | ConvertTo-Json -Depth 12 -Compress)"
+                }
+                if ($message.requestId -eq $pauseRequestId -and $message.type -eq 'preview.state' -and
+                    $message.payload.state -eq 'Paused') {
+                    $pauseTimes += [double]$message.payload.time
+                    break
+                }
+            }
+        }
+        if ([Math]::Abs($pauseTimes[1] - $pauseTimes[0]) -gt 0.05) {
+            throw "Unity playback time continued after pause ($($pauseTimes[0]) -> $($pauseTimes[1]))."
+        }
+        Write-Output "Preview seek/play/pause sequencing succeeded (seek=$seekTime, advanced=$advancedTime)."
+
+        if ($TestStoryboardFailureRetention) {
+            $retentionRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
+                "naziki-storyboard-retention-$([Guid]::NewGuid().ToString('N'))"
+            try {
+                Copy-Item -LiteralPath $resolvedVfsRoot -Destination $retentionRoot -Recurse
+                [System.IO.File]::WriteAllBytes(
+                    (Join-Path $retentionRoot 'retention-broken.png'),
+                    [byte[]](0x89, 0x50, 0x4e, 0x47, 0x00))
+                [System.IO.File]::WriteAllText(
+                    (Join-Path $retentionRoot 'storyboard.json'),
+                    '{"sprites":[{"id":"retention-probe","time":0,"path":"retention-broken.png"}]}',
+                    [Text.UTF8Encoding]::new($false))
+
+                $replaceRequestId = [Guid]::NewGuid().ToString('N')
+                Write-Frame $pipe ([ordered]@{
+                    protocol = 'naziki.editor-preview.v2'
+                    connectionId = $connectionId
+                    generation = $generation
+                    sessionId = $sessionId
+                    type = 'preview.replaceSnapshot'
+                    requestId = $replaceRequestId
+                    editorVersion = 2
+                    basePreviewVersion = 1
+                    targetPreviewVersion = 2
+                    payload = [ordered]@{
+                        vfsRoot = $retentionRoot
+                        level = 'level.json'
+                        time = $pauseTimes[1]
+                        settings = @{}
+                    }
+                })
+
+                $replaceReady = $null
+                $replaceDeadline = [DateTime]::UtcNow.AddSeconds(30)
+                while ([DateTime]::UtcNow -lt $replaceDeadline) {
+                    $message = Read-Frame $pipe 10000
+                    if ($message.requestId -ne $replaceRequestId) { continue }
+                    if ($message.type -eq 'preview.load.failed' -or $message.type -eq 'command.rejected') {
+                        throw "Unity rejected the transactional storyboard probe: $($message | ConvertTo-Json -Depth 12 -Compress)"
+                    }
+                    if ($message.type -eq 'preview.load.ready') {
+                        $replaceReady = $message
+                        break
+                    }
+                }
+                if (-not $replaceReady) {
+                    throw 'Unity did not report the failed storyboard hot update within 30 seconds.'
+                }
+                $retentionDiagnostics = @($replaceReady.payload.diagnostics)
+                if ($replaceReady.payload.storyboardLoaded -ne $true -or
+                    $replaceReady.payload.storyboardRetained -ne $true) {
+                    throw "Unity did not retain the previous storyboard: $($replaceReady.payload | ConvertTo-Json -Depth 12 -Compress)"
+                }
+                $decodeDiagnostic = @($retentionDiagnostics | Where-Object {
+                    $_.code -eq 'PREVIEW_ASSET_DECODE_FAILED' -and $_.fatal -eq $false
+                })
+                if ($decodeDiagnostic.Count -ne 1) {
+                    throw "Unity did not return the expected nonfatal asset-decode diagnostic: $($retentionDiagnostics | ConvertTo-Json -Depth 12 -Compress)"
+                }
+
+                $retainedSeekRequestId = [Guid]::NewGuid().ToString('N')
+                Write-Frame $pipe ([ordered]@{
+                    protocol = 'naziki.editor-preview.v2'
+                    connectionId = $connectionId
+                    generation = $generation
+                    sessionId = $sessionId
+                    type = 'preview.seek'
+                    requestId = $retainedSeekRequestId
+                    editorVersion = 2
+                    basePreviewVersion = 2
+                    targetPreviewVersion = 2
+                    payload = @{ time = 0.5 }
+                })
+                while ($true) {
+                    $message = Read-Frame $pipe 10000
+                    if ($message.requestId -ne $retainedSeekRequestId) { continue }
+                    if ($message.type -ne 'preview.ack') {
+                        throw "Retained storyboard failed the follow-up seek: $($message | ConvertTo-Json -Depth 12 -Compress)"
+                    }
+                    break
+                }
+                Write-Output 'Corrupt-image hot update returned PREVIEW_ASSET_DECODE_FAILED and retained the previous initialized storyboard.'
+            }
+            finally {
+                $resolvedRetentionRoot = [System.IO.Path]::GetFullPath($retentionRoot)
+                $resolvedTempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+                if ($resolvedRetentionRoot.StartsWith($resolvedTempRoot,
+                        [System.StringComparison]::OrdinalIgnoreCase) -and
+                    (Split-Path -Leaf $resolvedRetentionRoot).StartsWith(
+                        'naziki-storyboard-retention-',
+                        [System.StringComparison]::Ordinal) -and
+                    (Test-Path -LiteralPath $resolvedRetentionRoot)) {
+                    Remove-Item -LiteralPath $resolvedRetentionRoot -Recurse -Force
+                }
+            }
+        }
     }
 
     Write-Frame $pipe ([ordered]@{

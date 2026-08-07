@@ -20,6 +20,7 @@ namespace Cytoid.Storyboard
         public Game Game { get; }
         public StoryboardRenderer Renderer { get; }
         public StoryboardConfig Config { get; }
+        public string AssetRoot { get; }
         
         public readonly JObject RootObject;
         
@@ -33,11 +34,14 @@ namespace Cytoid.Storyboard
         
         public readonly Dictionary<string, JObject> Templates = new Dictionary<string, JObject>();
 
-        public Storyboard(Game game, string content)
+        public Storyboard(Game game, string content, string assetRoot = null)
         {
             Game = game;
             Renderer = new StoryboardRenderer(this);
             Config = new StoryboardConfig(this);
+            AssetRoot = string.IsNullOrWhiteSpace(assetRoot)
+                ? game.Level?.Path ?? string.Empty
+                : Path.GetFullPath(assetRoot);
             
             UnitFloat.Storyboard = this;
             RootObject = JObject.Parse(content);

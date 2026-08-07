@@ -60,7 +60,7 @@ public sealed class StoryboardPreviewServiceTests
                 [
                     new C2Note
                     {
-                        id = 1,
+                        id = 0,
                         page_index = 0,
                         has_sibling = null,
                         is_forward = null,
@@ -78,7 +78,7 @@ public sealed class StoryboardPreviewServiceTests
         Assert.Null(wire["skip_music_on_completion"]);
         Assert.False(note.Value<bool>("has_sibling"));
         Assert.False(note.Value<bool>("is_forward"));
-        Assert.Null(note[nameof(C2Note.NoteDirection)]);
+        Assert.Equal(1, note.Value<int>(nameof(C2Note.NoteDirection)));
         Assert.DoesNotContain(wire.DescendantsAndSelf().OfType<JValue>(),
             value => value.Type == JTokenType.Null);
         Assert.Empty(new ChartPreviewWireAdapter().Validate(
@@ -137,21 +137,32 @@ public sealed class StoryboardPreviewServiceTests
     }
 
     [Fact]
-    public void ExportFailureNeverReusesPreviousStoryboardAsCurrentSnapshot()
+    public void ExportFailureFallsBackWithoutReusingPreviousStoryboard()
     {
         var bridge = new ToggleBridge();
         var service = new StoryboardPreviewService(bridge,
             new FakeResources());
         var context = new ProjectDataContext(MessageBroker.Default);
 
-        service.GetSnapshot(context);
-        bridge.Fail = true;
-        Assert.Throws<Newtonsoft.Json.JsonSerializationException>(
-            () => service.GetSnapshot(context));
-        service.StartSession();
+        var valid = service.GetSnapshot(context);
+        Assert.True(valid.StoryboardEnabled);
 
-        Assert.Throws<Newtonsoft.Json.JsonSerializationException>(
-            () => service.GetSnapshot(context));
+        bridge.Fail = true;
+        var failed = service.GetSnapshot(context);
+
+        Assert.False(failed.StoryboardEnabled);
+        Assert.Equal("{}", failed.StoryboardJson);
+        var diagnostic = Assert.Single(failed.CaptureDiagnostics);
+        Assert.Equal("FAILED", diagnostic.Code);
+        Assert.Equal(PreviewDiagnosticImpact.StoryboardOnly,
+            diagnostic.Impact);
+
+        service.StartSession();
+        var failedInNewSession = service.GetSnapshot(context);
+
+        Assert.False(failedInNewSession.StoryboardEnabled);
+        Assert.Equal("{}", failedInNewSession.StoryboardJson);
+        Assert.NotEqual(failed.SessionId, failedInNewSession.SessionId);
     }
 
     private sealed class FakeBridge : IStoryboardCanonicalBridge

@@ -51,6 +51,7 @@ public sealed class EditorStoryboardSerializer : IEditorStoryboardSerializer
         if (document.SchemaVersion != 1)
             throw new JsonSerializationException(
                 $"Unsupported editor storyboard schema {document.SchemaVersion}.");
+        StoryboardCompiledMigration.MigrateCanonicalDocument(document);
         foreach (var migration in diagnostics.Where(item => item.Migrated))
             document.Metadata.ImportDiagnostics.Add(
                 new EditorStoryboardStoredDiagnostic
@@ -225,6 +226,8 @@ public sealed class StoryboardImportService : IStoryboardImportService
         if (normalization.Conflicts.Count > 0)
             return new StoryboardImportResult(null, issues,
                 normalization.Conflicts);
+
+        issues.AddRange(StoryboardCompiledMigration.ExpandWireRoot(root));
 
         var unitDiagnostics =
             StoryboardCanonicalValues.NormalizeWireUnits(root);
@@ -569,6 +572,8 @@ public sealed class StoryboardImportService : IStoryboardImportService
                 source.Value<string>("parent_id")),
             NoteBinding = binding,
             BasePatch = ExtractPatch(source, kind),
+            RootEasing = source.Value<string>("easing"),
+            RootDestroy = source.Value<bool?>("destroy"),
             RootTemplate = ParseTemplateBinding(source, ExtractPatch(source, kind)),
             Source = new EditorSourceInfo
             {

@@ -1,0 +1,19 @@
+{
+  "format_version": 3,
+  "ProjectName": "未命名故事板",
+  "EditorVersion": "1.0.0",
+  "CreationTime": "2026-08-07T16:32:12.5977408+08:00",
+  "LastModifiedTime": "2026-08-07T16:32:12.5977408+08:00",
+  "LevelFilePath": "level/level.json",
+  "StoryboardExportPath": "level/storyboard.json",
+  "storyboard_source_path": ".naziki/storyboard.editor.json",
+  "storyboard_source_hash": "b837ffc99860cbaba28b9ee508fc9e6800e7fedbbc449bd89c7d92626f2ffdd0",
+  "storyboard_export_hash": "8541b3ecca80b000f76d45cee65d447e8d1b6a8cc67323f94a8f21fc9bd092bb",
+  "ChartFilePath": "level/CHAOS.json",
+  "AudioFilePath": "music/music.ogg",
+  "BackgroundPath": "assets/background/bg.png",
+  "MaterialFolderPath": "assets",
+  "LastTimelinePosition": 0.0,
+  "CanvasZoomLevel": 1.0,
+  "ControlBoardIdMaps": {}
+}

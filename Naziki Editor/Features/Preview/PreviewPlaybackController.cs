@@ -47,6 +47,7 @@ public interface IUnityPreviewSessionService : IPreviewReloadCoordinator
 {
     Task AttachWindowAsync(IntPtr parentWindow, int pixelWidth, int pixelHeight);
     Task ResizeAsync(int pixelWidth, int pixelHeight, bool active);
+    Task RefreshSurfaceAsync(int pixelWidth, int pixelHeight);
     Task OpenProjectAsync(Naziki_Editor.State.ProjectDataContext context, double playbackTime = 0);
     Task RetryAsync();
     Task ShutdownAsync();

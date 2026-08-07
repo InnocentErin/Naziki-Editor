@@ -35,6 +35,13 @@ namespace Naziki_Editor.Core.Abstractions
         /// <summary>显示错误对话框（含详细错误信息，可折叠查看）</summary>
         void ShowErrorDialog(string message, string title, string? errorDetails = null);
 
+        /// <summary>显示可复制、非致命的多项诊断对话框。</summary>
+        void ShowDiagnosticDialog(
+            string message,
+            string title,
+            string? diagnosticDetails = null,
+            bool hasErrors = true);
+
         /// <summary>打开文件选择对话框，返回选中路径或 null</summary>
         string? ShowOpenFileDialog(string title, string filter);
 

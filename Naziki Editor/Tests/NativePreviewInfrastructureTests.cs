@@ -329,7 +329,7 @@ public sealed class NativePreviewInfrastructureTests
         var background = Path.Combine(source, "cover.png");
         var sprite = Path.Combine(source, "sprite.png");
         await File.WriteAllBytesAsync(music, [1, 2, 3]);
-        await File.WriteAllBytesAsync(background, [4, 5, 6]);
+        await File.WriteAllBytesAsync(background, ValidPngBytes());
         await File.WriteAllBytesAsync(sprite, [7, 8, 9]);
 
         try
@@ -412,7 +412,7 @@ public sealed class NativePreviewInfrastructureTests
         var music = Path.Combine(root, "music.ogg");
         var background = Path.Combine(root, "background.png");
         File.WriteAllBytes(music, [1, 2, 3]);
-        File.WriteAllBytes(background, [4, 5, 6]);
+        File.WriteAllBytes(background, ValidPngBytes());
         File.WriteAllText(Path.Combine(assets, "storyboard-asset.txt"), "asset");
         var snapshot = CreateSnapshot(7, assets, music, background) with
         {
@@ -456,6 +456,37 @@ public sealed class NativePreviewInfrastructureTests
             Assert.True(File.Exists(Path.Combine(vfsRoot, "background.png")));
             Assert.Equal(PreviewAvailabilityState.Ready, host.Availability);
             Assert.Equal(PreviewSessionPhase.PreviewReady, host.SessionStatus.Phase);
+
+            await WaitUntilAsync(
+                () => host.State == PreviewPlaybackState.Paused,
+                "Initial preview state was not confirmed as paused.");
+            transport.AutoRespondPlayback = false;
+            host.Play();
+            host.Play();
+            await WaitUntilAsync(
+                () => transport.Sent.Any(message => message.Type == "preview.play"),
+                "The play command was not sent.");
+            Assert.Equal(PreviewPlaybackState.Paused, host.State);
+            var play = Assert.Single(transport.Sent, message => message.Type == "preview.play");
+            transport.Raise(play with
+            {
+                Type = "preview.state",
+                Payload = new JObject
+                {
+                    ["state"] = "Playing",
+                    ["time"] = 2.5,
+                    ["duration"] = 12
+                }
+            });
+            await WaitUntilAsync(
+                () => host.State == PreviewPlaybackState.Playing,
+                "The confirmed playing state was not applied.");
+            transport.AutoRespondPlayback = true;
+
+            var surfaceSyncCount = process.SurfaceSyncCount;
+            await host.RefreshSurfaceAsync(960, 540);
+            Assert.True(process.SurfaceSyncCount > surfaceSyncCount);
+            Assert.Contains(transport.Sent, message => message.Type == "preview.viewport.apply");
 
             var settingsApplyCount = transport.Sent.Count(message => message.Type == "preview.settings.apply");
             store.Set("Performance.PreviewFrameRate", "30");
@@ -837,6 +868,9 @@ public sealed class NativePreviewInfrastructureTests
             ProjectName = "Test"
         };
 
+    private static byte[] ValidPngBytes() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
     private sealed class FakeStoryboardValidator : IStoryboardDocumentValidator
     {
         public IReadOnlyList<StoryboardDiagnostic> Validate(StoryboardRoot document) => [];
@@ -852,6 +886,7 @@ public sealed class NativePreviewInfrastructureTests
         public string PipeName => "connected-fake";
         public List<PreviewProtocolMessage> Sent { get; } = [];
         public string? FailSendType { get; init; }
+        public bool AutoRespondPlayback { get; set; } = true;
         public event EventHandler<PreviewProtocolMessage>? MessageReceived;
         public event EventHandler<PreviewTransportStateChanged>? ConnectionChanged;
         public event EventHandler<PreviewTransportFault>? Faulted;
@@ -920,6 +955,31 @@ public sealed class NativePreviewInfrastructureTests
                     }
                 });
             }
+            if (message.Type is "preview.seek" or "preview.clock.set" or
+                "preview.scrub.begin" or "preview.viewport.apply")
+            {
+                Raise(message with { Type = "preview.ack", Payload = new JObject() });
+            }
+            if (AutoRespondPlayback &&
+                (message.Type is "preview.play" or "preview.pause" or "preview.stop"))
+            {
+                var state = message.Type switch
+                {
+                    "preview.play" => "Playing",
+                    "preview.pause" => "Paused",
+                    _ => "Stopped"
+                };
+                Raise(message with
+                {
+                    Type = "preview.state",
+                    Payload = new JObject
+                    {
+                        ["state"] = state,
+                        ["time"] = state == "Stopped" ? 0 : 2.5,
+                        ["duration"] = 12
+                    }
+                });
+            }
             return Task.CompletedTask;
         }
 
@@ -945,6 +1005,7 @@ public sealed class NativePreviewInfrastructureTests
         public long Generation { get; private set; }
         public string RuntimePath => "fake";
         public UnityPreviewLaunchOptions? LaunchOptions { get; private set; }
+        public int SurfaceSyncCount { get; private set; }
         public event EventHandler<UnityPreviewProcessExited>? Exited;
 
         public Task StartAsync(
@@ -985,6 +1046,17 @@ public sealed class NativePreviewInfrastructureTests
         public Task ReparentAsync(
             IntPtr parentWindow,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task SyncGraphicsWindowAsync(
+            IntPtr parentWindow,
+            int pixelWidth,
+            int pixelHeight,
+            bool forceRedraw = true,
+            CancellationToken cancellationToken = default)
+        {
+            SurfaceSyncCount++;
+            return Task.CompletedTask;
+        }
 
         public Task StopAsync(
             TimeSpan gracefulTimeout,

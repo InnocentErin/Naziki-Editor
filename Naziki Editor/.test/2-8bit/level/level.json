@@ -1,0 +1,29 @@
+{
+    "version": 1,
+    "format": "c2",
+    "schema_version": 2,
+    "id": "he.8bitprincess",
+    "title": "8bit Princess",
+    "artist": "seiya-murai",
+    "artist_source": "from iidx",
+    "illustrator": "null",
+    "illustrator_source": "null",
+    "charter": "he",
+    "music": {
+        "path": "8bit.ogg"
+    },
+    "music_preview": {
+        "path": "pv.mp3"
+    },
+    "background": {
+        "path": "bg.png"
+    },
+    "charts": [
+        {
+            "type": "extreme",
+            "name": "8bit",
+            "difficulty": 13,
+            "path": "8bit.json"
+        }
+    ]
+}

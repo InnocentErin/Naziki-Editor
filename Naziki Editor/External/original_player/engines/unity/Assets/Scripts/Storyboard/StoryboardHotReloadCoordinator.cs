@@ -10,9 +10,13 @@ namespace Cytoid.Storyboard
     /// </summary>
     public static class StoryboardHotReloadCoordinator
     {
-        public static async UniTask Apply(Game game, string candidateJson, JArray changes)
+        public static async UniTask Apply(
+            Game game,
+            string candidateJson,
+            JArray changes,
+            string assetRoot = null)
         {
-            await game.PreviewReplaceStoryboard(candidateJson);
+            await game.PreviewReplaceStoryboard(candidateJson, assetRoot);
         }
     }
 }

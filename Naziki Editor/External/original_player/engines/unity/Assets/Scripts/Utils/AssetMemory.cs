@@ -82,10 +82,22 @@ public class AssetMemory
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            var texture = bytes.ToTexture2D();
-            if (texture == null)
+            Texture2D texture;
+            try
             {
-                throw new InvalidDataException($"Unable to decode image: {localPath}");
+                texture = bytes.ToTexture2D();
+            }
+            catch (Exception exception)
+            {
+                var decodeException = new InvalidDataException(
+                    $"PREVIEW_ASSET_DECODE_FAILED: resource '{path}' resolved to '{localPath}' but could not be decoded.",
+                    exception);
+                decodeException.Data["code"] = "PREVIEW_ASSET_DECODE_FAILED";
+                decodeException.Data["source"] = "asset";
+                decodeException.Data["stage"] = "decode";
+                decodeException.Data["path"] = path;
+                decodeException.Data["resourcePath"] = localPath;
+                throw decodeException;
             }
 
             texture.name = path;

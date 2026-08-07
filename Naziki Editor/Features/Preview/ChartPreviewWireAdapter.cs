@@ -10,8 +10,7 @@ public sealed record ChartPreviewWireIssue(
     string Message);
 
 /// <summary>
-/// Produces a standard Cytoid chart payload for the bundled player.
-/// The player remains an unchanged consumer of the generated files.
+/// Produces and validates the exact chart payload consumed by the bundled Unity player.
 /// </summary>
 public interface IChartPreviewWireAdapter
 {
@@ -23,6 +22,7 @@ public interface IChartPreviewWireAdapter
 
 public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
 {
+    private const ChartRuntimeProfile PreviewProfile = ChartRuntimeProfile.BundledUnity;
     private readonly IChartJsonCodec _codec;
 
     public ChartPreviewWireAdapter()
@@ -40,16 +40,15 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
         if (chart is null)
             return null;
 
-        var json = document is not null &&
-                   ReferenceEquals(document.Projection, chart)
-            ? _codec.EncodeWire(document, ChartRuntimeProfile.Cytoid)
-            : _codec.EncodeWire(chart, ChartRuntimeProfile.Cytoid);
+        var json = document is not null && ReferenceEquals(document.Projection, chart)
+            ? _codec.EncodeWire(document, PreviewProfile)
+            : _codec.EncodeWire(chart, PreviewProfile);
         var root = JObject.Parse(json);
         var wireNoteCount = (root["note_list"] as JArray)?.Count ?? -1;
         var modelNoteCount = chart.note_list?.Count;
         if (!modelNoteCount.HasValue)
             throw new JsonSerializationException(
-                "谱面模型的 note_list 为 null，无法生成 Cytoid 预览数据。");
+                "谱面模型的 note_list 为 null，无法生成 Unity 预览数据。");
         if (wireNoteCount != modelNoteCount.Value)
             throw new JsonSerializationException(
                 $"谱面预览序列化前后音符数量不一致：内存 {modelNoteCount.Value}，输出 {wireNoteCount}。");
@@ -67,21 +66,17 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
                     "$.chart",
                     "谱面 JSON 为空。",
                     ChartDiagnosticSeverity.Error,
-                    ChartRuntimeProfile.Cytoid)
+                    PreviewProfile)
             ];
         }
 
-        return _codec.Decode(json, ChartRuntimeProfile.Cytoid)
-            .Diagnostics;
+        return _codec.Decode(json, PreviewProfile).Diagnostics;
     }
 
-    public IReadOnlyList<ChartDiagnostic> Diagnose(
-        ChartDocument document)
+    public IReadOnlyList<ChartDiagnostic> Diagnose(ChartDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return _codec.Validate(
-            document.Source,
-            ChartRuntimeProfile.Cytoid);
+        return _codec.Validate(document.Source, PreviewProfile);
     }
 
     public IReadOnlyList<ChartPreviewWireIssue> Validate(string? json)
@@ -99,58 +94,45 @@ public sealed class ChartPreviewWireAdapter : IChartPreviewWireAdapter
             return [new("$", $"谱面 JSON 无法解析：{ex.Message}")];
         }
 
-        var issues = new List<ChartPreviewWireIssue>();
+        var issues = _codec.Validate(root, PreviewProfile)
+            .Where(item => item.Severity == ChartDiagnosticSeverity.Error)
+            .Select(item => new ChartPreviewWireIssue(item.Path, item.Message))
+            .ToList();
+
         RequireArray(root["page_list"], "$.page_list", issues);
         RequireArray(root["tempo_list"], "$.tempo_list", issues);
         RequireArray(root["note_list"], "$.note_list", issues);
         RequireArray(root["event_order_list"], "$.event_order_list", issues);
 
-        if (root["note_list"] is JArray notes)
-        {
-            if (notes.Count == 0)
-                issues.Add(new("$.note_list",
-                    "正式 Unity 播放器要求谱面至少包含一个音符。"));
-            for (var index = 0; index < notes.Count; index++)
-            {
-                if (notes[index] is not JObject note)
-                {
-                    issues.Add(new($"$.note_list[{index}]",
-                        "Unity 要求每个音符都是 JSON 对象。"));
-                    continue;
-                }
-
-            }
-        }
-        if (root["page_list"] is JArray { Count: 0 })
-            issues.Add(new("$.page_list", "正式 Unity 播放器要求至少一个扫描页。"));
-        if (root["tempo_list"] is JArray { Count: 0 })
-            issues.Add(new("$.tempo_list", "正式 Unity 播放器要求至少一个 BPM 段。"));
-
         foreach (var value in Traverse(root).OfType<JValue>())
         {
             if (value.Type == JTokenType.Null)
+            {
                 issues.Add(new(ToJsonPath(value.Path),
                     "Unity wire JSON 不应包含 null 可选字段。"));
-            else if (value.Type == JTokenType.Float &&
-                     value.Value is double number &&
-                     !double.IsFinite(number))
+            }
+            else if (value.Type is JTokenType.Float or JTokenType.Integer &&
+                     !IsFinite(value))
             {
                 issues.Add(new(ToJsonPath(value.Path),
                     "Unity wire JSON 中的数值必须是有限数。"));
             }
         }
 
-        return issues;
+        return issues
+            .DistinctBy(item => (item.Path, item.Message))
+            .ToArray();
     }
 
-    private static void RequireInteger(
-        JToken? token,
-        string path,
-        ICollection<ChartPreviewWireIssue> issues)
-    {
-        if (token?.Type != JTokenType.Integer)
-            issues.Add(new(path, "Unity 要求该字段为整数。"));
-    }
+    private static bool IsFinite(JValue value) =>
+        value.Value switch
+        {
+            double number => double.IsFinite(number),
+            float number => float.IsFinite(number),
+            decimal => true,
+            byte or sbyte or short or ushort or int or uint or long or ulong => true,
+            _ => false
+        };
 
     private static void RequireArray(
         JToken? token,

@@ -91,6 +91,7 @@ namespace Naziki_Editor.Views
             {
                 UpdateAspectButtons();
                 ApplyAspectRatioLayout();
+                _ = RefreshSurfaceIfReadyAsync();
             };
         }
 
@@ -130,6 +131,8 @@ namespace Naziki_Editor.Views
                     _playback.Seek(initialTime);
                     await _previewSession.OpenProjectAsync(Context, initialTime);
                 }
+                await _previewSession.RefreshSurfaceAsync(width, height);
+                _unityHost.RefreshSurface();
                 PreviewDiagnostics_Changed(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -167,7 +170,10 @@ namespace Naziki_Editor.Views
             if (!_nativePreviewOpened)
                 await OpenNativePreviewAsync(_unityHost.HostHandle);
             else
+            {
                 await _previewSession.ResizeAsync(width, height, CanvasTabControl.SelectedIndex == 0);
+                _unityHost.RefreshSurface();
+            }
         }
 
         private (int Width, int Height) GetPreviewPixelSize()
@@ -263,6 +269,51 @@ namespace Naziki_Editor.Views
                 () => _previewSession.ReloadLevelAsync(Context, _previewPlayback.CurrentTime));
         }
 
+        private async void BtnRefreshPreview_Click(object sender, RoutedEventArgs e)
+        {
+            if (_reloadInProgress || _unityHost.HostHandle == IntPtr.Zero)
+                return;
+            _reloadInProgress = true;
+            using var loading = _loading.Begin(this, "请稍等，正在刷新预览界面");
+            SetReloadButtonsEnabled(false);
+            TxtPreviewState.Text = "正在刷新 Unity 预览界面…";
+            try
+            {
+                var (width, height) = GetPreviewPixelSize();
+                await _previewSession.RefreshSurfaceAsync(width, height);
+                _unityHost.RefreshSurface();
+                TxtPreviewState.Text = "Unity Original Player 已就绪";
+            }
+            catch (Exception ex)
+            {
+                TxtPreviewState.Text = "预览界面刷新失败：" + ex.Message;
+                TxtPreviewState.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            }
+            finally
+            {
+                _reloadInProgress = false;
+                SetReloadButtonsEnabled(true);
+            }
+        }
+
+        private async Task RefreshSurfaceIfReadyAsync()
+        {
+            if (!_nativePreviewOpened || _reloadInProgress ||
+                _unityHost.HostHandle == IntPtr.Zero || CanvasTabControl.SelectedIndex != 0)
+                return;
+            try
+            {
+                var (width, height) = GetPreviewPixelSize();
+                await _previewSession.RefreshSurfaceAsync(width, height);
+                _unityHost.RefreshSurface();
+            }
+            catch (Exception ex)
+            {
+                TxtPreviewState.Text = "预览界面自动刷新失败：" + ex.Message;
+                TxtPreviewState.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            }
+        }
+
         private async Task RunReloadAsync(string status, Func<Task> action)
         {
             if (_reloadInProgress)
@@ -301,6 +352,7 @@ namespace Naziki_Editor.Views
 
         private void SetReloadButtonsEnabled(bool enabled)
         {
+            BtnRefreshPreview.IsEnabled = enabled;
             BtnReloadPlayer.IsEnabled = enabled;
             BtnReloadLevel.IsEnabled = enabled;
             BtnAspect169.IsEnabled = enabled;
@@ -318,10 +370,42 @@ namespace Naziki_Editor.Views
 
         private void BtnPreviewDiagnostics_Click(object sender, RoutedEventArgs e)
         {
+            var diagnostics = _previewDiagnostics.Diagnostics
+                .GroupBy(item => new
+                {
+                    item.Severity,
+                    item.Code,
+                    item.Message,
+                    item.Path,
+                    item.EntityId,
+                    item.StackTrace
+                })
+                .Select(group => group.OrderByDescending(item => item.RepeatCount).First())
+                .OrderBy(item => item.Severity == PreviewDiagnosticSeverity.Error ? 0 :
+                    item.Severity == PreviewDiagnosticSeverity.Warning ? 1 : 2)
+                .ThenBy(item => item.Code, StringComparer.Ordinal)
+                .ToList();
+            if (diagnostics.Count == 0)
+            {
+                _dialogService.ShowMessage("当前没有 Unity 预览错误或警告。", "Unity 预览诊断");
+                return;
+            }
+
+            static string SeverityLabel(PreviewDiagnosticSeverity severity) => severity switch
+            {
+                PreviewDiagnosticSeverity.Error => "错误",
+                PreviewDiagnosticSeverity.Warning => "警告",
+                _ => "信息"
+            };
+            var summaryText = string.Join(
+                Environment.NewLine,
+                diagnostics.Select(item =>
+                    $"{SeverityLabel(item.Severity)} [{item.Code}] " +
+                    item.Message.Replace('\r', ' ').Replace('\n', ' ')));
             var details = string.Join(
                 Environment.NewLine + Environment.NewLine,
-                _previewDiagnostics.Diagnostics.Select(item =>
-                    $"[{item.Code}] {item.Message}" +
+                diagnostics.Select(item =>
+                    $"{SeverityLabel(item.Severity)} [{item.Code}] {item.Message}" +
                     $"{Environment.NewLine}时间：{item.Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}" +
                     (string.IsNullOrWhiteSpace(item.Path) ? string.Empty : $"{Environment.NewLine}位置：{item.Path}") +
                     (string.IsNullOrWhiteSpace(item.EntityId) ? string.Empty : $"{Environment.NewLine}实体：{item.EntityId}") +
@@ -329,19 +413,13 @@ namespace Naziki_Editor.Views
                     (item.RepeatCount <= 1 ? string.Empty : $"{Environment.NewLine}重复次数：{item.RepeatCount}") +
                     (string.IsNullOrWhiteSpace(item.Suggestion) ? string.Empty : $"{Environment.NewLine}建议：{item.Suggestion}") +
                     (string.IsNullOrWhiteSpace(item.StackTrace) ? string.Empty : $"{Environment.NewLine}调用堆栈：{Environment.NewLine}{item.StackTrace}")));
-            var summary = _previewDiagnostics.Summary;
-            if (summary.ErrorCount > 0)
-                _dialogService.ShowErrorDialog(
-                    summary.Primary?.Message ?? "Unity 预览发生错误。",
-                    $"Unity 预览诊断（{summary.ErrorCount} 个错误，{summary.WarningCount} 个警告）",
-                    details);
-            else if (summary.WarningCount > 0)
-                _dialogService.ShowMessage(
-                    $"{summary.Primary?.Message}{Environment.NewLine}{Environment.NewLine}{details}",
-                    $"Unity 预览诊断（{summary.WarningCount} 个警告）",
-                    DialogMessageType.Warning);
-            else
-                _dialogService.ShowMessage("当前没有 Unity 预览错误或警告。", "Unity 预览诊断");
+            var errorCount = diagnostics.Count(item => item.Severity == PreviewDiagnosticSeverity.Error);
+            var warningCount = diagnostics.Count(item => item.Severity == PreviewDiagnosticSeverity.Warning);
+            _dialogService.ShowDiagnosticDialog(
+                summaryText,
+                $"Unity 预览诊断（{errorCount} 个错误，{warningCount} 个警告）",
+                details,
+                errorCount > 0);
         }
 
         private void BtnRepairResources_Click(object sender, RoutedEventArgs e)
@@ -460,7 +538,7 @@ namespace Naziki_Editor.Views
             }
         }
 
-        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (e.Source is TabControl tabControl && tabControl.SelectedItem is TabItem)
             {
@@ -475,7 +553,7 @@ namespace Naziki_Editor.Views
                 if (_unityHost.HostHandle != IntPtr.Zero)
                 {
                     var (width, height) = GetPreviewPixelSize();
-                    _ = _previewSession.ResizeAsync(
+                    await _previewSession.ResizeAsync(
                         width,
                         height,
                         tabControl.SelectedIndex == 0);
@@ -483,6 +561,8 @@ namespace Naziki_Editor.Views
                 _unityHost.Visibility = tabControl.SelectedIndex == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+                if (tabControl.SelectedIndex == 0)
+                    await RefreshSurfaceIfReadyAsync();
             }
         }
 

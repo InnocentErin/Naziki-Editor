@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "version": 40,
+  "id": "innocenterin.vampire39",
+  "title": "ヴァンパイア TSAR Remix",
+  "title_localized": "Vampire [TSAR Remix]",
+  "artist": "TSAR,初音ミク",
+  "artist_localized": "TSAR,Hatsune Miku",
+  "illustrator": "Unknown",
+  "charter": "InnocentErin",
+  "storyboarder": "InnocentErin&Naziki",
+  "music": {
+    "path": "music.ogg"
+  },
+  "music_preview": {
+    "path": "preview.ogg"
+  },
+  "background": {
+    "path": "bg.png"
+  },
+  "charts": [
+    {
+      "type": "extreme",
+      "name": "Electronic Vampire",
+      "difficulty": 14,
+      "path": "CHAOS.json",
+      "music_override": {
+        "path": "music.ogg"
+      },
+      "storyboard": {
+        "path": "CHAOS_storyboard.json"
+      }
+    },{
+      "type": "hard",
+      "name": "naziki的水版",
+      "difficulty": 13,
+      "path": "hard.json",
+      "music_override": {
+        "path": "music.ogg"
+      },
+      "storyboard": {
+        "path": "CHAOS_storyboard.json"
+      }
+    },
+    {
+      "type": "easy",
+      "name": "Electronic Vampire",
+      "difficulty": 5,
+      "path": "EASY.json",
+      "music_override": {
+        "path": "music.ogg"
+      },
+      "storyboard": {
+        "path": "EASY_storyboard.json"
+      }
+    }
+  ]
+}
